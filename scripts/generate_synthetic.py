@@ -435,7 +435,7 @@ def main() -> None:
     labeled_features.to_csv(
         OUT / "labeled_gene_features.csv",
         index=False,
-        float_format="%.12g",
+        float_format="%.10g",
     )
     print(
         {
