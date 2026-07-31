@@ -1,0 +1,205 @@
+{
+  "additionalProperties": false,
+  "anyOf": [
+    {
+      "properties": {
+        "value_numeric": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "value_numeric"
+      ]
+    },
+    {
+      "properties": {
+        "value_text": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "value_text"
+      ]
+    }
+  ],
+  "properties": {
+    "evidence_id": {
+      "minLength": 1,
+      "title": "Evidence Id",
+      "type": "string"
+    },
+    "source_study_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Study Id"
+    },
+    "source_screen_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Screen Id"
+    },
+    "raw_data_family_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Raw Data Family Id"
+    },
+    "gene_symbol": {
+      "minLength": 1,
+      "title": "Gene Symbol",
+      "type": "string"
+    },
+    "evidence_type": {
+      "minLength": 1,
+      "title": "Evidence Type",
+      "type": "string"
+    },
+    "context_type": {
+      "minLength": 1,
+      "title": "Context Type",
+      "type": "string"
+    },
+    "context_value": {
+      "minLength": 1,
+      "title": "Context Value",
+      "type": "string"
+    },
+    "value_numeric": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Value Numeric"
+    },
+    "value_text": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Value Text"
+    },
+    "source_name": {
+      "minLength": 1,
+      "title": "Source Name",
+      "type": "string"
+    },
+    "source_version": {
+      "minLength": 1,
+      "title": "Source Version",
+      "type": "string"
+    },
+    "source_url": {
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Source Url",
+      "type": "string"
+    },
+    "source_license": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source License"
+    },
+    "available_date": {
+      "format": "date",
+      "title": "Available Date",
+      "type": "string"
+    },
+    "retrieved_date": {
+      "format": "date",
+      "title": "Retrieved Date",
+      "type": "string"
+    },
+    "transformation_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Transformation Id"
+    },
+    "source_locator": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Locator"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "evidence_id",
+    "gene_symbol",
+    "evidence_type",
+    "context_type",
+    "context_value",
+    "source_name",
+    "source_version",
+    "source_url",
+    "available_date",
+    "retrieved_date"
+  ],
+  "title": "EvidenceRecord",
+  "type": "object",
+  "x-semantic-rules": [
+    "retrieved_date must be on or after available_date; enforced by validate_registry_integrity"
+  ]
+}

@@ -1,0 +1,206 @@
+{
+  "$defs": {
+    "AssessmentStage": {
+      "enum": [
+        "index",
+        "curated"
+      ],
+      "title": "AssessmentStage",
+      "type": "string"
+    },
+    "IntakeStatus": {
+      "enum": [
+        "benchmark_ready",
+        "metadata_only",
+        "exclude"
+      ],
+      "title": "IntakeStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "assessment_stage": {
+            "const": "index"
+          }
+        },
+        "required": [
+          "assessment_stage"
+        ]
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "enum": [
+              "metadata_only",
+              "exclude"
+            ]
+          },
+          "benchmark_ready": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "else": {
+        "properties": {
+          "status": {
+            "enum": [
+              "metadata_only",
+              "exclude"
+            ]
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "benchmark_ready": {
+            "const": true
+          }
+        },
+        "required": [
+          "benchmark_ready"
+        ]
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "const": "benchmark_ready"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "exclude"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "candidate_for_full_curation": {
+            "const": false
+          }
+        }
+      }
+    }
+  ],
+  "description": "One deterministic screen-level eligibility assessment.",
+  "properties": {
+    "intake_id": {
+      "minLength": 1,
+      "title": "Intake Id",
+      "type": "string"
+    },
+    "screen_id": {
+      "minLength": 1,
+      "title": "Screen Id",
+      "type": "string"
+    },
+    "external_screen_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "External Screen Id"
+    },
+    "external_dataset_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "External Dataset Id"
+    },
+    "source_name": {
+      "minLength": 1,
+      "title": "Source Name",
+      "type": "string"
+    },
+    "source_version": {
+      "minLength": 1,
+      "title": "Source Version",
+      "type": "string"
+    },
+    "policy_version": {
+      "minimum": 1,
+      "title": "Policy Version",
+      "type": "integer"
+    },
+    "assessment_stage": {
+      "$ref": "#/$defs/AssessmentStage"
+    },
+    "status": {
+      "$ref": "#/$defs/IntakeStatus"
+    },
+    "candidate_for_full_curation": {
+      "title": "Candidate For Full Curation",
+      "type": "boolean"
+    },
+    "benchmark_ready": {
+      "title": "Benchmark Ready",
+      "type": "boolean"
+    },
+    "reason_codes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reason Codes"
+    },
+    "assessed_date": {
+      "format": "date",
+      "title": "Assessed Date",
+      "type": "string"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "intake_id",
+    "screen_id",
+    "source_name",
+    "source_version",
+    "policy_version",
+    "assessment_stage",
+    "status",
+    "candidate_for_full_curation",
+    "benchmark_ready",
+    "assessed_date"
+  ],
+  "title": "ScreenIntakeRecord",
+  "type": "object"
+}

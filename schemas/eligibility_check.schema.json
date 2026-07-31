@@ -1,0 +1,119 @@
+{
+  "$defs": {
+    "AssessmentStage": {
+      "enum": [
+        "index",
+        "curated"
+      ],
+      "title": "AssessmentStage",
+      "type": "string"
+    },
+    "EligibilityOutcome": {
+      "enum": [
+        "pass",
+        "fail",
+        "unknown"
+      ],
+      "title": "EligibilityOutcome",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Auditable result for one intake rule applied to one screen.",
+  "properties": {
+    "check_id": {
+      "minLength": 1,
+      "title": "Check Id",
+      "type": "string"
+    },
+    "intake_id": {
+      "minLength": 1,
+      "title": "Intake Id",
+      "type": "string"
+    },
+    "screen_id": {
+      "minLength": 1,
+      "title": "Screen Id",
+      "type": "string"
+    },
+    "assessment_stage": {
+      "$ref": "#/$defs/AssessmentStage"
+    },
+    "rule_id": {
+      "minLength": 1,
+      "title": "Rule Id",
+      "type": "string"
+    },
+    "outcome": {
+      "$ref": "#/$defs/EligibilityOutcome"
+    },
+    "observed_value": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Observed Value"
+    },
+    "normalized_value": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Normalized Value"
+    },
+    "required_for_scope": {
+      "title": "Required For Scope",
+      "type": "boolean"
+    },
+    "required_for_benchmark": {
+      "title": "Required For Benchmark",
+      "type": "boolean"
+    },
+    "reason_code": {
+      "minLength": 1,
+      "title": "Reason Code",
+      "type": "string"
+    },
+    "source_locator": {
+      "minLength": 1,
+      "title": "Source Locator",
+      "type": "string"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "check_id",
+    "intake_id",
+    "screen_id",
+    "assessment_stage",
+    "rule_id",
+    "outcome",
+    "required_for_scope",
+    "required_for_benchmark",
+    "reason_code",
+    "source_locator"
+  ],
+  "title": "EligibilityCheckRecord",
+  "type": "object"
+}

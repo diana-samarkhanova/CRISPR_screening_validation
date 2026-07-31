@@ -1,0 +1,9 @@
+study_id,citation,doi,publication_date,organism,source_url,data_license,source_role,independent_screen_source,source_id,source_type,pubmed_id,notes
+SYN-STUDY-01,Synthetic software test study 1,,2021-01-01,human,https://example.org/synthetic,CC0-1.0,original_screen,True,SYN-SOURCE-01,software_fixture,,Synthetic; not biological evidence.
+SYN-STUDY-02,Synthetic software test study 2,,2022-01-01,human,https://example.org/synthetic,CC0-1.0,original_screen,True,SYN-SOURCE-02,software_fixture,,Synthetic; not biological evidence.
+SYN-STUDY-03,Synthetic software test study 3,,2023-01-01,human,https://example.org/synthetic,CC0-1.0,original_screen,True,SYN-SOURCE-03,software_fixture,,Synthetic; not biological evidence.
+SYN-STUDY-04,Synthetic software test study 4,,2024-01-01,human,https://example.org/synthetic,CC0-1.0,original_screen,True,SYN-SOURCE-04,software_fixture,,Synthetic; not biological evidence.
+SYN-STUDY-05,Synthetic software test study 5,,2025-01-01,human,https://example.org/synthetic,CC0-1.0,original_screen,True,SYN-SOURCE-05,software_fixture,,Synthetic; not biological evidence.
+SYN-STUDY-06,Synthetic software test study 6,,2021-01-01,human,https://example.org/synthetic,CC0-1.0,original_screen,True,SYN-SOURCE-06,software_fixture,,Synthetic; not biological evidence.
+SYN-STUDY-07,Synthetic software test study 7,,2022-01-01,human,https://example.org/synthetic,CC0-1.0,original_screen,True,SYN-SOURCE-07,software_fixture,,Synthetic; not biological evidence.
+SYN-STUDY-08,Synthetic software test study 8,,2023-01-01,human,https://example.org/synthetic,CC0-1.0,original_screen,True,SYN-SOURCE-08,software_fixture,,Synthetic; not biological evidence.

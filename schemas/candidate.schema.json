@@ -1,0 +1,127 @@
+{
+  "$defs": {
+    "LabelCode": {
+      "description": "Evidence labels for an individual validation event.",
+      "enum": [
+        "V3",
+        "V2",
+        "V1",
+        "F0",
+        "D",
+        "A",
+        "T",
+        "U"
+      ],
+      "title": "LabelCode",
+      "type": "string"
+    },
+    "PhenotypeDirection": {
+      "enum": [
+        "resistance",
+        "sensitization",
+        "neutral",
+        "discordant",
+        "unknown"
+      ],
+      "title": "PhenotypeDirection",
+      "type": "string"
+    },
+    "TestingStatus": {
+      "enum": [
+        "tested",
+        "not_tested",
+        "unknown"
+      ],
+      "title": "TestingStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "label_code": {
+            "const": "U"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "testing_status": {
+            "enum": [
+              "not_tested",
+              "unknown"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "label_code": {
+            "enum": [
+              "V3",
+              "V2",
+              "V1",
+              "F0",
+              "D",
+              "A",
+              "T"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "testing_status": {
+            "const": "tested"
+          }
+        }
+      }
+    }
+  ],
+  "properties": {
+    "study_id": {
+      "minLength": 1,
+      "title": "Study Id",
+      "type": "string"
+    },
+    "screen_id": {
+      "minLength": 1,
+      "title": "Screen Id",
+      "type": "string"
+    },
+    "contrast_id": {
+      "minLength": 1,
+      "title": "Contrast Id",
+      "type": "string"
+    },
+    "gene_symbol": {
+      "minLength": 1,
+      "title": "Gene Symbol",
+      "type": "string"
+    },
+    "phenotype_direction": {
+      "$ref": "#/$defs/PhenotypeDirection"
+    },
+    "label_code": {
+      "$ref": "#/$defs/LabelCode"
+    },
+    "testing_status": {
+      "$ref": "#/$defs/TestingStatus"
+    }
+  },
+  "required": [
+    "study_id",
+    "screen_id",
+    "contrast_id",
+    "gene_symbol",
+    "phenotype_direction",
+    "label_code",
+    "testing_status"
+  ],
+  "title": "CandidateRecord",
+  "type": "object"
+}

@@ -1,0 +1,103 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "mapping_id": {
+      "minLength": 1,
+      "title": "Mapping Id",
+      "type": "string"
+    },
+    "screen_id": {
+      "minLength": 1,
+      "title": "Screen Id",
+      "type": "string"
+    },
+    "source_name": {
+      "minLength": 1,
+      "title": "Source Name",
+      "type": "string"
+    },
+    "source_version": {
+      "minLength": 1,
+      "title": "Source Version",
+      "type": "string"
+    },
+    "external_dataset_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "External Dataset Id"
+    },
+    "external_screen_id": {
+      "minLength": 1,
+      "title": "External Screen Id",
+      "type": "string"
+    },
+    "relationship": {
+      "minLength": 1,
+      "title": "Relationship",
+      "type": "string"
+    },
+    "replicate_number": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Replicate Number"
+    },
+    "source_url": {
+      "anyOf": [
+        {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Url"
+    },
+    "retrieved_date": {
+      "format": "date",
+      "title": "Retrieved Date",
+      "type": "string"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "mapping_id",
+    "screen_id",
+    "source_name",
+    "source_version",
+    "external_screen_id",
+    "relationship",
+    "retrieved_date"
+  ],
+  "title": "ExternalScreenMapRecord",
+  "type": "object"
+}

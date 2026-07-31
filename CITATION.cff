@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use CRISPR-EvidenceRank, please cite the software release and associated paper."
+title: "CRISPR-EvidenceRank"
+type: software
+authors:
+  - family-names: "Samarkhanova"
+    given-names: "Diana"
+license: "Apache-2.0"
+abstract: >-
+  A guide-aware, experimental-design-aware, and context-specific framework for
+  prioritizing human CRISPR-Cas9 knockout drug-response screen hits for
+  orthogonal validation.

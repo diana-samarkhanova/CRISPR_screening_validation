@@ -1,0 +1,92 @@
+version: 2
+
+normalized_hierarchy:
+  levels:
+    - study
+    - screen
+    - contrast
+    - sample
+  semantics:
+    study: publication_or_author_defined_research_source
+    screen: shared_cell_library_and_perturbation_experiment
+    contrast: defined_treatment_vs_comparator_question
+    sample: sequenced_biological_or_technical_observation
+
+source_deduplication:
+  group_keys:
+    - source_family_id
+    - raw_data_family_id
+  inputs:
+    - publication_and_preprint_relationships
+    - raw_accessions
+    - author_supplied_count_or_score_matrices
+    - biogrid_orcs_screen_ids
+  rule: >-
+    Different analysis methods, repositories, or ORCS records derived from the
+    same experimental material do not create independent screen families.
+
+metadata_sources:
+  discovery:
+    - name: BioGRID_ORCS
+      official_url: https://orcs.thebiogrid.org/
+      downloads: https://downloads.thebiogrid.org/BioGRID-ORCS/Latest-Release/
+      role: discovery_structured_screen_metadata_and_author_gene_scores
+      prohibited_role: orthogonal_validation_label
+  verification_priority:
+    - primary_paper_methods_and_supplements
+    - raw_repository_sample_metadata
+    - author_supplied_count_or_score_files
+    - curated_registry_record
+  preserve:
+    - source_version
+    - source_url
+    - source_locator
+    - available_date
+    - retrieved_date
+    - verification_status
+  prohibit:
+    - filling_unreported_screen_conditions_from_a_library_methods_paper
+    - treating_absence_from_orcs_as_zero_or_not_tested
+
+count_input:
+  type: raw_integer_sgrna_counts
+  required_identifier_columns:
+    - sgrna_id
+    - gene_symbol
+  reject:
+    - negative_counts
+    - fractional_counts
+    - non_finite_counts
+    - undeclared_sample_columns
+    - duplicate_sgrna_ids
+    - duplicate_sample_ids
+
+normalization:
+  primary:
+    method: median_ratio
+    size_factor_variant: positive_counts
+    exclude_from_size_factors:
+      - guides_with_positive_counts_in_fewer_than_two_samples
+    pseudocount: 1.0
+    rationale: robust_to_a_minority_of_strongly_expanding_or_depleting_guides
+  sensitivity:
+    - method: cpm
+      role: legacy_comparison_only
+
+guide_qc:
+  low_count_threshold: 30
+  direction_deadband_log2: 0.1
+  neutral_rule: absolute_median_guide_lfc_at_or_below_deadband
+
+screen_scope:
+  one_screen_per_featurization_call: true
+  multiple_contrasts_within_screen: true
+  one_contrast_maps_to_exactly_one_screen: true
+  sample_contrast_screen_consistency_required: true
+
+experimental_design_missingness:
+  unknown_representation: null
+  explicit_zero_is_observed_value: true
+  missingness_indicators: prespecified_for_nullable_model_features
+  imputation_fit_scope: outer_training_fold
+  unsupported_profile_action: reduced_profile_or_abstention

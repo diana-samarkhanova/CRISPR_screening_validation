@@ -1,0 +1,339 @@
+{
+  "$defs": {
+    "PerturbationModality": {
+      "enum": [
+        "CRISPR_KO",
+        "CRISPRa",
+        "CRISPRi",
+        "RNAi",
+        "overexpression",
+        "mutation",
+        "inhibitor",
+        "other"
+      ],
+      "title": "PerturbationModality",
+      "type": "string"
+    },
+    "PhenotypeDirection": {
+      "enum": [
+        "resistance",
+        "sensitization",
+        "neutral",
+        "discordant",
+        "unknown"
+      ],
+      "title": "PhenotypeDirection",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "treatment_dose": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "treatment_dose"
+        ]
+      },
+      "then": {
+        "properties": {
+          "treatment_unit": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "treatment_unit"
+        ]
+      }
+    }
+  ],
+  "properties": {
+    "screen_id": {
+      "minLength": 1,
+      "title": "Screen Id",
+      "type": "string"
+    },
+    "study_id": {
+      "minLength": 1,
+      "title": "Study Id",
+      "type": "string"
+    },
+    "source_family_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Family Id"
+    },
+    "raw_data_family_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Raw Data Family Id"
+    },
+    "perturbation_modality": {
+      "$ref": "#/$defs/PerturbationModality"
+    },
+    "screen_design": {
+      "minLength": 1,
+      "title": "Screen Design",
+      "type": "string"
+    },
+    "cell_line": {
+      "minLength": 1,
+      "title": "Cell Line",
+      "type": "string"
+    },
+    "depmap_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Depmap Id"
+    },
+    "cellosaurus_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cellosaurus Id"
+    },
+    "engineered_genotype": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Engineered Genotype"
+    },
+    "cancer_type": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cancer Type"
+    },
+    "library_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Library Id"
+    },
+    "drug_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Drug Name"
+    },
+    "drug_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Drug Id"
+    },
+    "drug_class": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Drug Class"
+    },
+    "library_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Library Name"
+    },
+    "library_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Library Version"
+    },
+    "treatment_dose": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Treatment Dose"
+    },
+    "treatment_unit": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Treatment Unit"
+    },
+    "duration_days": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Duration Days"
+    },
+    "intended_direction": {
+      "$ref": "#/$defs/PhenotypeDirection",
+      "default": "unknown"
+    },
+    "input_mode": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Input Mode"
+    },
+    "data_accession": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Data Accession"
+    },
+    "source_url": {
+      "anyOf": [
+        {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Url"
+    },
+    "available_date": {
+      "anyOf": [
+        {
+          "format": "date",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Available Date"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "screen_id",
+    "study_id",
+    "perturbation_modality",
+    "screen_design",
+    "cell_line"
+  ],
+  "title": "ScreenRecord",
+  "type": "object"
+}

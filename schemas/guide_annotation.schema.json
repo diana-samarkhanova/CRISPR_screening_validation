@@ -1,0 +1,143 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "library_id": {
+      "minLength": 1,
+      "title": "Library Id",
+      "type": "string"
+    },
+    "sgrna_id": {
+      "minLength": 1,
+      "title": "Sgrna Id",
+      "type": "string"
+    },
+    "gene_symbol": {
+      "minLength": 1,
+      "title": "Gene Symbol",
+      "type": "string"
+    },
+    "targeting_class": {
+      "minLength": 1,
+      "title": "Targeting Class",
+      "type": "string"
+    },
+    "sequence": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sequence"
+    },
+    "chromosome": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Chromosome"
+    },
+    "cut_position": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cut Position"
+    },
+    "multi_target_count": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Multi Target Count"
+    },
+    "activity_score": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Activity Score"
+    },
+    "specificity_score": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Specificity Score"
+    },
+    "annotation_source": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Annotation Source"
+    },
+    "annotation_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Annotation Version"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "library_id",
+    "sgrna_id",
+    "gene_symbol",
+    "targeting_class"
+  ],
+  "title": "GuideAnnotationRecord",
+  "type": "object"
+}

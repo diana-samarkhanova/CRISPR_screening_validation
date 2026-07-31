@@ -1,0 +1,746 @@
+{
+  "$defs": {
+    "ControlType": {
+      "enum": [
+        "vehicle",
+        "untreated",
+        "baseline_t0",
+        "later_timepoint",
+        "sorted_population",
+        "matched_nontargeting",
+        "other",
+        "unknown"
+      ],
+      "title": "ControlType",
+      "type": "string"
+    },
+    "LabelCode": {
+      "description": "Evidence labels for an individual validation event.",
+      "enum": [
+        "V3",
+        "V2",
+        "V1",
+        "F0",
+        "D",
+        "A",
+        "T",
+        "U"
+      ],
+      "title": "LabelCode",
+      "type": "string"
+    },
+    "PerturbationModality": {
+      "enum": [
+        "CRISPR_KO",
+        "CRISPRa",
+        "CRISPRi",
+        "RNAi",
+        "overexpression",
+        "mutation",
+        "inhibitor",
+        "other"
+      ],
+      "title": "PerturbationModality",
+      "type": "string"
+    },
+    "PhenotypeDirection": {
+      "enum": [
+        "resistance",
+        "sensitization",
+        "neutral",
+        "discordant",
+        "unknown"
+      ],
+      "title": "PhenotypeDirection",
+      "type": "string"
+    },
+    "TestingStatus": {
+      "enum": [
+        "tested",
+        "not_tested",
+        "unknown"
+      ],
+      "title": "TestingStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "not": {
+        "properties": {
+          "phenotype_reproduced": {
+            "const": true
+          },
+          "opposite_direction_reproduced": {
+            "const": true
+          }
+        },
+        "required": [
+          "phenotype_reproduced",
+          "opposite_direction_reproduced"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "label_code": {
+            "enum": [
+              "V3",
+              "V2",
+              "V1",
+              "F0",
+              "D",
+              "A",
+              "T"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "testing_status": {
+            "const": "tested"
+          }
+        },
+        "required": [
+          "testing_status"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "label_code": {
+            "enum": [
+              "V2",
+              "V3"
+            ]
+          }
+        }
+      },
+      "then": {
+        "anyOf": [
+          {
+            "properties": {
+              "independent_reagent_count": {
+                "minimum": 2,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "independent_reagent_count"
+            ]
+          },
+          {
+            "properties": {
+              "orthogonal_perturbation": {
+                "const": true
+              }
+            },
+            "required": [
+              "orthogonal_perturbation"
+            ]
+          }
+        ],
+        "properties": {
+          "testing_status": {
+            "const": "tested"
+          },
+          "perturbation_confirmed": {
+            "const": true
+          },
+          "phenotype_reproduced": {
+            "const": true
+          },
+          "appropriate_control": {
+            "const": true
+          },
+          "opposite_direction_reproduced": {
+            "enum": [
+              false,
+              null
+            ]
+          }
+        },
+        "required": [
+          "testing_status",
+          "perturbation_confirmed",
+          "phenotype_reproduced",
+          "appropriate_control"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "label_code": {
+            "const": "V3"
+          }
+        }
+      },
+      "then": {
+        "anyOf": [
+          {
+            "properties": {
+              "rescue_performed": {
+                "const": true
+              }
+            },
+            "required": [
+              "rescue_performed"
+            ]
+          },
+          {
+            "properties": {
+              "causal_reversal_performed": {
+                "const": true
+              }
+            },
+            "required": [
+              "causal_reversal_performed"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "label_code": {
+            "const": "F0"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "testing_status": {
+            "const": "tested"
+          },
+          "perturbation_confirmed": {
+            "const": true
+          },
+          "assay_adequate": {
+            "const": true
+          },
+          "phenotype_reproduced": {
+            "const": false
+          },
+          "opposite_direction_reproduced": {
+            "enum": [
+              false,
+              null
+            ]
+          }
+        },
+        "required": [
+          "testing_status",
+          "perturbation_confirmed",
+          "assay_adequate",
+          "phenotype_reproduced"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "label_code": {
+            "const": "D"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "testing_status": {
+            "const": "tested"
+          },
+          "perturbation_confirmed": {
+            "const": true
+          },
+          "phenotype_reproduced": {
+            "const": false
+          },
+          "opposite_direction_reproduced": {
+            "const": true
+          }
+        },
+        "required": [
+          "testing_status",
+          "perturbation_confirmed",
+          "phenotype_reproduced",
+          "opposite_direction_reproduced"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "label_code": {
+            "const": "U"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "testing_status": {
+            "enum": [
+              "not_tested",
+              "unknown"
+            ]
+          },
+          "perturbation_confirmed": {
+            "enum": [
+              false,
+              null
+            ]
+          },
+          "independent_reagent_count": {
+            "enum": [
+              0,
+              null
+            ]
+          },
+          "orthogonal_perturbation": {
+            "enum": [
+              false,
+              null
+            ]
+          },
+          "phenotype_reproduced": {
+            "enum": [
+              false,
+              null
+            ]
+          },
+          "opposite_direction_reproduced": {
+            "enum": [
+              false,
+              null
+            ]
+          },
+          "rescue_performed": {
+            "enum": [
+              false,
+              null
+            ]
+          },
+          "causal_reversal_performed": {
+            "enum": [
+              false,
+              null
+            ]
+          },
+          "effect_size": {
+            "type": "null"
+          },
+          "p_value": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "testing_status"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "validation_treatment_dose": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "validation_treatment_dose"
+        ]
+      },
+      "then": {
+        "properties": {
+          "validation_treatment_unit": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "validation_treatment_unit"
+        ]
+      }
+    }
+  ],
+  "properties": {
+    "event_id": {
+      "minLength": 1,
+      "title": "Event Id",
+      "type": "string"
+    },
+    "study_id": {
+      "minLength": 1,
+      "title": "Study Id",
+      "type": "string"
+    },
+    "screen_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Screen Id"
+    },
+    "contrast_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Contrast Id"
+    },
+    "gene_symbol": {
+      "minLength": 1,
+      "title": "Gene Symbol",
+      "type": "string"
+    },
+    "drug_name": {
+      "minLength": 1,
+      "title": "Drug Name",
+      "type": "string"
+    },
+    "cell_line": {
+      "minLength": 1,
+      "title": "Cell Line",
+      "type": "string"
+    },
+    "perturbation_modality": {
+      "$ref": "#/$defs/PerturbationModality"
+    },
+    "phenotype_direction": {
+      "$ref": "#/$defs/PhenotypeDirection"
+    },
+    "label_code": {
+      "$ref": "#/$defs/LabelCode"
+    },
+    "testing_status": {
+      "$ref": "#/$defs/TestingStatus"
+    },
+    "perturbation_confirmed": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Perturbation Confirmed"
+    },
+    "independent_reagent_count": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Independent Reagent Count"
+    },
+    "orthogonal_perturbation": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Orthogonal Perturbation"
+    },
+    "appropriate_control": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Appropriate Control"
+    },
+    "assay_adequate": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Assay Adequate"
+    },
+    "phenotype_reproduced": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Phenotype Reproduced"
+    },
+    "opposite_direction_reproduced": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Opposite Direction Reproduced"
+    },
+    "rescue_performed": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Rescue Performed"
+    },
+    "causal_reversal_performed": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Causal Reversal Performed"
+    },
+    "effect_size": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Effect Size"
+    },
+    "effect_metric": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Effect Metric"
+    },
+    "p_value": {
+      "anyOf": [
+        {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "P Value"
+    },
+    "validation_treatment_dose": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Validation Treatment Dose"
+    },
+    "validation_treatment_unit": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Validation Treatment Unit"
+    },
+    "validation_exposure_days": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Validation Exposure Days"
+    },
+    "validation_assay_endpoint": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Validation Assay Endpoint"
+    },
+    "validation_control_type": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ControlType"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "validation_biological_replicate_count": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Validation Biological Replicate Count"
+    },
+    "validation_guide_source": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Validation Guide Source"
+    },
+    "protein_confirmed": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Protein Confirmed"
+    },
+    "second_model_tested": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Second Model Tested"
+    },
+    "source_url": {
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Source Url",
+      "type": "string"
+    },
+    "source_locator": {
+      "minLength": 1,
+      "title": "Source Locator",
+      "type": "string"
+    },
+    "curator": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Curator"
+    },
+    "adjudication_status": {
+      "default": "single_curator",
+      "title": "Adjudication Status",
+      "type": "string"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "event_id",
+    "study_id",
+    "gene_symbol",
+    "drug_name",
+    "cell_line",
+    "perturbation_modality",
+    "phenotype_direction",
+    "label_code",
+    "testing_status",
+    "source_url",
+    "source_locator"
+  ],
+  "title": "ValidationEventRecord",
+  "type": "object"
+}

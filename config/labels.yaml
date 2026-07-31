@@ -1,0 +1,69 @@
+version: 2
+labels:
+  V3:
+    name: causal_validation
+    model_role: positive
+    minimum_requirements:
+      - perturbation_confirmed
+      - phenotype_reproduced
+      - at_least_two_independent_reagents_or_orthogonal_perturbation
+      - appropriate_control
+      - rescue_or_equivalent_causal_reversal
+  V2:
+    name: reproduced
+    model_role: positive
+    minimum_requirements:
+      - perturbation_confirmed
+      - phenotype_reproduced
+      - at_least_two_independent_reagents_or_orthogonal_perturbation
+      - appropriate_control
+  V1:
+    name: supportive
+    model_role: unlabeled
+    description: Follow-up is directionally supportive but does not meet V2.
+  F0:
+    name: failed_validation
+    model_role: negative
+    minimum_requirements:
+      - perturbation_confirmed
+      - assay_adequate
+      - phenotype_not_reproduced
+  D:
+    name: discordant
+    model_role: negative
+    minimum_requirements:
+      - perturbation_confirmed
+      - opposite_direction_reproduced
+  A:
+    name: ambiguous
+    model_role: unlabeled
+  T:
+    name: technical_failure
+    model_role: unlabeled
+  U:
+    name: untested_or_unknown
+    model_role: unlabeled
+    description: >-
+      No adjudicated validation outcome. Keep testing_status=not_tested and
+      testing_status=unknown distinct.
+
+primary_positive: [V2, V3]
+primary_negative: [F0, D]
+unlabeled: [V1, A, T, U]
+
+label_source_policy:
+  allowed:
+    - documented_targeted_validation_event
+  prohibited:
+    - biogrid_orcs_hit_call
+    - author_screen_gene_score
+    - cross_screen_recurrence
+    - absence_from_validation_section
+  note: >-
+    ORCS and other screen databases provide discovery metadata and gene-score
+    evidence. They do not establish that a gene was independently perturbed and
+    reproduced the phenotype.
+
+validation_protocol_policy:
+  purpose: label_adjudication_and_reporting
+  success_model_feature_use: prohibited_unless_declared_before_prediction

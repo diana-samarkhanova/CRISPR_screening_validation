@@ -1,0 +1,483 @@
+{
+  "$defs": {
+    "ReplicateUnit": {
+      "enum": [
+        "independent_infection",
+        "biological_culture",
+        "technical_split",
+        "unknown"
+      ],
+      "title": "ReplicateUnit",
+      "type": "string"
+    },
+    "ScreenScale": {
+      "enum": [
+        "genome_wide",
+        "targeted",
+        "saturation",
+        "other",
+        "unknown"
+      ],
+      "title": "ScreenScale",
+      "type": "string"
+    },
+    "SelectionStrategy": {
+      "enum": [
+        "positive_selection",
+        "negative_selection",
+        "bidirectional_selection",
+        "competitive_growth",
+        "marker_sort",
+        "other",
+        "unknown"
+      ],
+      "title": "SelectionStrategy",
+      "type": "string"
+    },
+    "SourceRole": {
+      "enum": [
+        "original_screen",
+        "protocol",
+        "reanalysis",
+        "validation_only",
+        "review",
+        "other"
+      ],
+      "title": "SourceRole",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "screen_id": {
+      "minLength": 1,
+      "title": "Screen Id",
+      "type": "string"
+    },
+    "source_role": {
+      "$ref": "#/$defs/SourceRole",
+      "default": "original_screen"
+    },
+    "parent_screen_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Parent Screen Id"
+    },
+    "screen_scale": {
+      "$ref": "#/$defs/ScreenScale",
+      "default": "unknown"
+    },
+    "screen_format": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Screen Format"
+    },
+    "experimental_setup": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Experimental Setup"
+    },
+    "selection_strategy": {
+      "$ref": "#/$defs/SelectionStrategy",
+      "default": "unknown"
+    },
+    "library_type": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Library Type"
+    },
+    "library_methodology": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Library Methodology"
+    },
+    "enzyme": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Enzyme"
+    },
+    "vector_architecture": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Vector Architecture"
+    },
+    "effector_components": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Effector Components"
+    },
+    "guide_target_region": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Guide Target Region"
+    },
+    "library_size_guides": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Library Size Guides"
+    },
+    "target_gene_count": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Target Gene Count"
+    },
+    "guides_per_gene_median": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Guides Per Gene Median"
+    },
+    "nontargeting_guide_count": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Nontargeting Guide Count"
+    },
+    "library_moi": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Library Moi"
+    },
+    "effector_moi": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Effector Moi"
+    },
+    "coverage_transduction": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Coverage Transduction"
+    },
+    "coverage_selection": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Coverage Selection"
+    },
+    "coverage_harvest": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Coverage Harvest"
+    },
+    "infection_replicate_count": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Infection Replicate Count"
+    },
+    "replicate_unit": {
+      "$ref": "#/$defs/ReplicateUnit",
+      "default": "unknown"
+    },
+    "antibiotic_selection_days": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Antibiotic Selection Days"
+    },
+    "editing_maturation_days": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Editing Maturation Days"
+    },
+    "plasmid_reads_per_guide": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Plasmid Reads Per Guide"
+    },
+    "plasmid_zero_guide_fraction": {
+      "anyOf": [
+        {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Plasmid Zero Guide Fraction"
+    },
+    "plasmid_skew_ratio": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Plasmid Skew Ratio"
+    },
+    "screen_reads_per_guide": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Screen Reads Per Guide"
+    },
+    "gdna_fraction_amplified": {
+      "anyOf": [
+        {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Gdna Fraction Amplified"
+    },
+    "pcr_cycle_count": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Pcr Cycle Count"
+    },
+    "cnv_amplification_risk_assessed": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cnv Amplification Risk Assessed"
+    },
+    "analysis_method": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Analysis Method"
+    },
+    "normalization_method": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Normalization Method"
+    },
+    "source_locator": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Locator"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "screen_id"
+  ],
+  "title": "ScreenDesignRecord",
+  "type": "object"
+}

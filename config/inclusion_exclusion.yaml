@@ -1,0 +1,60 @@
+version: 2
+target_question: >-
+  Which genes from a completed human CRISPR-Cas9 knockout drug-response screen
+  are most likely to reproduce under an independent perturbation in a defined
+  drug-cell context?
+
+include:
+  organism: [human]
+  perturbation: [CRISPR_KO]
+  design:
+    - pooled_positive_selection
+    - pooled_negative_selection
+    - pooled_competitive_growth
+  treatment:
+    - small_molecule
+    - therapeutic_biologic_with_defined_target
+  required:
+    - gene_level_mapping
+    - treatment_and_control_arm
+    - identifiable_cell_context
+    - identifiable_drug
+    - identifiable_study_screen_contrast_sample_hierarchy
+    - reconstructable_comparator_and_condition_roles
+    - source_family_or_raw_data_family_identifier
+    - public_or_authorized_data_source
+
+exclude_from_v1_training:
+  - CRISPRa
+  - CRISPRi
+  - base_editing
+  - prime_editing
+  - single_cell_perturb_seq
+  - organism_other_than_human
+  - non_drug_primary_phenotype
+  - arrayed_screen_without_genome_scale_candidate_set
+  - screen_without_comparator
+  - screen_with_unresolvable_treatment_control_contrast
+  - combination_treatment_without_interpretable_comparator
+  - validation_only_paper_without_linkable_screen
+
+retain_as_auxiliary_evidence:
+  - RNAi_validation
+  - pharmacological_perturbation
+  - clinical_reversion_mutation
+  - tumor_multiomics
+  - protein_interaction
+  - pathway_membership
+
+notes:
+  - Auxiliary evidence must not be converted directly into a V2/V3 screen-validation label.
+  - Absence from a validation section is not a negative.
+  - CRISPRa and CRISPRi require modality-specific models.
+  - >-
+    BioGRID ORCS is an official discovery and author-score source. ORCS hit
+    calls, ranks, and phenotype annotations are not orthogonal-validation
+    outcomes.
+  - >-
+    Library papers such as Joung et al. may identify a library and document its
+    original protocol, but unreported MOI, coverage, selection, dose, duration,
+    and control values are never copied into a historical screen record.

@@ -1,0 +1,270 @@
+{
+  "$defs": {
+    "ReplicateUnit": {
+      "enum": [
+        "independent_infection",
+        "biological_culture",
+        "technical_split",
+        "unknown"
+      ],
+      "title": "ReplicateUnit",
+      "type": "string"
+    },
+    "SampleRole": {
+      "enum": [
+        "control",
+        "treatment",
+        "baseline"
+      ],
+      "title": "SampleRole",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "sample_id": {
+      "minLength": 1,
+      "title": "Sample Id",
+      "type": "string"
+    },
+    "screen_id": {
+      "minLength": 1,
+      "title": "Screen Id",
+      "type": "string"
+    },
+    "contrast_id": {
+      "minLength": 1,
+      "title": "Contrast Id",
+      "type": "string"
+    },
+    "condition_role": {
+      "$ref": "#/$defs/SampleRole"
+    },
+    "sample_subrole": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sample Subrole"
+    },
+    "replicate": {
+      "minimum": 1,
+      "title": "Replicate",
+      "type": "integer"
+    },
+    "biological_replicate_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Biological Replicate Id"
+    },
+    "infection_replicate_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Infection Replicate Id"
+    },
+    "technical_replicate_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Technical Replicate Id"
+    },
+    "pair_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Pair Id"
+    },
+    "replicate_unit": {
+      "$ref": "#/$defs/ReplicateUnit",
+      "default": "unknown"
+    },
+    "timepoint_days": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Timepoint Days"
+    },
+    "timepoint_reference": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Timepoint Reference"
+    },
+    "treatment_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Treatment Name"
+    },
+    "treatment_dose": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Treatment Dose"
+    },
+    "treatment_unit": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Treatment Unit"
+    },
+    "batch": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Batch"
+    },
+    "library_prep_batch": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Library Prep Batch"
+    },
+    "sequencing_batch": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sequencing Batch"
+    },
+    "cell_count": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cell Count"
+    },
+    "coverage_per_guide": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Coverage Per Guide"
+    },
+    "fastq_accession": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Fastq Accession"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "sample_id",
+    "screen_id",
+    "contrast_id",
+    "condition_role",
+    "replicate"
+  ],
+  "title": "SampleRecord",
+  "type": "object"
+}

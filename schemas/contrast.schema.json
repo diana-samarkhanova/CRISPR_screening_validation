@@ -1,0 +1,298 @@
+{
+  "$defs": {
+    "ControlType": {
+      "enum": [
+        "vehicle",
+        "untreated",
+        "baseline_t0",
+        "later_timepoint",
+        "sorted_population",
+        "matched_nontargeting",
+        "other",
+        "unknown"
+      ],
+      "title": "ControlType",
+      "type": "string"
+    },
+    "ExposureSchedule": {
+      "enum": [
+        "continuous",
+        "pulse",
+        "intermittent",
+        "repeated_dose",
+        "other",
+        "unknown"
+      ],
+      "title": "ExposureSchedule",
+      "type": "string"
+    },
+    "PhenotypeDirection": {
+      "enum": [
+        "resistance",
+        "sensitization",
+        "neutral",
+        "discordant",
+        "unknown"
+      ],
+      "title": "PhenotypeDirection",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "screen_id": {
+      "minLength": 1,
+      "title": "Screen Id",
+      "type": "string"
+    },
+    "contrast_id": {
+      "minLength": 1,
+      "title": "Contrast Id",
+      "type": "string"
+    },
+    "contrast_name": {
+      "minLength": 1,
+      "title": "Contrast Name",
+      "type": "string"
+    },
+    "treatment_name": {
+      "minLength": 1,
+      "title": "Treatment Name",
+      "type": "string"
+    },
+    "treatment_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Treatment Id"
+    },
+    "drug_class": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Drug Class"
+    },
+    "treatment_dose": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Treatment Dose"
+    },
+    "treatment_unit": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Treatment Unit"
+    },
+    "dose_basis": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Dose Basis"
+    },
+    "control_type": {
+      "$ref": "#/$defs/ControlType"
+    },
+    "comparator_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Comparator Name"
+    },
+    "exposure_schedule": {
+      "$ref": "#/$defs/ExposureSchedule",
+      "default": "unknown"
+    },
+    "exposure_days": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Exposure Days"
+    },
+    "recovery_days": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Recovery Days"
+    },
+    "endpoint_timepoint_days": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Endpoint Timepoint Days"
+    },
+    "phenotype_endpoint": {
+      "minLength": 1,
+      "title": "Phenotype Endpoint",
+      "type": "string"
+    },
+    "intended_direction": {
+      "$ref": "#/$defs/PhenotypeDirection"
+    },
+    "vehicle_control_present": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Vehicle Control Present"
+    },
+    "baseline_control_present": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Baseline Control Present"
+    },
+    "same_infection_split": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Same Infection Split"
+    },
+    "matched_control": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Matched Control"
+    },
+    "positive_control_description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Positive Control Description"
+    },
+    "negative_control_description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Negative Control Description"
+    },
+    "source_locator": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Locator"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "screen_id",
+    "contrast_id",
+    "contrast_name",
+    "treatment_name",
+    "control_type",
+    "phenotype_endpoint",
+    "intended_direction"
+  ],
+  "title": "ContrastRecord",
+  "type": "object"
+}

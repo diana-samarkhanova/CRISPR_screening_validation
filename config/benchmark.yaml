@@ -1,0 +1,98 @@
+version: 2
+primary_endpoint: within_screen_reproducibility_ranking
+unit: gene_x_screen_x_contrast_x_direction
+
+data_hierarchy:
+  - study
+  - screen
+  - contrast
+  - sample
+
+splits:
+  primary: grouped_kfold_by_source_or_raw_family
+  grouping_key_priority:
+    - source_family_id
+    - raw_data_family_id
+    - study_id
+  rule: >-
+    All records connected through the same publication/preprint, raw accession,
+    author-supplied matrix, or reanalysis of that material remain in one outer
+    fold. A study_id fallback is allowed only after unresolved provenance is
+    reported.
+  required_sensitivity_analyses:
+    - leave_one_source_or_raw_family_out
+    - leave_one_study_out
+    - leave_one_compound_out
+    - leave_one_drug_class_out
+    - cell_line_out
+    - lineage_out
+    - cold_gene
+    - temporal
+
+primary_metrics:
+  - observed_success_yield_at_5
+  - observed_success_yield_at_10
+  - observed_success_yield_at_20
+  - observed_recall_at_5
+  - observed_recall_at_10
+  - observed_recall_at_20
+  - observed_ndcg_at_5
+  - observed_ndcg_at_10
+  - observed_ndcg_at_20
+  - macro_average_precision
+
+secondary_metrics:
+  - global_average_precision
+  - adjudicated_precision_at_5
+  - adjudicated_precision_at_10
+  - adjudicated_precision_at_20
+  - uncalibrated_brier_score
+  - calibration_slope
+  - calibration_intercept
+
+uncertainty:
+  resampling_unit: source_or_raw_family
+  secondary_resampling_unit: study
+  method: cluster_bootstrap
+  confidence: 0.95
+  minimum_effective_draw_fraction: 0.8
+  require_both_global_target_classes: true
+  query_key_encoding: tuple
+
+training_weights:
+  base: inverse_study_frequency
+  sensitivity: clipped_selection_ipw
+  ipw_requires:
+    - at_least_two_independent_inner_study_groups
+    - both_tested_and_explicitly_not_tested_candidates
+    - both_testing_status_classes_in_every_inner_training_fold
+  limitation: >-
+    Selection IPW does not yet model whether a tested outcome becomes
+    adjudicable; V1/A/T observation missingness is reported separately.
+
+required_baselines:
+  - absolute_effect
+  - mageck_rank
+  - mageck_fdr
+  - drugz_normz
+  - cross_screen_recurrence
+  - regularized_logistic
+
+adjacent_non_equivalent_benchmarks:
+  assaybench:
+    task: pre_screen_gene_rank_prediction_from_assay_description
+    role: landscape_comparator_not_post_screen_validation_baseline
+    official_repository: https://github.com/Genentech/AssayBench
+    paper: https://arxiv.org/abs/2605.10876
+
+leakage_rules:
+  - no_rows_from_the_same_source_or_raw_family_across_train_and_test
+  - no_rows_from_the_same_study_across_train_and_test
+  - reanalyses_and_duplicate_orcs_screen_records_are_not_independent
+  - cross_screen_features_are_recomputed_from_outer_training_families_only
+  - evidence_features_must_obey_available_date_cutoff
+  - validation_result_text_is_never_a_feature_for_its_own_label
+  - orcs_hit_calls_and_scores_are_gene_score_evidence_not_validation_labels
+  - validation_protocol_fields_are_not_success_features_unless_declared_before_prediction
+  - exact_gene_drug_cell_line_and_library_ids_are_join_or_ood_keys_not_memorization_features
+  - private_case_study_is_held_out_until_model_freeze

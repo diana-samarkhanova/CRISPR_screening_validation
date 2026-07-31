@@ -182,7 +182,15 @@ crispr-evidencerank ingest-orcs-index \
   --table BIOGRID-ORCS-ALL-homo_sapiens-2.0.18.index.tab.txt \
   --release 2.0.18 \
   --retrieved-date 2026-07-30 \
+  --organism-scope "Homo sapiens" \
   --output-dir data/processed/orcs_2.0.18/index
+
+crispr-evidencerank triage-orcs-index \
+  --table BIOGRID-ORCS-ALL-homo_sapiens-2.0.18.index.tab.txt \
+  --release 2.0.18 \
+  --retrieved-date 2026-07-30 \
+  --organism-scope "Homo sapiens" \
+  --output-dir data/processed/orcs_2.0.18/triage
 
 crispr-evidencerank ingest-orcs-screen \
   --table BIOGRID-ORCS-SCREEN_95-2.0.18.screen.tab.txt \
@@ -194,6 +202,19 @@ crispr-evidencerank ingest-orcs-screen \
 The adapter preserves lossless raw tables alongside normalized registry
 records and parsing issues. `HIT` remains `author_hit`; unreported comparator
 and score direction remain unknown.
+
+Index triage writes one screen-level status and one auditable row per
+eligibility rule. Explicit non-human, non-KO, non-drug, or arrayed records may
+be excluded. Missing metadata remains `metadata_only`; index metadata can
+never promote a screen directly to `benchmark_ready`.
+
+`Toxin Exposure` is not treated as equivalent to `Drug Exposure`, because the
+ORCS condition field may describe a toxin, pathogen, medium, or another
+non-drug exposure. Such records remain candidates for manual review. A curated
+screen becomes `benchmark_ready` only when the complete policy-v2 rule set is
+present and passing, including comparator/sample reconstruction, count-level
+signal, source and raw-data families, rights, and adjudicated validation
+events.
 
 ## Training-label policy
 
@@ -271,4 +292,3 @@ benchmarks prediction of a screen gene ranking from an assay description. It is
 an important landscape comparator, but it predicts the screen result before
 screening rather than the orthogonal reproducibility of an already observed
 guide-level hit.
-

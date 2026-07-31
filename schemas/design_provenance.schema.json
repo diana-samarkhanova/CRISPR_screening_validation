@@ -1,0 +1,167 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "provenance_id": {
+      "minLength": 1,
+      "title": "Provenance Id",
+      "type": "string"
+    },
+    "study_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Study Id"
+    },
+    "screen_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Screen Id"
+    },
+    "contrast_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Contrast Id"
+    },
+    "sample_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sample Id"
+    },
+    "entity_type": {
+      "minLength": 1,
+      "title": "Entity Type",
+      "type": "string"
+    },
+    "entity_id": {
+      "minLength": 1,
+      "title": "Entity Id",
+      "type": "string"
+    },
+    "field_name": {
+      "minLength": 1,
+      "title": "Field Name",
+      "type": "string"
+    },
+    "reported_value": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reported Value"
+    },
+    "normalized_value": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Normalized Value"
+    },
+    "source_kind": {
+      "minLength": 1,
+      "title": "Source Kind",
+      "type": "string"
+    },
+    "source_url": {
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Source Url",
+      "type": "string"
+    },
+    "source_locator": {
+      "minLength": 1,
+      "title": "Source Locator",
+      "type": "string"
+    },
+    "extraction_method": {
+      "minLength": 1,
+      "title": "Extraction Method",
+      "type": "string"
+    },
+    "confidence": {
+      "minLength": 1,
+      "title": "Confidence",
+      "type": "string"
+    },
+    "available_date": {
+      "format": "date",
+      "title": "Available Date",
+      "type": "string"
+    },
+    "retrieved_date": {
+      "format": "date",
+      "title": "Retrieved Date",
+      "type": "string"
+    },
+    "curator": {
+      "minLength": 1,
+      "title": "Curator",
+      "type": "string"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "provenance_id",
+    "entity_type",
+    "entity_id",
+    "field_name",
+    "source_kind",
+    "source_url",
+    "source_locator",
+    "extraction_method",
+    "confidence",
+    "available_date",
+    "retrieved_date",
+    "curator"
+  ],
+  "title": "DesignProvenanceRecord",
+  "type": "object"
+}

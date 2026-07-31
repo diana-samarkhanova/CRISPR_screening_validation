@@ -1,0 +1,303 @@
+{
+  "$defs": {
+    "PhenotypeDirection": {
+      "enum": [
+        "resistance",
+        "sensitization",
+        "neutral",
+        "discordant",
+        "unknown"
+      ],
+      "title": "PhenotypeDirection",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "cnv_corrected": {
+            "const": true
+          }
+        },
+        "required": [
+          "cnv_corrected"
+        ]
+      },
+      "then": {
+        "properties": {
+          "correction_method": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "correction_method"
+        ]
+      }
+    }
+  ],
+  "anyOf": [
+    {
+      "properties": {
+        "effect": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "effect"
+      ]
+    },
+    {
+      "properties": {
+        "p_value": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "p_value"
+      ]
+    },
+    {
+      "properties": {
+        "fdr": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "fdr"
+      ]
+    },
+    {
+      "properties": {
+        "rank": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "rank"
+      ]
+    },
+    {
+      "properties": {
+        "score": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "score"
+      ]
+    },
+    {
+      "properties": {
+        "author_hit": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "author_hit"
+      ]
+    }
+  ],
+  "properties": {
+    "screen_id": {
+      "minLength": 1,
+      "title": "Screen Id",
+      "type": "string"
+    },
+    "contrast_id": {
+      "minLength": 1,
+      "title": "Contrast Id",
+      "type": "string"
+    },
+    "gene_symbol": {
+      "minLength": 1,
+      "title": "Gene Symbol",
+      "type": "string"
+    },
+    "method": {
+      "minLength": 1,
+      "title": "Method",
+      "type": "string"
+    },
+    "analysis_tail": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Analysis Tail"
+    },
+    "direction": {
+      "$ref": "#/$defs/PhenotypeDirection"
+    },
+    "effect": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Effect"
+    },
+    "p_value": {
+      "anyOf": [
+        {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "P Value"
+    },
+    "fdr": {
+      "anyOf": [
+        {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Fdr"
+    },
+    "rank": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Rank"
+    },
+    "score": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Score"
+    },
+    "author_hit": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Author Hit"
+    },
+    "score_type": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Score Type"
+    },
+    "cnv_corrected": {
+      "default": false,
+      "title": "Cnv Corrected",
+      "type": "boolean"
+    },
+    "correction_method": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Correction Method"
+    },
+    "method_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Method Version"
+    },
+    "source_database": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Database"
+    },
+    "source_screen_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Screen Id"
+    },
+    "source_file": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source File"
+    }
+  },
+  "required": [
+    "screen_id",
+    "contrast_id",
+    "gene_symbol",
+    "method",
+    "direction"
+  ],
+  "title": "GeneScoreRecord",
+  "type": "object"
+}

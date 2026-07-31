@@ -1,0 +1,236 @@
+version: 2
+
+feature_profiles:
+  screen_only:
+    implementation_status: implemented
+    feature_groups:
+      - screen_signal
+      - technical_qc
+    minimum_input: gene_score_or_count_derived_features
+  screen_plus_design:
+    implementation_status: implemented
+    feature_groups:
+      - screen_signal
+      - technical_qc
+      - experimental_design
+    minimum_input: study_screen_contrast_sample_metadata
+  context_aware:
+    implementation_status: planned
+    feature_groups:
+      - screen_signal
+      - technical_qc
+      - experimental_design
+      - artifact_risk
+      - biological_context
+      - cross_screen
+    minimum_input: screen_plus_design_plus_versioned_external_context
+  selection_model:
+    implementation_status: baseline_implemented
+    feature_groups:
+      - screen_signal
+      - technical_qc
+      - experimental_design
+      - author_selection
+    endpoint: tested_vs_explicitly_not_tested
+
+feature_groups:
+  screen_signal:
+    allowed_for_primary_model: true
+    features:
+      - guide_n
+      - median_guide_lfc
+      - mean_guide_lfc
+      - absolute_median_guide_lfc
+      - absolute_mean_guide_lfc
+      - is_sensitization_signal
+      - is_neutral_signal
+      - direction_aligned_median_guide_lfc
+      - direction_aligned_mean_guide_lfc
+      - direction_signal_agreement
+      - guide_lfc_mad
+      - guide_lfc_iqr
+      - guide_direction_agreement
+      - top2_abs_lfc_mean
+      - leave_one_guide_out_median_sd
+      - strongest_guide_dominance
+      - mean_control_count
+      - low_count_fraction
+      - zero_fraction_control
+      - zero_fraction_treatment
+      - within_screen_effect_percentile
+      - mageck_lfc
+      - mageck_fdr
+      - drugz_normz
+      - orcs_author_score
+      - orcs_author_rank
+    source_rules:
+      orcs: >-
+        BioGRID ORCS preserves author-method screen scores and ranked hits. These
+        fields may be gene-score evidence for the observed screen, but never an
+        orthogonal-validation label.
+  technical_qc:
+    allowed_for_primary_model: true
+    features:
+      - median_library_size
+      - replicate_correlation
+      - control_replicate_correlation
+      - treatment_replicate_correlation
+      - replicate_effect_sd
+      - essential_gene_separation
+      - nontargeting_dispersion
+      - coverage_per_guide
+  experimental_design:
+    allowed_for_primary_model: true
+    features:
+      - library_size_guides
+      - target_gene_count
+      - guides_per_gene_median
+      - nontargeting_guide_count
+      - library_moi
+      - effector_moi
+      - coverage_transduction
+      - coverage_selection
+      - coverage_harvest
+      - minimum_declared_coverage
+      - infection_replicate_count
+      - observed_infection_replicate_count
+      - observed_biological_replicate_count
+      - observed_technical_replicate_count
+      - observed_timepoint_count
+      - independent_infection_replicates_declared
+      - paired_replicate_fraction
+      - vehicle_control_present
+      - baseline_control_present
+      - same_infection_split
+      - matched_control
+      - cnv_amplification_risk_assessed
+      - control_sample_n
+      - treatment_sample_n
+      - baseline_sample_n
+      - antibiotic_selection_days
+      - editing_maturation_days
+      - plasmid_reads_per_guide
+      - plasmid_zero_guide_fraction
+      - plasmid_skew_ratio
+      - screen_reads_per_guide
+      - gdna_fraction_amplified
+      - pcr_cycle_count
+      - exposure_days
+      - recovery_days
+      - endpoint_timepoint_days
+      - treatment_dose_reported
+      - design_metadata_completeness
+      - screen_scale_genome_wide
+      - selection_strategy_positive_selection
+      - selection_strategy_negative_selection
+      - selection_strategy_bidirectional_selection
+      - selection_strategy_competitive_growth
+      - selection_strategy_marker_sort
+      - control_type_vehicle
+      - control_type_untreated
+      - control_type_baseline_t0
+      - control_type_later_timepoint
+      - control_type_matched_nontargeting
+      - control_type_unknown
+    provenance_level:
+      - screen
+      - contrast
+      - sample
+    prohibit:
+      - copying_unreported_values_from_a_library_reference_protocol
+      - comparing_raw_doses_across_compounds_without_a_common_scale
+  artifact_risk:
+    allowed_for_primary_model: true
+    features:
+      - copy_number
+      - expression_log2_tpm
+      - raw_corrected_effect_delta
+      - raw_corrected_rank_delta
+      - multi_target_flag
+      - common_essential_flag
+      - low_expression_flag
+      - cnv_correction_available
+  cross_screen:
+    allowed_for_primary_model: true
+    temporal_cutoff_required: true
+    outer_fold_recomputation_required: true
+    source_family_deduplication_required: true
+    features:
+      - same_drug_independent_screen_count
+      - same_drug_class_independent_screen_count
+      - same_direction_recurrence_fraction
+  biological_context:
+    allowed_for_primary_model: true
+    temporal_cutoff_required: true
+    features:
+      - cell_line_gene_effect
+      - baseline_drug_response
+      - gene_alteration_match
+      - pathway_context_score
+  author_selection:
+    allowed_for_primary_model: false
+    allowed_for_selection_model: true
+    features:
+      - author_reported_hit_flag
+      - author_hit
+      - orcs_author_hit_call
+      - author_reported_hit_rank
+      - author_candidate_zone_flag
+      - author_validation_selection_flag
+  literature_and_knowledge_graph:
+    allowed_for_primary_model: false
+    reason: >-
+      Initially reported as a separate evidence component to avoid circularity
+      and literature-popularity leakage.
+    features:
+      - publication_count
+      - drug_gene_text_score
+      - knowledge_graph_proximity
+  therapeutic_priority:
+    allowed_for_reproducibility_target: false
+    reason: Distinct endpoint from experimental reproducibility.
+    features:
+      - tractability
+      - tumor_selectivity
+      - normal_tissue_risk
+      - druggability
+  novelty:
+    allowed_for_reproducibility_target: false
+    reason: Report separately; novelty is not evidence of validation success.
+    features:
+      - context_specific_publication_count
+      - first_report_year
+
+missingness:
+  policy:
+    - retain_prespecified_missingness_indicators
+    - fit_imputation_within_outer_training_data_only
+    - distinguish_reported_zero_from_not_reported
+    - route_or_abstain_when_required_profile_inputs_are_unsupported
+  coverage_outputs:
+    - profile_name
+    - metadata_completeness_fraction
+    - feature_family_availability
+    - outside_training_support_flags
+  prohibit:
+    - treating_missing_as_zero_without_semantic_justification
+    - dropping_all_incomplete_studies_without_sensitivity_analysis
+    - silently_using_population_means_for_missing_multiomics
+
+identifier_policy:
+  join_or_ood_only:
+    - gene_symbol
+    - exact_drug_id
+    - exact_cell_line_id
+    - exact_library_id
+    - biogrid_orcs_screen_id
+
+forbidden_success_features:
+  - label_code
+  - testing_status
+  - validation_phenotype_reproduced
+  - validation_effect_size
+  - rescue_performed
+  - causal_reversal_performed
+  - author_validation_selection_flag
+  - validation_figure_prominence

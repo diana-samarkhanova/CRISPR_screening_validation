@@ -1,0 +1,2 @@
+library_id,library_name,library_version,perturbation_modality,library_scope,target_gene_count,total_guide_count,expected_guides_per_gene,nontargeting_guide_count,vector_architecture,enzyme,guide_target_region,reference_url,source_locator,notes
+SYN-LIB-01,SyntheticLibrary,v1,CRISPR_KO,genome_wide,60,240,4.0,20,synthetic single-vector,synthetic Cas9,coding sequence,https://example.org/synthetic,software fixture,Synthetic; not a biological library.
