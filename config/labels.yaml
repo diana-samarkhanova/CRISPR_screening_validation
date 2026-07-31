@@ -67,3 +67,12 @@ label_source_policy:
 validation_protocol_policy:
   purpose: label_adjudication_and_reporting
   success_model_feature_use: prohibited_unless_declared_before_prediction
+  draft_status: single_curator
+  benchmark_ready_statuses:
+    - adjudicated
+    - consensus
+    - consensus_adjudicated
+    - double_curated
+    - dual_curator_consensus
+    - approved_for_benchmark
+    - verified_for_benchmark

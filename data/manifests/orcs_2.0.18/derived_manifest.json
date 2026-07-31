@@ -1,0 +1,16 @@
+{
+  "candidate_screen_ids": {
+    "filename": "candidate_screen_ids.txt",
+    "record_count": 1674,
+    "sha256": "1ed5bd73edb65c916ba9b4ee2cc3a2cfd185a280ddee98fdcbcc37d3cdda55a6"
+  },
+  "curation_queue": {
+    "filename": "curation_queue.tsv",
+    "outcome_blind": true,
+    "policy_version": 2,
+    "record_count": 1674,
+    "sha256": "71977ef63a54c61a8aaa9d05fd6252656247136f2b64745e8ce791fae50d3733"
+  },
+  "release": "2.0.18",
+  "source_name": "BioGRID ORCS"
+}

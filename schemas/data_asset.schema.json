@@ -1,35 +1,127 @@
 {
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "sha256": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sha256"
+        ]
+      },
+      "then": {
+        "properties": {
+          "byte_size": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "byte_size"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "byte_size": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "byte_size"
+        ]
+      },
+      "then": {
+        "properties": {
+          "sha256": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sha256"
+        ]
+      }
+    },
+    {
+      "if": {
+        "anyOf": [
+          {
+            "properties": {
+              "redistribution_raw": {
+                "const": true
+              }
+            },
+            "required": [
+              "redistribution_raw"
+            ]
+          },
+          {
+            "properties": {
+              "redistribution_derived": {
+                "const": true
+              }
+            },
+            "required": [
+              "redistribution_derived"
+            ]
+          }
+        ]
+      },
+      "then": {
+        "anyOf": [
+          {
+            "properties": {
+              "license_spdx": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "license_spdx"
+            ]
+          },
+          {
+            "properties": {
+              "license_terms_url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "license_terms_url"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "retrieved_at_utc": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "retrieved_at_utc"
+        ]
+      },
+      "then": {
+        "properties": {
+          "retrieved_at_utc": {
+            "pattern": "(?:Z|[+-]00:00)$"
+          }
+        }
+      }
+    }
+  ],
   "description": "Versioned pointer to raw or derived data without redistributing it.",
   "properties": {
     "asset_id": {
       "minLength": 1,
       "title": "Asset Id",
       "type": "string"
-    },
-    "study_id": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Study Id"
-    },
-    "screen_id": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Screen Id"
     },
     "source_name": {
       "minLength": 1,
@@ -65,42 +157,6 @@
       "title": "Source Url",
       "type": "string"
     },
-    "sha256": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Sha256"
-    },
-    "source_license": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Source License"
-    },
-    "redistribution_permitted": {
-      "anyOf": [
-        {
-          "type": "boolean"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Redistribution Permitted"
-    },
     "available_date": {
       "anyOf": [
         {
@@ -118,6 +174,216 @@
       "format": "date",
       "title": "Retrieved Date",
       "type": "string"
+    },
+    "retrieved_at_utc": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Retrieved At Utc"
+    },
+    "sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sha256"
+    },
+    "byte_size": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Byte Size"
+    },
+    "checksum_provenance": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Checksum Provenance"
+    },
+    "license_spdx": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "License Spdx"
+    },
+    "license_terms_url": {
+      "anyOf": [
+        {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "License Terms Url"
+    },
+    "rights_holder": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Rights Holder"
+    },
+    "redistribution_raw": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Redistribution Raw"
+    },
+    "redistribution_derived": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Redistribution Derived"
+    },
+    "study_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Study Id"
+    },
+    "screen_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Screen Id"
+    },
+    "source_family_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Family Id"
+    },
+    "raw_data_family_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Raw Data Family Id"
+    },
+    "download_method": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Download Method"
+    },
+    "transformation_entrypoint": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Transformation Entrypoint"
+    },
+    "code_commit": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Code Commit"
+    },
+    "curator_status": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Curator Status"
     },
     "notes": {
       "anyOf": [
@@ -141,5 +407,9 @@
     "retrieved_date"
   ],
   "title": "DataAssetRecord",
-  "type": "object"
+  "type": "object",
+  "x-semantic-rules": [
+    "retrieved_date must be on or after available_date; enforced at runtime because JSON Schema cannot compare fields",
+    "retrieved_at_utc must carry a zero UTC offset"
+  ]
 }

@@ -42,6 +42,15 @@ Training on a harmonized public compendium and prospective validation are the
 next scientific milestones. Until those are complete, output is a
 **relative reproducibility score**, not a calibrated probability.
 
+The current ORCS intake milestone pins the human screen archive to BioGRID
+ORCS `2.0.18`, compiled on `2025-09-09` and publicly available on
+`2025-10-07`. The observed index contains 1,952 human screen records. Index-only
+triage assigns 278 to `exclude` and 1,674 to `metadata_only`; within the latter,
+435 are confirmed-scope candidates and 1,239 require manual scope review.
+There are zero `benchmark_ready` screens at this stage. These counts describe
+an outcome-blind curation queue, not a harmonized or trainable biological
+corpus.
+
 Development from v0.2 onward is versioned in a private GitHub repository.
 Public visibility is a later release gate, not a prerequisite for using Git
 history and continuous integration. See `docs/REPOSITORY_POLICY.md`.
@@ -114,10 +123,12 @@ when required inputs lie outside training support.
 
 [BioGRID ORCS](https://orcs.thebiogrid.org/) is used to discover published
 screens, recover structured metadata, and import author-method gene scores,
-ranks, and hit calls. Its [versioned downloads](https://downloads.thebiogrid.org/BioGRID-ORCS/Latest-Release/)
-are recorded with source version and retrieval date. ORCS is not an
-orthogonal-validation registry: an ORCS hit call can be a screen-signal feature
-or baseline, but never a `V2/V3/F0/D` label.
+ranks, and hit calls. Intake is pinned to the
+[ORCS 2.0.18 release archive](https://downloads.thebiogrid.org/BioGRID-ORCS/Release-Archive/BIOGRID-ORCS-2.0.18/)
+rather than the mutable latest-release path. The compiled date, public
+availability date, and actual retrieval date are recorded separately. ORCS is
+not an orthogonal-validation registry: an ORCS hit call can be a screen-signal
+feature or baseline, but never a `V2/V3/F0/D` label.
 
 Primary papers, supplements, raw repositories, and author-supplied matrices are
 used to verify exact treatment and control conditions. Library references such
@@ -178,23 +189,42 @@ analysis.
 For a release-pinned BioGRID ORCS archive:
 
 ```bash
-crispr-evidencerank ingest-orcs-index \
-  --table BIOGRID-ORCS-ALL-homo_sapiens-2.0.18.index.tab.txt \
+crispr-evidencerank prepare-orcs-release \
+  --release-registry config/orcs_releases.yaml \
   --release 2.0.18 \
-  --retrieved-date 2026-07-30 \
+  --retrieved-date 2026-07-31 \
+  --cache-dir data/external/orcs_2.0.18 \
+  --output-dir data/processed/orcs_2.0.18/release_intake
+```
+
+This command downloads or reuses only the pinned archive, verifies its
+project-computed SHA-256 and exact tar inventory, cross-checks all index IDs
+against the per-screen member IDs, then atomically writes normalization,
+provenance, triage, and curation-queue outputs. It refuses to mix a rerun into
+an existing output directory.
+
+The lower-level adapters remain available for focused reprocessing:
+
+```bash
+crispr-evidencerank ingest-orcs-index \
+  --table BIOGRID-ORCS-SCREEN_INDEX-2.0.18.index.tab.txt \
+  --release 2.0.18 \
+  --available-date 2025-10-07 \
+  --retrieved-date 2026-07-31 \
   --organism-scope "Homo sapiens" \
   --output-dir data/processed/orcs_2.0.18/index
 
 crispr-evidencerank triage-orcs-index \
-  --table BIOGRID-ORCS-ALL-homo_sapiens-2.0.18.index.tab.txt \
+  --table BIOGRID-ORCS-SCREEN_INDEX-2.0.18.index.tab.txt \
   --release 2.0.18 \
-  --retrieved-date 2026-07-30 \
+  --available-date 2025-10-07 \
+  --retrieved-date 2026-07-31 \
   --organism-scope "Homo sapiens" \
   --output-dir data/processed/orcs_2.0.18/triage
 
 crispr-evidencerank ingest-orcs-screen \
   --table BIOGRID-ORCS-SCREEN_95-2.0.18.screen.tab.txt \
-  --index-metadata BIOGRID-ORCS-ALL-homo_sapiens-2.0.18.index.tab.txt \
+  --index-metadata BIOGRID-ORCS-SCREEN_INDEX-2.0.18.index.tab.txt \
   --release 2.0.18 \
   --output-dir data/processed/orcs_2.0.18/screen_95
 ```
@@ -208,13 +238,30 @@ eligibility rule. Explicit non-human, non-KO, non-drug, or arrayed records may
 be excluded. Missing metadata remains `metadata_only`; index metadata can
 never promote a screen directly to `benchmark_ready`.
 
+For ORCS 2.0.18, the observed deterministic triage is:
+
+| Intake result | Screen records |
+|---|---:|
+| Total | 1,952 |
+| `exclude` | 278 |
+| `metadata_only` | 1,674 |
+| Confirmed-scope queue | 435 |
+| Manual-scope-review queue | 1,239 |
+| `benchmark_ready` | 0 |
+
+The queue is outcome-blind: ranking uses scope and metadata completeness, not
+ORCS `HIT`, author score magnitude, validation outcomes, or later evidence.
+Queue rank is therefore a curation priority only. It must not be interpreted as
+a biological hit rank or model-training label.
+
 `Toxin Exposure` is not treated as equivalent to `Drug Exposure`, because the
 ORCS condition field may describe a toxin, pathogen, medium, or another
 non-drug exposure. Such records remain candidates for manual review. A curated
 screen becomes `benchmark_ready` only when the complete policy-v2 rule set is
 present and passing, including comparator/sample reconstruction, count-level
 signal, source and raw-data families, rights, and adjudicated validation
-events.
+events. A draft `single_curator` event remains useful for curation but cannot
+open the benchmark gate until it receives an approved consensus status.
 
 ## Training-label policy
 
@@ -257,11 +304,19 @@ evaluated separately after the KO model is frozen.
 
 ## Data and copyright
 
-Code is licensed under Apache-2.0. Third-party datasets retain their original
-terms. This repository should contain accession manifests, download scripts,
-checksums, derived features that are lawful to redistribute, and exact
-provenance—not copied article text, figures, or unrestricted copies of source
-matrices.
+Code is licensed under Apache-2.0. The ORCS-distributed 2.0.18 archive and its
+index/score files are covered by the ORCS download terms recorded in the data
+manifest. That license does not transfer to publisher supplements, GEO/SRA
+assets, author count matrices, FASTQ files, or other upstream source data;
+those retain their own terms and require separate rights review. This
+repository should contain accession manifests, download scripts, checksums,
+derived features that are lawful to redistribute, and exact provenance—not
+copied article text, figures, or unrestricted copies of source matrices.
+
+The recorded SHA-256 for the ORCS archive is computed by this project after
+download and is not represented as a checksum published by BioGRID. The
+retrieval timestamp records when that exact byte stream was obtained; it is not
+the release's compiled or availability date.
 
 For ORCS-derived records, preserve the ORCS release, screen ID, original
 publication, author scoring method, and raw/source-family mapping. Multiple

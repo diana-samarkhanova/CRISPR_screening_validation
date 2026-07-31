@@ -57,7 +57,22 @@ structured metadata, and author-method gene scores. Record its release,
 retrieval date, ORCS screen ID, original publication, scoring method, and
 source/raw-family mapping. ORCS ranks and hit calls are screen evidence, not
 orthogonal-validation labels. Versioned releases are available from the
-[official ORCS download repository](https://downloads.thebiogrid.org/BioGRID-ORCS/Latest-Release/).
+[official ORCS release archive](https://downloads.thebiogrid.org/BioGRID-ORCS/Release-Archive/).
+
+The current intake pins the human screen archive to ORCS `2.0.18`, compiled on
+`2025-09-09` and publicly available on `2025-10-07`. Its retrieval date and UTC
+retrieval timestamp are recorded separately; neither may substitute for the
+release's availability date in temporal evaluation. The SHA-256 stored in the
+manifest is computed by this project from the downloaded bytes. It is a local
+integrity value, not a publisher-supplied checksum. For the observed
+752,653,348-byte archive, that digest is
+`39222a9650eed083edf193debe45eedc4aabc779ca04ea70107b6bd1efd9b8d7`.
+
+The MIT terms recorded for this asset apply only to files distributed by
+BioGRID ORCS. They must not be inherited by publisher supplements, SRA/GEO
+objects, FASTQ files, author count matrices, or other upstream data linked from
+an ORCS record. Each upstream asset requires its own rights holder, terms,
+redistribution decision, checksum, and provenance row.
 
 Primary methods, supplements, raw-repository metadata, and author files verify
 historical conditions. A library-design paper, including Joung et al., may
@@ -75,3 +90,17 @@ Cross-screen recurrence and other source-derived features are reconstructed
 inside each outer training fold after source/raw-family deduplication. The
 held-out family and any evidence first available after the test cutoff are
 excluded.
+
+## ORCS intake and curation queue
+
+The ORCS 2.0.18 human index contains 1,952 observed screen records. Automated
+index triage yields 278 `exclude` and 1,674 `metadata_only` records. The
+outcome-blind curation queue contains 435 confirmed-scope candidates and 1,239
+manual-scope-review candidates; no index-only record is `benchmark_ready`.
+
+Queue ordering may use only eligibility scope and metadata completeness. It
+must not use ORCS `HIT`, author score magnitude, validation labels, or evidence
+that became available after the screen. ORCS `HIT` remains an author-reported
+screen call and can never supply a `V2`, `V3`, `F0`, or `D` validation event.
+The queue is a worklist for full-text and data-rights curation, not a training
+dataset.

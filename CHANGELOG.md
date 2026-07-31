@@ -4,6 +4,33 @@ All notable project changes are recorded here. The project follows semantic
 versioning once public releases begin; development checkpoints use a `.devN`
 suffix and are not claims of a trained biological model.
 
+## Unreleased — ORCS 2.0.18 intake checkpoint
+
+- Pinned the human-screen intake to BioGRID ORCS `2.0.18`, compiled on
+  `2025-09-09` and publicly available on `2025-10-07`, with a separate actual
+  retrieval timestamp.
+- Recorded the downloaded archive's SHA-256 as a project-computed integrity
+  value, not a checksum published by BioGRID.
+- Limited ORCS MIT licensing to ORCS-distributed files; linked publisher,
+  GEO/SRA, FASTQ, count-matrix, and other upstream assets retain independent
+  rights requirements.
+- Added an outcome-blind curation queue that excludes ORCS `HIT`, author score
+  magnitude, validation outcomes, and future evidence from ordering.
+- Added atomic `prepare-orcs-release` acquisition with a pinned archive/index
+  checksum contract, bounded tar inventory, safe index-only extraction, and
+  exact cross-checking of all index and screen-member IDs.
+- Made benchmark readiness independently fact-derived from linked design,
+  quantitative signal, rights, family, and reviewed validation records; a
+  self-declared check or `single_curator` draft cannot open the gate.
+- Added runtime/JSON-Schema parity checks for intake and data-asset invariants,
+  plus portable checksums for the checked-in derived queue.
+- Recorded the observed human-index intake: 1,952 total screens, 278
+  `exclude`, 1,674 `metadata_only`, 435 confirmed-scope candidates, 1,239
+  manual-review candidates, and zero `benchmark_ready`.
+- Kept the checkpoint explicitly non-trainable: full-text design curation,
+  comparator/sample reconstruction, count-level evidence, data-rights review,
+  and independent validation-event adjudication remain required.
+
 ## 0.2.0.dev0 — 2026-07-30
 
 - Added the normalized `study → screen → contrast → sample` hierarchy.

@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 
 from crispr_evidencerank.orcs import (
+    classify_orcs_modality,
     normalize_orcs_header,
     parse_orcs_index,
     parse_orcs_screen_scores,
@@ -184,3 +185,16 @@ def test_dynamic_header_collisions_are_rejected():
 def test_header_alias_tracks_rest_and_bulk_methodology_names():
     assert normalize_orcs_header("METHODOLOGY") == ("library_methodology")
     assert normalize_orcs_header("DATASET ID") == "external_dataset_id"
+
+
+def test_modality_classifier_rejects_contradictory_or_base_editing_metadata():
+    conflict = classify_orcs_modality("CRISPRa", "Knockout")
+    assert conflict.modality.value == "other"
+    assert conflict.conflict
+
+    base_edit = classify_orcs_modality(
+        "Cytosine Base Editing-Mediated Gene KnockOut",
+        "Knockout",
+    )
+    assert base_edit.modality.value == "other"
+    assert base_edit.explicit_non_ko

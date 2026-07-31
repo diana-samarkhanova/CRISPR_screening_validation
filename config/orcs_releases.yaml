@@ -1,0 +1,68 @@
+schema_version: 1
+
+releases:
+  "2.0.18":
+    release: "2.0.18"
+    source_name: BioGRID ORCS
+    organism: Homo sapiens
+    taxonomy_id: 9606
+    archive_url: >-
+      https://downloads.thebiogrid.org/Download/BioGRID-ORCS/Release-Archive/BIOGRID-ORCS-2.0.18/BIOGRID-ORCS-ALL-homo_sapiens-2.0.18.screens.tar.gz
+    archive_filename: BIOGRID-ORCS-ALL-homo_sapiens-2.0.18.screens.tar.gz
+    archive_sha256: 39222a9650eed083edf193debe45eedc4aabc779ca04ea70107b6bd1efd9b8d7
+    archive_byte_size: 752653348
+    checksum_provenance: locally_computed_not_publisher_provided
+    expected_regular_member_count: 1953
+    expected_screen_member_count: 1952
+    expected_total_uncompressed_bytes: 2883261168
+    expected_max_member_bytes: 3934397
+    index_member: BIOGRID-ORCS-SCREEN_INDEX-2.0.18.index.tab.txt
+    index_sha256: 6754e87ef758a3525ab7d690b183338f2ee6de72a36dde6e85fe19dee165f02d
+    index_byte_size: 1328911
+    expected_index_data_rows: 1952
+    expected_index_headers:
+      - "#SCREEN_ID"
+      - SOURCE_ID
+      - SOURCE_TYPE
+      - AUTHOR
+      - SCREEN_NAME
+      - SCORES_SIZE
+      - FULL_SIZE
+      - FULL_SIZE_AVAILABLE
+      - NUMBER_OF_HITS
+      - ANALYSIS
+      - SIGNIFICANCE_INDICATOR
+      - SIGNIFICANCE_CRITERIA
+      - THROUGHPUT
+      - SCREEN_TYPE
+      - SCREEN_FORMAT
+      - EXPERIMENTAL_SETUP
+      - DURATION
+      - CONDITION_NAME
+      - CONDITION_DOSAGE
+      - MOI
+      - LIBRARY
+      - LIBRARY_TYPE
+      - LIBRARY_METHODOLOGY
+      - ENZYME
+      - CELL_LINE
+      - CELL_TYPE
+      - PHENOTYPE
+      - SCORE_COL_COUNT
+      - SCORE.1_TYPE
+      - SCORE.2_TYPE
+      - SCORE.3_TYPE
+      - SCORE.4_TYPE
+      - SCORE.5_TYPE
+      - ORGANISM_ID
+      - ORGANISM_OFFICIAL
+      - NOTES
+      - SOURCE
+      - SCREEN_RATIONALE
+    compiled_date: 2025-09-09
+    available_date: 2025-10-07
+    license_spdx: MIT
+    license_url: https://biogrid-downloads.nyc3.digitaloceanspaces.com/LICENSE.txt
+    allowed_download_hosts:
+      - downloads.thebiogrid.org
+      - biogrid-downloads.nyc3.digitaloceanspaces.com

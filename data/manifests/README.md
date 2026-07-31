@@ -7,8 +7,9 @@ asset. Unknown values remain empty.
 Every asset must record:
 
 - stable source/version/accession and exact URL;
-- available and retrieval dates;
-- SHA-256 and byte size after retrieval;
+- available date, retrieval date, and UTC retrieval timestamp;
+- SHA-256, byte size, and whether the checksum was publisher-provided or
+  locally computed;
 - license or terms URL and raw/derived redistribution decisions;
 - study, screen, source-family, and raw-data-family identifiers;
 - download and transformation entry points;

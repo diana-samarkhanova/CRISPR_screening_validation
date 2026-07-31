@@ -84,6 +84,16 @@ class OrcsGeneScoreParseResult:
     issues: pd.DataFrame
 
 
+@dataclass(frozen=True)
+class OrcsModalityAssessment:
+    """One conservative interpretation of ORCS library metadata."""
+
+    modality: PerturbationModality
+    conflict: bool
+    explicit_non_ko: bool
+    observed_value: str | None
+
+
 def normalize_orcs_header(header: object) -> str:
     """Return a stable snake-case name for a dynamic ORCS header."""
 
@@ -174,6 +184,12 @@ def _retrieved_date_value(value: date | str) -> date:
     return date.fromisoformat(value)
 
 
+def _optional_date_value(value: date | str | None) -> date | None:
+    if value is None:
+        return None
+    return _retrieved_date_value(value)
+
+
 def orcs_screen_id(release: str, external_screen_id: str) -> str:
     """Return a release-qualified internal screen identifier."""
 
@@ -227,16 +243,76 @@ def _parse_exact_nonnegative_number(value: object) -> float | None:
     return number if math.isfinite(number) and number >= 0 else None
 
 
+def classify_orcs_modality(
+    library_type: object,
+    library_methodology: object,
+) -> OrcsModalityAssessment:
+    """Classify ORCS perturbation metadata without resolving contradictions.
+
+    A row containing incompatible modality signals is deliberately returned as
+    ``OTHER``. In particular, a stray ``Knockout`` methodology cannot turn a
+    CRISPRa/CRISPRi or base-editing screen into a CRISPR-Cas9 KO screen.
+    """
+
+    values = [
+        value for value in (_text(library_type), _text(library_methodology)) if value
+    ]
+    observed = " | ".join(values) if values else None
+    searchable = " ".join(value.casefold() for value in values)
+
+    has_activation = "crispra" in searchable or "activation" in searchable
+    has_inhibition = "crispri" in searchable or "inhibition" in searchable
+    has_knockout = (
+        "crisprn" in searchable or "crispr ko" in searchable or "knockout" in searchable
+    )
+    has_explicit_other = any(
+        token in searchable
+        for token in (
+            "base edit",
+            "prime edit",
+            "rnai",
+            "shrna",
+            "sirna",
+        )
+    )
+
+    if has_explicit_other:
+        return OrcsModalityAssessment(
+            modality=PerturbationModality.OTHER,
+            conflict=(has_activation or has_inhibition),
+            explicit_non_ko=True,
+            observed_value=observed,
+        )
+
+    observed_modalities = sum((has_activation, has_inhibition, has_knockout))
+    if observed_modalities > 1:
+        return OrcsModalityAssessment(
+            modality=PerturbationModality.OTHER,
+            conflict=True,
+            explicit_non_ko=False,
+            observed_value=observed,
+        )
+    if has_activation:
+        modality = PerturbationModality.CRISPRA
+    elif has_inhibition:
+        modality = PerturbationModality.CRISPRI
+    elif has_knockout:
+        modality = PerturbationModality.CRISPR_KO
+    else:
+        modality = PerturbationModality.OTHER
+    return OrcsModalityAssessment(
+        modality=modality,
+        conflict=False,
+        explicit_non_ko=False,
+        observed_value=observed,
+    )
+
+
 def _perturbation_modality(row: Mapping[str, object]) -> PerturbationModality:
-    library_type = (_text(row.get("library_type")) or "").casefold()
-    methodology = (_text(row.get("library_methodology")) or "").casefold()
-    if "crispra" in library_type or methodology == "activation":
-        return PerturbationModality.CRISPRA
-    if "crispri" in library_type or methodology == "inhibition":
-        return PerturbationModality.CRISPRI
-    if "crisprn" in library_type or methodology == "knockout":
-        return PerturbationModality.CRISPR_KO
-    return PerturbationModality.OTHER
+    return classify_orcs_modality(
+        row.get("library_type"),
+        row.get("library_methodology"),
+    ).modality
 
 
 def _selection_strategy(value: object) -> SelectionStrategy:
@@ -291,6 +367,7 @@ def parse_orcs_index(
     *,
     release: str,
     retrieved_date: date | str,
+    available_date: date | str | None = None,
     organism_scope: str | None = None,
 ) -> OrcsIndexParseResult:
     """Parse an ORCS screen index into conservative registry records.
@@ -302,6 +379,9 @@ def parse_orcs_index(
 
     release = _release_value(release)
     retrieved_date = _retrieved_date_value(retrieved_date)
+    available_date = _optional_date_value(available_date)
+    if available_date is not None and available_date > retrieved_date:
+        raise ValueError("ORCS available_date cannot follow retrieved_date")
     organism_scope = _text(organism_scope)
     raw, normalized, header_map = _normalize_table(source)
     if "screen_id" not in normalized:
@@ -417,9 +497,7 @@ def parse_orcs_index(
                     "https://orcs.thebiogrid.org/Screen/"
                     f"{quote(external_screen_id, safe='')}"
                 ),
-                # A conservative availability bound. A separate release
-                # manifest may replace this with the verified release date.
-                "available_date": retrieved_date,
+                "available_date": available_date,
                 "notes": _notes(
                     source_notes,
                     f"ORCS screen rationale: {rationale}" if rationale else None,

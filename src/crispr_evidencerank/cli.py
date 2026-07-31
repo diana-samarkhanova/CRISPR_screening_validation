@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import date
 from pathlib import Path
+from typing import get_args
 
 import pandas as pd
 
@@ -18,6 +20,8 @@ from .modeling import (
     grouped_oof_predictions,
 )
 from .orcs import parse_orcs_index, parse_orcs_screen_scores
+from .orcs_prepare import prepare_orcs_release
+from .orcs_release import load_orcs_release_spec
 
 
 def _write_frame(frame: pd.DataFrame, path: str | Path) -> None:
@@ -32,7 +36,13 @@ def _write_frame(frame: pd.DataFrame, path: str | Path) -> None:
 
 
 def command_validate(args: argparse.Namespace) -> int:
-    frame = read_table(args.table)
+    model = CONTRACTS[args.contract]
+    string_fields = {
+        name: "string"
+        for name, field in model.model_fields.items()
+        if field.annotation is str or str in get_args(field.annotation)
+    }
+    frame = read_table(args.table, dtype=string_fields)
     valid, errors = validate_records(frame, args.contract)
     report = {
         "contract": args.contract,
@@ -93,6 +103,7 @@ def command_ingest_orcs_index(args: argparse.Namespace) -> int:
         args.table,
         release=args.release,
         retrieved_date=args.retrieved_date,
+        available_date=args.available_date,
         organism_scope=args.organism_scope,
     )
     frames = {
@@ -128,6 +139,7 @@ def command_triage_orcs_index(args: argparse.Namespace) -> int:
         args.table,
         release=args.release,
         retrieved_date=args.retrieved_date,
+        available_date=args.available_date,
         organism_scope=args.organism_scope,
         policy_version=args.policy_version,
     )
@@ -138,6 +150,7 @@ def command_triage_orcs_index(args: argparse.Namespace) -> int:
         result.eligibility_checks,
         output_dir / "eligibility_checks.tsv",
     )
+    _write_frame(result.curation_queue, output_dir / "curation_queue.tsv")
     candidate_text = "".join(
         f"{screen_id}\n" for screen_id in result.candidate_screen_ids
     )
@@ -150,6 +163,21 @@ def command_triage_orcs_index(args: argparse.Namespace) -> int:
         encoding="utf-8",
     )
     print(json.dumps(result.summary, indent=2, sort_keys=True))
+    return 0
+
+
+def command_prepare_orcs_release(args: argparse.Namespace) -> int:
+    spec = load_orcs_release_spec(args.release_registry, release=args.release)
+    prepared = prepare_orcs_release(
+        spec,
+        args.output_dir,
+        retrieved_date=args.retrieved_date,
+        policy_version=args.policy_version,
+        archive_path=args.archive,
+        cache_dir=args.cache_dir,
+        timeout_seconds=args.timeout_seconds,
+    )
+    print(json.dumps(prepared.summary, indent=2, sort_keys=True))
     return 0
 
 
@@ -255,6 +283,7 @@ def build_parser() -> argparse.ArgumentParser:
     orcs_index.add_argument("--table", required=True)
     orcs_index.add_argument("--release", required=True)
     orcs_index.add_argument("--retrieved-date", required=True)
+    orcs_index.add_argument("--available-date")
     orcs_index.add_argument("--organism-scope")
     orcs_index.add_argument("--output-dir", required=True)
     orcs_index.set_defaults(func=command_ingest_orcs_index)
@@ -266,6 +295,7 @@ def build_parser() -> argparse.ArgumentParser:
     orcs_triage.add_argument("--table", required=True)
     orcs_triage.add_argument("--release", required=True)
     orcs_triage.add_argument("--retrieved-date", required=True)
+    orcs_triage.add_argument("--available-date")
     orcs_triage.add_argument("--organism-scope")
     orcs_triage.add_argument(
         "--policy-version",
@@ -275,6 +305,32 @@ def build_parser() -> argparse.ArgumentParser:
     )
     orcs_triage.add_argument("--output-dir", required=True)
     orcs_triage.set_defaults(func=command_triage_orcs_index)
+
+    orcs_prepare = subparsers.add_parser(
+        "prepare-orcs-release",
+        help="verify and atomically prepare one pinned BioGRID ORCS release",
+    )
+    orcs_prepare.add_argument(
+        "--release-registry",
+        default="config/orcs_releases.yaml",
+    )
+    orcs_prepare.add_argument("--release", default="2.0.18")
+    orcs_prepare.add_argument(
+        "--retrieved-date",
+        type=date.fromisoformat,
+        required=True,
+    )
+    orcs_prepare.add_argument("--archive")
+    orcs_prepare.add_argument("--cache-dir", default="data/external/orcs")
+    orcs_prepare.add_argument(
+        "--policy-version",
+        type=int,
+        choices=sorted(SUPPORTED_POLICY_VERSIONS),
+        default=2,
+    )
+    orcs_prepare.add_argument("--timeout-seconds", type=float, default=60.0)
+    orcs_prepare.add_argument("--output-dir", required=True)
+    orcs_prepare.set_defaults(func=command_prepare_orcs_release)
 
     orcs_screen = subparsers.add_parser(
         "ingest-orcs-screen",

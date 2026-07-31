@@ -29,7 +29,10 @@ metadata_sources:
   discovery:
     - name: BioGRID_ORCS
       official_url: https://orcs.thebiogrid.org/
-      downloads: https://downloads.thebiogrid.org/BioGRID-ORCS/Latest-Release/
+      downloads: >-
+        https://downloads.thebiogrid.org/BioGRID-ORCS/Release-Archive/BIOGRID-ORCS-2.0.18/
+      release_registry: config/orcs_releases.yaml
+      pinned_release: 2.0.18
       role: discovery_structured_screen_metadata_and_author_gene_scores
       prohibited_role: orthogonal_validation_label
   verification_priority:
