@@ -429,7 +429,14 @@ def main() -> None:
     first_screen_counts.to_csv(OUT / "guide_counts_screen_01.csv", index=False)
     candidates_frame.to_csv(OUT / "candidate_status.csv", index=False)
     validation_frame.to_csv(OUT / "validation_events.csv", index=False)
-    labeled_features.to_csv(OUT / "labeled_gene_features.csv", index=False)
+    # Quantize derived floating-point features at serialization time so that
+    # harmless BLAS/libm last-bit differences do not change the checked-in
+    # software fixture across supported Python runner images.
+    labeled_features.to_csv(
+        OUT / "labeled_gene_features.csv",
+        index=False,
+        float_format="%.12g",
+    )
     print(
         {
             "studies": len(studies_frame),
