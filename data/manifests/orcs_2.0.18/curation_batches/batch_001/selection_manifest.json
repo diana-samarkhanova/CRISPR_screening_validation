@@ -1,0 +1,32 @@
+{
+  "batch_id": "orcs-2.0.18-batch-001",
+  "end_rank": 10,
+  "forbidden_selection_columns": [
+    "author_hit",
+    "effect",
+    "fdr",
+    "hit",
+    "label_code",
+    "number_of_hits",
+    "p_value",
+    "score",
+    "testing_status",
+    "validation_outcome",
+    "validation_status"
+  ],
+  "record_count": 10,
+  "require_unique_source_families": true,
+  "schema_version": 1,
+  "selected_date": "2026-08-01",
+  "selection": {
+    "filename": "selection.tsv",
+    "sha256": "b3f2de96e2b29999522ca7086d855f4ef8dd5e248f0f0e79b22aaeb7789afd8c"
+  },
+  "selection_policy": "contiguous_queue_rank_outcome_blind_v1",
+  "source_queue": {
+    "filename": "curation_queue.tsv",
+    "record_count": 1674,
+    "sha256": "71977ef63a54c61a8aaa9d05fd6252656247136f2b64745e8ce791fae50d3733"
+  },
+  "start_rank": 1
+}

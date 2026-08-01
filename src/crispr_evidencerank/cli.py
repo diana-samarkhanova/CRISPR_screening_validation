@@ -11,6 +11,7 @@ from typing import get_args
 import pandas as pd
 
 from .contracts import CONTRACTS, validate_records
+from .curation import write_curation_batch
 from .features import featurize_count_table, featurize_experimental_design
 from .intake import SUPPORTED_POLICY_VERSIONS, triage_orcs_index
 from .io import read_table
@@ -181,6 +182,20 @@ def command_prepare_orcs_release(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_select_curation_batch(args: argparse.Namespace) -> int:
+    manifest = write_curation_batch(
+        args.queue,
+        args.output_dir,
+        batch_id=args.batch_id,
+        selected_date=args.selected_date,
+        start_rank=args.start_rank,
+        batch_size=args.batch_size,
+        require_unique_source_families=not args.allow_repeated_source_families,
+    )
+    print(json.dumps(manifest, indent=2, sort_keys=True))
+    return 0
+
+
 def command_ingest_orcs_screen(args: argparse.Namespace) -> int:
     metadata = read_table(args.index_metadata) if args.index_metadata else None
     parsed = parse_orcs_screen_scores(
@@ -342,6 +357,24 @@ def build_parser() -> argparse.ArgumentParser:
     orcs_screen.add_argument("--contrast-id")
     orcs_screen.add_argument("--output-dir", required=True)
     orcs_screen.set_defaults(func=command_ingest_orcs_screen)
+
+    curation_batch = subparsers.add_parser(
+        "select-curation-batch",
+        help="freeze a contiguous outcome-blind full-text curation batch",
+    )
+    curation_batch.add_argument("--queue", required=True)
+    curation_batch.add_argument("--output-dir", required=True)
+    curation_batch.add_argument("--batch-id", required=True)
+    curation_batch.add_argument(
+        "--selected-date", type=date.fromisoformat, required=True
+    )
+    curation_batch.add_argument("--start-rank", type=int, default=1)
+    curation_batch.add_argument("--batch-size", type=int, default=10)
+    curation_batch.add_argument(
+        "--allow-repeated-source-families",
+        action="store_true",
+    )
+    curation_batch.set_defaults(func=command_select_curation_batch)
 
     benchmark = subparsers.add_parser(
         "benchmark", help="run grouped out-of-fold baseline evaluation"

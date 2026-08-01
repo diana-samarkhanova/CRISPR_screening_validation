@@ -12,6 +12,12 @@ Version `0.2.0.dev0` contains schemas, curation rules, an intake manifest, and
 synthetic fixtures. It does not contain a completed biological training
 dataset, a pretrained model, or calibrated probabilities.
 
+The first ten ORCS queue records have completed a single-curator full-text
+pilot review. Nine expose only author-derived score tables and one exposes raw
+sequencing reads, but none currently satisfies the count-level, rights,
+sample-map, and independent label-adjudication gates together. The pilot adds
+no `benchmark_ready` rows.
+
 ## Unit of prediction
 
 `gene × screen × contrast × direction`, linked through the normalized

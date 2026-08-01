@@ -1,0 +1,38 @@
+{
+  "assessed_date": "2026-08-01",
+  "batch_id": "orcs-2.0.18-batch-001",
+  "benchmark_ready_count": 0,
+  "curation_status": "single_curator_requires_independent_adjudication",
+  "curator_count": 1,
+  "disposition_counts": {
+    "metadata_only": 10
+  },
+  "full_text_reviewed_count": 10,
+  "quantitative_asset_family_count": 10,
+  "quantitative_data_status_counts": {
+    "author_scores_public": 9,
+    "raw_reads_public": 1
+  },
+  "raw_data_family_resolved_count": 1,
+  "record_count": 10,
+  "review_contract": "full_text_review",
+  "reviews": {
+    "filename": "reviews.tsv",
+    "sha256": "b44822515c4236593d4910e4f0160c5114691cd220fc2d4b2c2d98fa0bb9eb6f"
+  },
+  "schema_version": 1,
+  "selection": {
+    "filename": "selection.tsv",
+    "sha256": "b3f2de96e2b29999522ca7086d855f4ef8dd5e248f0f0e79b22aaeb7789afd8c"
+  },
+  "supplement_review_counts": {
+    "complete": 9,
+    "partial": 1
+  },
+  "validation_status_counts": {
+    "candidate_v1": 4,
+    "candidate_v2": 4,
+    "candidate_v3": 1,
+    "nonqualifying_only": 1
+  }
+}

@@ -51,6 +51,13 @@ There are zero `benchmark_ready` screens at this stage. These counts describe
 an outcome-blind curation queue, not a harmonized or trainable biological
 corpus.
 
+The first full-text pilot freezes queue ranks 1-10 from ten publication
+families before outcome review. Nine screens provide author-derived score
+tables only; one has public raw sequencing reads (`SRP158611`). All ten remain
+`metadata_only` because count-level ingestion, rights, raw-data-family, and/or
+independent validation adjudication are incomplete. Candidate validation
+grades are stored downstream of selection and are not yet training labels.
+
 Development from v0.2 onward is versioned in a private GitHub repository.
 Public visibility is a later release gate, not a prerequisite for using Git
 history and continuous integration. See `docs/REPOSITORY_POLICY.md`.

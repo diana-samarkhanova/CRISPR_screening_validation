@@ -45,6 +45,11 @@ candidates, and zero `benchmark_ready`. Queue order is outcome-blind and must
 not use ORCS `HIT`, author scores, validation outcomes, or future evidence.
 These records are a curation intake, not a trainable corpus.
 
+The checked-in pilot batch freezes queue ranks 1-10 independently of its
+downstream review. Its candidate validation grades are single-curator states,
+not released labels. All ten records remain `metadata_only`, and the repository
+still contains no biological benchmark corpus.
+
 ## Stage 2 — pilot data checkpoint
 
 Create the next development tag only after at least six public human

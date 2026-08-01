@@ -119,6 +119,32 @@ class EligibilityOutcome(StrEnum):
     UNKNOWN = "unknown"
 
 
+class ReviewCompleteness(StrEnum):
+    COMPLETE = "complete"
+    PARTIAL = "partial"
+    UNRESOLVED = "unresolved"
+    NOT_APPLICABLE = "not_applicable"
+
+
+class QuantitativeDataStatus(StrEnum):
+    RAW_READS_PUBLIC = "raw_reads_public"
+    RAW_COUNTS_PUBLIC = "raw_counts_public"
+    DERIVED_COUNTS_PUBLIC = "derived_counts_public"
+    AUTHOR_SCORES_PUBLIC = "author_scores_public"
+    AVAILABLE_FROM_AUTHORS = "available_from_authors"
+    NOT_FOUND = "not_found"
+    UNRESOLVED = "unresolved"
+
+
+class ValidationReviewStatus(StrEnum):
+    CANDIDATE_V3 = "candidate_v3"
+    CANDIDATE_V2 = "candidate_v2"
+    CANDIDATE_V1 = "candidate_v1"
+    NONQUALIFYING_ONLY = "nonqualifying_only"
+    NONE_REPORTED = "none_reported"
+    UNRESOLVED = "unresolved"
+
+
 INTAKE_POLICY_V2_SCOPE_RULE_IDS = frozenset(
     {
         "scope.organism_human",
@@ -516,6 +542,293 @@ class CurationQueueRecord(StrictRecord):
     metadata_completeness_count: int = Field(ge=0)
     full_gene_score_set_available: bool | None = None
     reason_codes: str | None = None
+
+
+_FULL_TEXT_REVIEW_JSON_SCHEMA = {
+    "allOf": [
+        {
+            "if": {
+                "required": ["quantitative_data_status"],
+                "properties": {
+                    "quantitative_data_status": {
+                        "enum": ["raw_reads_public", "raw_counts_public"]
+                    }
+                },
+            },
+            "then": {
+                "required": ["data_accession", "raw_data_family_id"],
+                "properties": {
+                    "data_accession": {"type": "string", "minLength": 1},
+                    "raw_data_family_id": {"type": "string", "minLength": 1},
+                },
+            },
+        },
+        *[
+            {
+                "if": {
+                    "required": ["validation_status"],
+                    "properties": {"validation_status": {"const": status}},
+                },
+                "then": {
+                    "required": [field_name],
+                    "properties": {field_name: {"type": "string", "minLength": 1}},
+                },
+            }
+            for status, field_name in (
+                ("candidate_v3", "candidate_v3_genes"),
+                ("candidate_v2", "candidate_v2_genes"),
+                ("candidate_v1", "candidate_v1_genes"),
+                ("nonqualifying_only", "nonqualifying_validation_genes"),
+            )
+        ],
+        {
+            "if": {
+                "required": ["disposition"],
+                "properties": {"disposition": {"const": "exclude"}},
+            },
+            "then": {
+                "required": ["scope_outcome"],
+                "properties": {"scope_outcome": {"const": "fail"}},
+            },
+            "else": {"properties": {"scope_outcome": {"enum": ["pass", "unknown"]}}},
+        },
+        {
+            "if": {
+                "required": ["validation_status"],
+                "properties": {"validation_status": {"const": "candidate_v2"}},
+            },
+            "then": {"properties": {"candidate_v3_genes": {"type": "null"}}},
+        },
+        {
+            "if": {
+                "required": ["validation_status"],
+                "properties": {"validation_status": {"const": "candidate_v1"}},
+            },
+            "then": {
+                "properties": {
+                    "candidate_v3_genes": {"type": "null"},
+                    "candidate_v2_genes": {"type": "null"},
+                }
+            },
+        },
+        {
+            "if": {
+                "required": ["validation_status"],
+                "properties": {
+                    "validation_status": {
+                        "enum": ["nonqualifying_only", "none_reported", "unresolved"]
+                    }
+                },
+            },
+            "then": {
+                "properties": {
+                    "candidate_v3_genes": {"type": "null"},
+                    "candidate_v2_genes": {"type": "null"},
+                    "candidate_v1_genes": {"type": "null"},
+                }
+            },
+        },
+        {
+            "if": {
+                "required": ["validation_status"],
+                "properties": {
+                    "validation_status": {"enum": ["none_reported", "unresolved"]}
+                },
+            },
+            "then": {
+                "properties": {"nonqualifying_validation_genes": {"type": "null"}}
+            },
+        },
+    ],
+    "x-semantic-rules": [
+        "Pipe-delimited blocker and gene lists are sorted and unique.",
+        "A gene cannot appear at multiple validation evidence levels.",
+        "Blocker codes must be policy-v2 rules and agree with raw-family resolution.",
+    ],
+}
+
+
+class FullTextReviewRecord(StrictRecord):
+    """Outcome-aware review kept downstream of the frozen curation queue.
+
+    This record deliberately has no ``benchmark_ready`` field. Readiness is
+    established only by ``ScreenIntakeRecord`` plus linked registry facts and
+    ``validate_registry_integrity``.
+    """
+
+    primary_key = ("review_id",)
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True,
+        allow_inf_nan=False,
+        json_schema_extra=_FULL_TEXT_REVIEW_JSON_SCHEMA,
+    )
+
+    review_id: str = Field(min_length=1)
+    batch_id: str = Field(min_length=1)
+    queue_id: str = Field(min_length=1)
+    queue_rank: int = Field(ge=1)
+    screen_id: str = Field(min_length=1)
+    external_screen_id: str = Field(min_length=1)
+    source_family_id: str = Field(min_length=1)
+    quantitative_asset_family_id: str = Field(min_length=1)
+    raw_data_family_id: str | None = None
+    source_id: str = Field(min_length=1)
+    doi: str = Field(min_length=1)
+    paper_url: HttpUrl
+    full_text_url: HttpUrl
+    supplement_url: HttpUrl
+    full_text_reviewed: bool
+    supplement_review: ReviewCompleteness
+    scope_outcome: EligibilityOutcome
+    design_review: ReviewCompleteness
+    sample_map_review: ReviewCompleteness
+    screen_model: str = Field(min_length=1)
+    library_design: str = Field(min_length=1)
+    treatment_contrast: str = Field(min_length=1)
+    screen_replication: str = Field(min_length=1)
+    analysis_method: str = Field(min_length=1)
+    quantitative_data_status: QuantitativeDataStatus
+    quantitative_asset_locator: str = Field(min_length=1)
+    data_accession: str | None = None
+    rights_outcome: EligibilityOutcome
+    rights_basis: str = Field(min_length=1)
+    validation_status: ValidationReviewStatus
+    candidate_v3_genes: str | None = Field(default=None, pattern=r"^[^|]+(?:\|[^|]+)*$")
+    candidate_v2_genes: str | None = Field(default=None, pattern=r"^[^|]+(?:\|[^|]+)*$")
+    candidate_v1_genes: str | None = Field(default=None, pattern=r"^[^|]+(?:\|[^|]+)*$")
+    nonqualifying_validation_genes: str | None = Field(
+        default=None, pattern=r"^[^|]+(?:\|[^|]+)*$"
+    )
+    validation_source_locator: str = Field(min_length=1)
+    disposition: Literal["metadata_only", "exclude"]
+    blocker_codes: str = Field(min_length=1, pattern=r"^[^|]+(?:\|[^|]+)*$")
+    assessed_date: date
+    curator: str = Field(min_length=1)
+    notes: str | None = None
+
+    @model_validator(mode="after")
+    def review_is_internally_consistent(self) -> FullTextReviewRecord:
+        candidate_fields = {
+            ValidationReviewStatus.CANDIDATE_V3: self.candidate_v3_genes,
+            ValidationReviewStatus.CANDIDATE_V2: self.candidate_v2_genes,
+            ValidationReviewStatus.CANDIDATE_V1: self.candidate_v1_genes,
+        }
+        candidate_statuses = set(candidate_fields)
+        if (
+            self.validation_status in candidate_statuses
+            and not candidate_fields[self.validation_status]
+        ):
+            raise ValueError(
+                "candidate validation status requires genes at the same level"
+            )
+        if (
+            self.validation_status == ValidationReviewStatus.NONQUALIFYING_ONLY
+            and not self.nonqualifying_validation_genes
+        ):
+            raise ValueError(
+                "nonqualifying validation status requires the reviewed genes"
+            )
+        if (
+            self.validation_status
+            in {
+                ValidationReviewStatus.NONE_REPORTED,
+                ValidationReviewStatus.UNRESOLVED,
+            }
+            and self.nonqualifying_validation_genes
+        ):
+            raise ValueError(
+                "none_reported or unresolved status cannot list nonqualifying genes"
+            )
+        populated_candidate_statuses = [
+            status for status, genes in candidate_fields.items() if genes
+        ]
+        expected_status = next(
+            (
+                status
+                for status in (
+                    ValidationReviewStatus.CANDIDATE_V3,
+                    ValidationReviewStatus.CANDIDATE_V2,
+                    ValidationReviewStatus.CANDIDATE_V1,
+                )
+                if status in populated_candidate_statuses
+            ),
+            None,
+        )
+        if expected_status is not None and self.validation_status != expected_status:
+            raise ValueError(
+                "validation_status must equal the highest populated candidate level"
+            )
+        if (
+            self.quantitative_data_status
+            in {
+                QuantitativeDataStatus.RAW_READS_PUBLIC,
+                QuantitativeDataStatus.RAW_COUNTS_PUBLIC,
+            }
+            and not self.data_accession
+        ):
+            raise ValueError("public raw reads or counts require a data_accession")
+        if (
+            self.quantitative_data_status
+            in {
+                QuantitativeDataStatus.RAW_READS_PUBLIC,
+                QuantitativeDataStatus.RAW_COUNTS_PUBLIC,
+            }
+            and not self.raw_data_family_id
+        ):
+            raise ValueError("public raw reads or counts require raw_data_family_id")
+        if (
+            self.disposition == "exclude"
+            and self.scope_outcome != EligibilityOutcome.FAIL
+        ):
+            raise ValueError("exclude disposition requires a failed scope review")
+        if (
+            self.disposition == "metadata_only"
+            and self.scope_outcome == EligibilityOutcome.FAIL
+        ):
+            raise ValueError("failed scope review requires exclude disposition")
+
+        blockers = self.blocker_codes.split("|")
+        if blockers != sorted(set(blockers)) or any(not value for value in blockers):
+            raise ValueError("blocker_codes must be unique, sorted, and pipe-delimited")
+        unknown_blockers = set(blockers) - INTAKE_POLICY_V2_BENCHMARK_RULE_IDS
+        if unknown_blockers:
+            unknown_rules = sorted(unknown_blockers)
+            raise ValueError(
+                f"blocker_codes contain unknown policy rules: {unknown_rules}"
+            )
+        raw_family_blocker = "provenance.raw_data_family"
+        if self.raw_data_family_id and raw_family_blocker in blockers:
+            raise ValueError(
+                "a resolved raw_data_family_id cannot retain its provenance blocker"
+            )
+        if not self.raw_data_family_id and raw_family_blocker not in blockers:
+            raise ValueError(
+                "a missing raw_data_family_id requires its provenance blocker"
+            )
+        gene_fields = {
+            "candidate_v3_genes": self.candidate_v3_genes,
+            "candidate_v2_genes": self.candidate_v2_genes,
+            "candidate_v1_genes": self.candidate_v1_genes,
+            "nonqualifying_validation_genes": self.nonqualifying_validation_genes,
+        }
+        seen_genes: set[str] = set()
+        for field_name, values in gene_fields.items():
+            if not values:
+                continue
+            genes = values.split("|")
+            if genes != sorted(set(genes)) or any(not value for value in genes):
+                raise ValueError(
+                    f"{field_name} must be unique, sorted, and pipe-delimited"
+                )
+            overlap = seen_genes & set(genes)
+            if overlap:
+                raise ValueError(
+                    "a validation gene cannot appear at multiple evidence levels: "
+                    f"{sorted(overlap)}"
+                )
+            seen_genes.update(genes)
+        return self
 
 
 class EligibilityCheckRecord(StrictRecord):
@@ -1251,6 +1564,7 @@ CONTRACTS: dict[str, type[StrictRecord]] = {
     "external_screen_map": ExternalScreenMapRecord,
     "screen_intake": ScreenIntakeRecord,
     "curation_queue": CurationQueueRecord,
+    "full_text_review": FullTextReviewRecord,
     "eligibility_check": EligibilityCheckRecord,
     "design_provenance": DesignProvenanceRecord,
     "data_asset": DataAssetRecord,

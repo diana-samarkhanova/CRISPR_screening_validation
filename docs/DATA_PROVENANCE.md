@@ -104,3 +104,16 @@ that became available after the screen. ORCS `HIT` remains an author-reported
 screen call and can never supply a `V2`, `V3`, `F0`, or `D` validation event.
 The queue is a worklist for full-text and data-rights curation, not a training
 dataset.
+
+The first frozen pilot batch covers queue ranks 1-10 from ten distinct source
+families. Selection and review are stored separately with independent SHA-256
+checksums. Full-text review found nine author-score-only screens and one screen
+with public raw reads (`SRP158611`), but no reviewed screen yet has an ingested
+count matrix, completed raw-data rights record, and independently adjudicated
+validation event together. Consequently all ten remain `metadata_only` and
+the batch contributes zero benchmark rows.
+
+Candidate `V1/V2/V3` grades in this batch are downstream single-curator review
+states. They are excluded from selection, design features, and readiness
+derivation until a second outcome-blind curator and adjudication step are
+complete.
