@@ -1,0 +1,49 @@
+{
+  "adjudicated_gene_count": 0,
+  "assessed_date": "2026-08-01",
+  "batch_id": "orcs-2.0.18-batch-001",
+  "benchmark_ready_count": 0,
+  "completion_progress": {
+    "filename": "reviews_curator_2_completion_progress.tsv",
+    "queue_ranks": [
+      1,
+      3,
+      4,
+      5
+    ],
+    "sha256": "8e2cac6205eaeab8ea05be623e207be4d805b50fc96d71f49d9121d5c0ac2507"
+  },
+  "completion_progress_screen_count": 4,
+  "frozen_second_review_screen_count": 5,
+  "human_adjudication_required": true,
+  "pending_queue_ranks": [
+    2
+  ],
+  "pending_second_review_screen_count": 1,
+  "predecessor_checkpoint": {
+    "manifest": {
+      "filename": "dual_review_manifest_partial.json",
+      "sha256": "324995f7de042e0c7e79049eea702bd2afbe38da9ac79ea2586b7b9880ec8785"
+    },
+    "queue_ranks": [
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "secondary_reviews": {
+      "filename": "reviews_curator_2_partial.tsv",
+      "sha256": "3fe697a9c5e24cdbb636155d163d8ac01772ccea5bbd92beefbd9bcd1883c0c2"
+    }
+  },
+  "released_label_count": 0,
+  "schema_version": 1,
+  "second_reviewed_screen_count": 9,
+  "selected_screen_count": 10,
+  "selection": {
+    "filename": "selection.tsv",
+    "sha256": "b3f2de96e2b29999522ca7086d855f4ef8dd5e248f0f0e79b22aaeb7789afd8c"
+  },
+  "status": "secondary_review_completion_progress_requires_remaining_review_and_human_adjudication"
+}

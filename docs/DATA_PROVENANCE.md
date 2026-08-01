@@ -119,7 +119,9 @@ Consequently all ten remain `metadata_only` and the batch contributes zero
 benchmark rows.
 
 Candidate `V1/V2/V3` grades in this batch are downstream review states. A
-second reviewer has completed ranks 6-10, yielding seven provisional gene-level
-agreements; ranks 1-5 remain pending. Agreement is excluded from selection,
-design features, readiness derivation, and released labels until a named human
-adjudicator verifies the evidence.
+second reviewer has completed frozen ranks 6-10, yielding seven provisional
+gene-level agreements, and a separately checksummed progress addendum preserves
+ranks 1, 3, 4, and 5 without comparing them to the primary review. Rank 2
+remains pending. Agreement is excluded from selection, design features,
+readiness derivation, and released labels until a named human adjudicator
+verifies the evidence.

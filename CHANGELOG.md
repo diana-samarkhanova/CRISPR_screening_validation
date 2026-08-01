@@ -27,10 +27,17 @@ suffix and are not claims of a trained biological model.
 - Recorded the observed human-index intake: 1,952 total screens, 278
   `exclude`, 1,674 `metadata_only`, 435 confirmed-scope candidates, 1,239
   manual-review candidates, and zero `benchmark_ready`.
-- Added a checksum-bound partial dual-review workflow. Ranks 6-10 have seven
-  provisional gene-level agreements; ranks 1-5 and human adjudication remain
-  explicitly pending, all adjudication-relevant metadata disagreements remain
-  recorded field by field, and agreement cannot release a benchmark label.
+- Added a checksum-bound dual-review workflow. The frozen ranks 6-10 checkpoint
+  has seven provisional gene-level agreements, and independently completed
+  ranks 1, 3, 4, and 5 are preserved in a separate progress manifest; rank 2
+  and human adjudication remain explicitly pending. Agreement cannot release a
+  benchmark label.
+- Added `complete-curation-reviews`, which requires the exact remaining review
+  complement plus authenticated predecessor and progress checksums, then
+  publishes a self-contained eleven-file bundle atomically for cooperating CLI
+  writers. Immutable snapshots, canonical filenames, raw-cell preservation,
+  and replay tests prevent partial, progress-rewriting, or basename-dependent
+  completion.
 - Added a complete 24-run accession map for `SRP158611`, with eight runs
   conditionally assigned to the two-donor CGS-21680 contrast and the other 16
   excluded as different screens. A separately checksummed ENA inventory

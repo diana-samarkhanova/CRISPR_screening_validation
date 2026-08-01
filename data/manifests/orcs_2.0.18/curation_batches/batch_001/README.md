@@ -7,8 +7,10 @@ score, or validation columns.
 `selection.tsv` is the immutable outcome-blind selection. `reviews.tsv` is a
 separate downstream full-text and supplement review. A partial independent
 review of ranks 6-10 is stored in `reviews_curator_2_partial.tsv`; its derived
-gene-level comparison and checksum manifest are separate again. These layers
-cannot alter the original selection.
+gene-level comparison and checksum manifest are separate again. Independently
+reviewed ranks 1, 3, 4, and 5 are frozen in
+`reviews_curator_2_completion_progress.tsv` with an exact-derived progress
+manifest. These layers cannot alter the original selection.
 
 ## Review result
 
@@ -27,9 +29,11 @@ cannot alter the original selection.
   checksum-bound 24-run ENA inventory containing verbatim sample aliases and
   repository library/instrument fields, plus a separate curated contrast-scope
   table; it remains conditional and no FASTQ has been ingested.
-- Independent second review is complete only for ranks 6-10. Seven compared
-  gene assessments agree provisionally; ranks 1-5 and every final human
-  adjudication remain pending.
+- Independent second review is recorded for nine screens: frozen ranks 6-10
+  plus progress ranks 1, 3, 4, and 5. Rank 2 and every final human adjudication
+  remain pending. The seven gene assessments already compared for ranks 6-10
+  agree provisionally; progress rows are not compared until the exact remaining
+  complement is complete.
 - The same five-screen comparison reports disagreements field by field across
   accessions, data families, supplement completeness, sample maps, replication,
   quantitative assets, rights, source locators, and blocker codes. Gene-level

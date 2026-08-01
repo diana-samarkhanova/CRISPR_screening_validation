@@ -15,10 +15,12 @@ dataset, a pretrained model, or calibrated probabilities.
 The first ten ORCS queue records have completed a primary full-text pilot
 review. Eight expose only author-derived score tables, one exposes a public
 sgRNA count matrix, and one exposes raw amplicon reads. Independent second
-review is complete for ranks 6-10; its seven gene-level agreements are
-provisional and still require human adjudication. No screen currently satisfies
-the count-level, rights, sample-map, and label-adjudication gates together. The
-pilot adds no `benchmark_ready` rows.
+review is recorded for nine screens: frozen ranks 6-10 plus a separate progress
+addendum for ranks 1, 3, 4, and 5. Rank 2 remains pending. The seven gene-level
+comparisons already materialized for ranks 6-10 are provisional, and the four
+new reviews are not compared until completion. All require human adjudication.
+No screen currently satisfies the count-level, rights, sample-map, and
+label-adjudication gates together. The pilot adds no `benchmark_ready` rows.
 
 ## Unit of prediction
 

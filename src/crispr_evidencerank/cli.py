@@ -11,7 +11,11 @@ from typing import get_args
 import pandas as pd
 
 from .contracts import CONTRACTS, validate_records
-from .curation import write_curation_batch, write_dual_review_bundle
+from .curation import (
+    write_completed_dual_review_bundle,
+    write_curation_batch,
+    write_dual_review_bundle,
+)
 from .features import featurize_count_table, featurize_experimental_design
 from .intake import SUPPORTED_POLICY_VERSIONS, triage_orcs_index
 from .io import read_table
@@ -204,6 +208,25 @@ def command_compare_curation_reviews(args: argparse.Namespace) -> int:
         args.output_dir,
         assessed_date=args.assessed_date,
         allow_partial_secondary=args.allow_partial_secondary,
+    )
+    print(json.dumps(manifest, indent=2, sort_keys=True))
+    return 0
+
+
+def command_complete_curation_reviews(args: argparse.Namespace) -> int:
+    manifest = write_completed_dual_review_bundle(
+        args.primary_reviews,
+        args.completion_reviews,
+        args.progress_reviews,
+        args.progress_manifest,
+        args.selection,
+        args.partial_secondary_reviews,
+        args.partial_comparison,
+        args.partial_manifest,
+        args.output_dir,
+        assessed_date=args.assessed_date,
+        expected_checkpoint_manifest_sha256=(args.expected_checkpoint_manifest_sha256),
+        expected_progress_manifest_sha256=(args.expected_progress_manifest_sha256),
     )
     print(json.dumps(manifest, indent=2, sort_keys=True))
     return 0
@@ -406,6 +429,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="explicitly permit a checksum-bound incomplete secondary review",
     )
     review_comparison.set_defaults(func=command_compare_curation_reviews)
+
+    review_completion = subparsers.add_parser(
+        "complete-curation-reviews",
+        help=(
+            "complete checksum-pinned review checkpoints atomically for "
+            "cooperating CLI writers"
+        ),
+    )
+    review_completion.add_argument("--primary-reviews", required=True)
+    review_completion.add_argument("--completion-reviews", required=True)
+    review_completion.add_argument("--progress-reviews", required=True)
+    review_completion.add_argument("--progress-manifest", required=True)
+    review_completion.add_argument("--selection", required=True)
+    review_completion.add_argument("--partial-secondary-reviews", required=True)
+    review_completion.add_argument("--partial-comparison", required=True)
+    review_completion.add_argument("--partial-manifest", required=True)
+    review_completion.add_argument(
+        "--expected-checkpoint-manifest-sha256", required=True
+    )
+    review_completion.add_argument("--expected-progress-manifest-sha256", required=True)
+    review_completion.add_argument("--output-dir", required=True)
+    review_completion.add_argument(
+        "--assessed-date", type=date.fromisoformat, required=True
+    )
+    review_completion.set_defaults(func=command_complete_curation_reviews)
 
     benchmark = subparsers.add_parser(
         "benchmark", help="run grouped out-of-fold baseline evaluation"

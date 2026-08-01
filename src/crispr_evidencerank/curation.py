@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import shutil
 import tempfile
 from datetime import date
 from pathlib import Path
@@ -108,6 +110,25 @@ REVIEW_COMPARISON_COLUMNS = tuple(ReviewComparisonRecord.model_fields)
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _path_lexists(path: Path) -> bool:
+    return os.path.lexists(path)
+
+
+def _read_table_text_cells(path: Path) -> pd.DataFrame:
+    """Read textual cells without treating literal values such as ``NA`` as null."""
+
+    if path.suffix.lower() == ".csv":
+        return pd.read_csv(path, dtype="string", keep_default_na=False)
+    if path.suffix.lower() in {".tsv", ".txt"}:
+        return pd.read_csv(
+            path,
+            sep="\t",
+            dtype="string",
+            keep_default_na=False,
+        )
+    raise ValueError(f"unsupported table extension: {path.suffix}")
 
 
 def select_curation_batch(
@@ -652,6 +673,277 @@ def build_dual_review_manifest(
     }
 
 
+def _require_expected_sha256(value: str, *, field_name: str) -> str:
+    expected = value.strip()
+    if len(expected) != 64 or any(
+        character not in "0123456789abcdef" for character in expected
+    ):
+        raise ValueError(f"{field_name} must be a lowercase SHA-256")
+    return expected
+
+
+def _derive_secondary_review_progress_manifest(
+    progress_reviews_path: Path,
+    primary_reviews_path: Path,
+    selection_path: Path,
+    frozen_secondary_reviews_path: Path,
+    frozen_comparison_path: Path,
+    predecessor_manifest_path: Path,
+    *,
+    assessed_date: date,
+    expected_predecessor_manifest_sha256: str,
+) -> dict[str, object]:
+    """Derive progress from private immutable snapshots."""
+
+    canonical_names = {
+        "progress": "reviews_curator_2_completion_progress.tsv",
+        "primary": "reviews.tsv",
+        "selection": "selection.tsv",
+        "frozen": "reviews_curator_2_partial.tsv",
+        "comparison": "review_comparison_partial.tsv",
+        "predecessor": "dual_review_manifest_partial.json",
+    }
+    observed_names = {
+        "progress": progress_reviews_path.name,
+        "primary": primary_reviews_path.name,
+        "selection": selection_path.name,
+        "frozen": frozen_secondary_reviews_path.name,
+        "comparison": frozen_comparison_path.name,
+        "predecessor": predecessor_manifest_path.name,
+    }
+    for component, expected_name in canonical_names.items():
+        if observed_names[component] != expected_name:
+            raise ValueError(
+                f"secondary review progress requires canonical {component} "
+                f"filename {expected_name!r}"
+            )
+
+    expected_predecessor_sha = _require_expected_sha256(
+        expected_predecessor_manifest_sha256,
+        field_name="expected_predecessor_manifest_sha256",
+    )
+    input_sha = {
+        "progress": _sha256(progress_reviews_path),
+        "primary": _sha256(primary_reviews_path),
+        "selection": _sha256(selection_path),
+        "frozen": _sha256(frozen_secondary_reviews_path),
+        "comparison": _sha256(frozen_comparison_path),
+        "predecessor": _sha256(predecessor_manifest_path),
+    }
+    if input_sha["predecessor"] != expected_predecessor_sha:
+        raise ValueError(
+            "predecessor checkpoint manifest SHA-256 does not match expected"
+        )
+    try:
+        predecessor = json.loads(predecessor_manifest_path.read_text(encoding="utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(
+            "predecessor checkpoint manifest is not valid UTF-8 JSON"
+        ) from exc
+    if not isinstance(predecessor, dict):
+        raise ValueError("predecessor checkpoint manifest must be a JSON object")
+    try:
+        predecessor_timestamp = pd.Timestamp(predecessor["assessed_date"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(
+            "predecessor checkpoint requires a valid assessed_date"
+        ) from exc
+    if pd.isna(predecessor_timestamp):
+        raise ValueError("predecessor checkpoint requires a valid assessed_date")
+    predecessor_date = predecessor_timestamp.date()
+    derived_predecessor = build_dual_review_manifest(
+        primary_reviews_path,
+        frozen_secondary_reviews_path,
+        selection_path,
+        frozen_comparison_path,
+        assessed_date=predecessor_date,
+    )
+    if predecessor != derived_predecessor:
+        raise ValueError(
+            "predecessor checkpoint manifest is not the exact deterministic derivation"
+        )
+    if derived_predecessor["status"] != (
+        "partial_dual_review_requires_completion_and_human_adjudication"
+    ):
+        raise ValueError("predecessor checkpoint is not an incomplete dual review")
+
+    primary = read_table(primary_reviews_path, dtype="string")
+    selection = read_table(selection_path, dtype="string")
+    frozen = read_table(frozen_secondary_reviews_path, dtype="string")
+    progress = read_table(progress_reviews_path, dtype="string")
+    primary_valid = _validate_review_against_selection(
+        primary,
+        selection,
+        role="primary",
+    )
+    frozen_valid = _validate_review_against_selection(
+        frozen,
+        selection,
+        role="frozen secondary",
+        allow_subset=True,
+    )
+    progress_valid = _validate_review_against_selection(
+        progress,
+        selection,
+        role="completion progress",
+        allow_subset=True,
+    )
+    if progress_valid.empty:
+        raise ValueError("secondary review progress requires at least one row")
+    forbidden_release_columns = {"benchmark_ready", "label_code"}
+    if forbidden_release_columns & set(progress.columns):
+        raise ValueError("secondary review progress contains released label columns")
+    frozen_ids = set(frozen_valid["queue_id"].astype(str))
+    progress_ids = set(progress_valid["queue_id"].astype(str))
+    overlap = sorted(frozen_ids & progress_ids)
+    if overlap:
+        raise ValueError(f"secondary review progress overlaps frozen rows: {overlap}")
+    if set(frozen_valid["review_id"].astype(str)) & set(
+        progress_valid["review_id"].astype(str)
+    ):
+        raise ValueError("secondary review progress reuses a frozen review_id")
+    frozen_batches = set(frozen_valid["batch_id"].astype(str))
+    progress_batches = set(progress_valid["batch_id"].astype(str))
+    if len(frozen_batches) != 1 or progress_batches != frozen_batches:
+        raise ValueError(
+            "frozen and progress reviews must use the same single batch_id"
+        )
+    frozen_batch = next(iter(frozen_batches))
+    frozen_curators = sorted(set(frozen_valid["curator"].astype(str)))
+    if derived_predecessor["secondary_curators"] != frozen_curators:
+        raise ValueError(
+            "predecessor secondary_curators do not match frozen secondary rows"
+        )
+    predecessor_primary_curators = set(primary_valid["curator"].astype(str))
+    progress_curators = set(progress_valid["curator"].astype(str))
+    primary_overlap = sorted(progress_curators & predecessor_primary_curators)
+    if primary_overlap:
+        raise ValueError(
+            "completion progress curator identities overlap primary curators: "
+            f"{primary_overlap}"
+        )
+    primary_review_ids = set(primary_valid["review_id"].astype(str))
+    progress_review_ids = set(progress_valid["review_id"].astype(str))
+    reused_primary_ids = sorted(primary_review_ids & progress_review_ids)
+    if reused_primary_ids:
+        raise ValueError(
+            f"completion progress reuses primary review IDs: {reused_primary_ids}"
+        )
+
+    selection_ids = set(selection["queue_id"].astype(str))
+    covered_ids = frozen_ids | progress_ids
+    pending_ids = selection_ids - covered_ids
+    if not pending_ids:
+        raise ValueError(
+            "a complete second review must use the completed dual-review bundle"
+        )
+    manifest_date = pd.Timestamp(assessed_date).date()
+    if predecessor_date > manifest_date:
+        raise ValueError(
+            "progress assessed_date cannot precede the predecessor checkpoint"
+        )
+    review_dates = pd.to_datetime(
+        pd.concat([frozen_valid["assessed_date"], progress_valid["assessed_date"]]),
+        errors="raise",
+    ).dt.date
+    if any(review_date > manifest_date for review_date in review_dates):
+        raise ValueError("progress assessed_date cannot precede a source review")
+
+    rank_by_queue = {
+        str(row["queue_id"]): int(row["queue_rank"]) for _, row in selection.iterrows()
+    }
+
+    def ranks(queue_ids: set[str]) -> list[int]:
+        return sorted(rank_by_queue[queue_id] for queue_id in queue_ids)
+
+    return {
+        "schema_version": 1,
+        "batch_id": frozen_batch,
+        "assessed_date": manifest_date.isoformat(),
+        "status": (
+            "secondary_review_completion_progress_requires_remaining_review_"
+            "and_human_adjudication"
+        ),
+        "human_adjudication_required": True,
+        "adjudicated_gene_count": 0,
+        "released_label_count": 0,
+        "benchmark_ready_count": 0,
+        "selected_screen_count": len(selection),
+        "frozen_second_review_screen_count": len(frozen_valid),
+        "completion_progress_screen_count": len(progress_valid),
+        "second_reviewed_screen_count": len(covered_ids),
+        "pending_second_review_screen_count": len(pending_ids),
+        "pending_queue_ranks": ranks(pending_ids),
+        "selection": {
+            "filename": selection_path.name,
+            "sha256": input_sha["selection"],
+        },
+        "predecessor_checkpoint": {
+            "manifest": {
+                "filename": predecessor_manifest_path.name,
+                "sha256": input_sha["predecessor"],
+            },
+            "secondary_reviews": {
+                "filename": frozen_secondary_reviews_path.name,
+                "sha256": input_sha["frozen"],
+            },
+            "queue_ranks": ranks(frozen_ids),
+        },
+        "completion_progress": {
+            "filename": progress_reviews_path.name,
+            "sha256": input_sha["progress"],
+            "queue_ranks": ranks(progress_ids),
+        },
+    }
+
+
+def build_secondary_review_progress_manifest(
+    progress_reviews_path: str | Path,
+    primary_reviews_path: str | Path,
+    selection_path: str | Path,
+    frozen_secondary_reviews_path: str | Path,
+    frozen_comparison_path: str | Path,
+    predecessor_manifest_path: str | Path,
+    *,
+    assessed_date: date,
+    expected_predecessor_manifest_sha256: str,
+) -> dict[str, object]:
+    """Record an authenticated incomplete addendum from one-read snapshots.
+
+    This manifest is intentionally not a dual-review comparison.  It preserves
+    independently completed rows while at least one selected screen is still
+    awaiting a second review, and it cannot release labels or readiness.
+    """
+
+    input_paths = {
+        "progress": Path(progress_reviews_path),
+        "primary": Path(primary_reviews_path),
+        "selection": Path(selection_path),
+        "frozen": Path(frozen_secondary_reviews_path),
+        "comparison": Path(frozen_comparison_path),
+        "predecessor": Path(predecessor_manifest_path),
+    }
+    input_content = {name: path.read_bytes() for name, path in input_paths.items()}
+    with tempfile.TemporaryDirectory(prefix=".secondary-review-progress-") as temp_name:
+        snapshots_dir = Path(temp_name)
+        snapshot_paths: dict[str, Path] = {}
+        for name, content in input_content.items():
+            snapshot_path = snapshots_dir / name / input_paths[name].name
+            snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+            snapshot_path.write_bytes(content)
+            snapshot_paths[name] = snapshot_path
+        return _derive_secondary_review_progress_manifest(
+            snapshot_paths["progress"],
+            snapshot_paths["primary"],
+            snapshot_paths["selection"],
+            snapshot_paths["frozen"],
+            snapshot_paths["comparison"],
+            snapshot_paths["predecessor"],
+            assessed_date=assessed_date,
+            expected_predecessor_manifest_sha256=(expected_predecessor_manifest_sha256),
+        )
+
+
 def write_dual_review_bundle(
     primary_reviews_path: str | Path,
     secondary_reviews_path: str | Path,
@@ -711,6 +1003,479 @@ def write_dual_review_bundle(
         )
         staging_dir.replace(output_dir)
     return manifest
+
+
+def write_completed_dual_review_bundle(
+    primary_reviews_path: str | Path,
+    completion_reviews_path: str | Path,
+    progress_reviews_path: str | Path,
+    progress_manifest_path: str | Path,
+    selection_path: str | Path,
+    partial_secondary_reviews_path: str | Path,
+    partial_comparison_path: str | Path,
+    partial_manifest_path: str | Path,
+    output_dir: str | Path,
+    *,
+    assessed_date: date,
+    expected_checkpoint_manifest_sha256: str,
+    expected_progress_manifest_sha256: str,
+) -> dict[str, object]:
+    """Complete a frozen partial dual-review checkpoint as one atomic bundle.
+
+    All input paths are read once after acquiring a sibling publisher lock;
+    validation and publication then use only private snapshots.  The final
+    directory rename is atomic for cooperating CLI writers.  Out-of-band
+    writers are detected by a second destination check immediately before the
+    rename, but they are outside the lock's cooperation guarantee.
+    """
+
+    input_paths = {
+        "primary_reviews": Path(primary_reviews_path),
+        "completion_reviews": Path(completion_reviews_path),
+        "progress_reviews": Path(progress_reviews_path),
+        "progress_manifest": Path(progress_manifest_path),
+        "selection": Path(selection_path),
+        "partial_secondary_reviews": Path(partial_secondary_reviews_path),
+        "partial_comparison": Path(partial_comparison_path),
+        "partial_manifest": Path(partial_manifest_path),
+    }
+    if input_paths["completion_reviews"].suffix.lower() != ".tsv":
+        raise ValueError("completion reviews must use the .tsv format")
+    if input_paths["progress_reviews"].suffix.lower() != ".tsv":
+        raise ValueError("progress reviews must use the .tsv format")
+    output_dir = Path(output_dir)
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = output_dir.parent / f".{output_dir.name}.publish.lock"
+    try:
+        lock_fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError as exc:
+        raise FileExistsError(
+            f"completed dual-review publisher lock already exists: {lock_path}"
+        ) from exc
+
+    try:
+        os.write(lock_fd, f"pid={os.getpid()}\n".encode("ascii"))
+        if _path_lexists(output_dir):
+            raise FileExistsError(
+                f"completed dual-review bundle already exists: {output_dir}"
+            )
+
+        # These are the only reads of caller-owned input paths.  Every later
+        # operation uses files reconstructed from this immutable byte snapshot.
+        input_content = {name: path.read_bytes() for name, path in input_paths.items()}
+
+        with tempfile.TemporaryDirectory(
+            dir=output_dir.parent,
+            prefix=f".{output_dir.name}.work-",
+        ) as work_name:
+            work_dir = Path(work_name)
+            snapshots_dir = work_dir / "snapshots"
+            snapshot_paths: dict[str, Path] = {}
+            for name, content in input_content.items():
+                snapshot_path = snapshots_dir / name / input_paths[name].name
+                snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+                snapshot_path.write_bytes(content)
+                snapshot_paths[name] = snapshot_path
+
+            expected_checkpoint_sha = _require_expected_sha256(
+                expected_checkpoint_manifest_sha256,
+                field_name="expected_checkpoint_manifest_sha256",
+            )
+            expected_progress_sha = _require_expected_sha256(
+                expected_progress_manifest_sha256,
+                field_name="expected_progress_manifest_sha256",
+            )
+            input_sha = {name: _sha256(path) for name, path in snapshot_paths.items()}
+            if input_sha["partial_manifest"] != expected_checkpoint_sha:
+                raise ValueError(
+                    "partial checkpoint manifest SHA-256 does not match expected"
+                )
+            if input_sha["progress_manifest"] != expected_progress_sha:
+                raise ValueError(
+                    "progress checkpoint manifest SHA-256 does not match expected"
+                )
+
+            # Parse only after authenticating the exact checkpoint manifest bytes.
+            try:
+                observed_partial_manifest = json.loads(
+                    snapshot_paths["partial_manifest"].read_text(encoding="utf-8")
+                )
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ValueError(
+                    "partial checkpoint manifest is not valid UTF-8 JSON"
+                ) from exc
+            if not isinstance(observed_partial_manifest, dict):
+                raise ValueError("partial checkpoint manifest must be a JSON object")
+            try:
+                predecessor_timestamp = pd.Timestamp(
+                    observed_partial_manifest["assessed_date"]
+                )
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ValueError(
+                    "partial checkpoint manifest requires a valid assessed_date"
+                ) from exc
+            if pd.isna(predecessor_timestamp):
+                raise ValueError(
+                    "partial checkpoint manifest requires a valid assessed_date"
+                )
+            predecessor_date = predecessor_timestamp.date()
+            completion_date = pd.Timestamp(assessed_date).date()
+            if completion_date < predecessor_date:
+                raise ValueError(
+                    "completed assessed_date cannot precede the partial checkpoint"
+                )
+
+            derived_partial_manifest = build_dual_review_manifest(
+                snapshot_paths["primary_reviews"],
+                snapshot_paths["partial_secondary_reviews"],
+                snapshot_paths["selection"],
+                snapshot_paths["partial_comparison"],
+                assessed_date=predecessor_date,
+            )
+            if observed_partial_manifest != derived_partial_manifest:
+                raise ValueError(
+                    "partial checkpoint manifest is not the exact deterministic "
+                    "derivation"
+                )
+            canonical_predecessor_filenames = {
+                "selection": "selection.tsv",
+                "primary_reviews": "reviews.tsv",
+                "secondary_reviews": "reviews_curator_2_partial.tsv",
+                "comparison": "review_comparison_partial.tsv",
+            }
+            for component, expected_filename in canonical_predecessor_filenames.items():
+                component_manifest = derived_partial_manifest.get(component)
+                observed_filename = (
+                    component_manifest.get("filename")
+                    if isinstance(component_manifest, dict)
+                    else None
+                )
+                if observed_filename != expected_filename:
+                    raise ValueError(
+                        "partial checkpoint must use canonical predecessor filename "
+                        f"{expected_filename!r} for {component}"
+                    )
+            if derived_partial_manifest["status"] != (
+                "partial_dual_review_requires_completion_and_human_adjudication"
+            ):
+                raise ValueError(
+                    "predecessor checkpoint is not an incomplete dual review"
+                )
+
+            try:
+                observed_progress_manifest = json.loads(
+                    snapshot_paths["progress_manifest"].read_text(encoding="utf-8")
+                )
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ValueError(
+                    "progress checkpoint manifest is not valid UTF-8 JSON"
+                ) from exc
+            if not isinstance(observed_progress_manifest, dict):
+                raise ValueError("progress checkpoint manifest must be a JSON object")
+            try:
+                progress_timestamp = pd.Timestamp(
+                    observed_progress_manifest["assessed_date"]
+                )
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ValueError(
+                    "progress checkpoint manifest requires a valid assessed_date"
+                ) from exc
+            if pd.isna(progress_timestamp):
+                raise ValueError(
+                    "progress checkpoint manifest requires a valid assessed_date"
+                )
+            progress_date = progress_timestamp.date()
+            if completion_date < progress_date:
+                raise ValueError(
+                    "completed assessed_date cannot precede the progress checkpoint"
+                )
+            derived_progress_manifest = _derive_secondary_review_progress_manifest(
+                snapshot_paths["progress_reviews"],
+                snapshot_paths["primary_reviews"],
+                snapshot_paths["selection"],
+                snapshot_paths["partial_secondary_reviews"],
+                snapshot_paths["partial_comparison"],
+                snapshot_paths["partial_manifest"],
+                assessed_date=progress_date,
+                expected_predecessor_manifest_sha256=expected_checkpoint_sha,
+            )
+            if observed_progress_manifest != derived_progress_manifest:
+                raise ValueError(
+                    "progress checkpoint manifest is not the exact deterministic "
+                    "derivation"
+                )
+
+            primary = read_table(snapshot_paths["primary_reviews"], dtype="string")
+            completion = read_table(
+                snapshot_paths["completion_reviews"], dtype="string"
+            )
+            progress = read_table(snapshot_paths["progress_reviews"], dtype="string")
+            selection = read_table(snapshot_paths["selection"], dtype="string")
+            partial_secondary = read_table(
+                snapshot_paths["partial_secondary_reviews"], dtype="string"
+            )
+            partial_secondary_raw = _read_table_text_cells(
+                snapshot_paths["partial_secondary_reviews"]
+            )
+            completion_raw = _read_table_text_cells(
+                snapshot_paths["completion_reviews"]
+            )
+            progress_raw = _read_table_text_cells(snapshot_paths["progress_reviews"])
+            primary_valid = _validate_review_against_selection(
+                primary,
+                selection,
+                role="primary",
+            )
+            partial_valid = _validate_review_against_selection(
+                partial_secondary,
+                selection,
+                role="partial secondary",
+                allow_subset=True,
+            )
+            completion_valid = _validate_review_against_selection(
+                completion,
+                selection,
+                role="completion secondary",
+                allow_subset=True,
+            )
+            progress_valid = _validate_review_against_selection(
+                progress,
+                selection,
+                role="completion progress",
+                allow_subset=True,
+            )
+
+            for role, reviews in (
+                ("partial secondary", partial_valid),
+                ("completion secondary", completion_valid),
+                ("completion progress", progress_valid),
+            ):
+                if reviews["queue_id"].duplicated().any():
+                    raise ValueError(f"{role} queue_id values must be unique")
+
+            selection_ids = set(selection["queue_id"].astype(str))
+            partial_ids = set(partial_valid["queue_id"].astype(str))
+            completion_ids = set(completion_valid["queue_id"].astype(str))
+            overlap = sorted(partial_ids & completion_ids)
+            if overlap:
+                raise ValueError(
+                    f"completion reviews overlap frozen partial rows: {overlap}"
+                )
+            expected_completion_ids = selection_ids - partial_ids
+            missing = sorted(expected_completion_ids - completion_ids)
+            unexpected = sorted(completion_ids - expected_completion_ids)
+            if missing or unexpected:
+                raise ValueError(
+                    "completion reviews are not the exact selection complement: "
+                    f"missing={missing}, unexpected={unexpected}"
+                )
+            progress_ids = set(progress_valid["queue_id"].astype(str))
+            missing_progress = sorted(progress_ids - completion_ids)
+            if missing_progress:
+                raise ValueError(
+                    f"completion reviews omit frozen progress rows: {missing_progress}"
+                )
+            if set(progress_raw.columns) != set(completion_raw.columns):
+                raise ValueError(
+                    "progress and completion review columns must match exactly"
+                )
+            progress_aligned = progress_raw.loc[:, completion_raw.columns]
+            completion_by_queue = completion_raw.set_index("queue_id", drop=False)
+            completion_progress_rows = completion_by_queue.loc[
+                progress_aligned["queue_id"].astype(str), completion_raw.columns
+            ].reset_index(drop=True)
+            if (
+                not completion_progress_rows.fillna("")
+                .astype(str)
+                .equals(progress_aligned.fillna("").astype(str).reset_index(drop=True))
+            ):
+                raise ValueError(
+                    "completion reviews changed authenticated progress cells"
+                )
+
+            if set(partial_secondary_raw.columns) != set(completion_raw.columns):
+                raise ValueError(
+                    "partial and completion review columns must match exactly"
+                )
+            raw_columns = partial_secondary_raw.columns.tolist()
+            completion_aligned = completion_raw.loc[:, raw_columns]
+            combined_secondary = pd.concat(
+                [partial_secondary_raw, completion_aligned], ignore_index=True
+            )
+            selection_order = {
+                str(queue_id): index
+                for index, queue_id in enumerate(selection["queue_id"].astype(str))
+            }
+            combined_secondary["_selection_order"] = combined_secondary["queue_id"].map(
+                selection_order
+            )
+            combined_secondary = (
+                combined_secondary.sort_values("_selection_order", kind="stable")
+                .drop(columns="_selection_order")
+                .reset_index(drop=True)
+            )
+            if len(combined_secondary) != len(selection):
+                raise ValueError(
+                    "completed secondary review count differs from the selection"
+                )
+
+            combined_valid = pd.concat(
+                [partial_valid, completion_valid], ignore_index=True
+            )
+            combined_valid["_selection_order"] = combined_valid["queue_id"].map(
+                selection_order
+            )
+            combined_valid = (
+                combined_valid.sort_values("_selection_order", kind="stable")
+                .drop(columns="_selection_order")
+                .reset_index(drop=True)
+            )
+
+            comparison = compare_full_text_reviews(
+                primary_valid,
+                combined_valid,
+                selection,
+                assessed_date=completion_date,
+            )
+            forbidden_release_columns = {"benchmark_ready", "label_code"}
+            if forbidden_release_columns & set(combined_secondary.columns):
+                raise ValueError("completed reviews contain released label columns")
+            if forbidden_release_columns & set(comparison.columns):
+                raise ValueError("completed comparison contains released label columns")
+
+            partial_ranks = sorted(partial_valid["queue_rank"].astype(int).tolist())
+            completion_ranks = sorted(
+                completion_valid["queue_rank"].astype(int).tolist()
+            )
+            staging_dir = work_dir / "publish"
+            staging_dir.mkdir()
+            preserved_files = {
+                "primary_reviews": "reviews.tsv",
+                "selection": "selection.tsv",
+                "partial_secondary_reviews": "reviews_curator_2_partial.tsv",
+                "partial_comparison": "review_comparison_partial.tsv",
+                "partial_manifest": "dual_review_manifest_partial.json",
+                "progress_reviews": "reviews_curator_2_completion_progress.tsv",
+                "progress_manifest": "secondary_review_progress_manifest.json",
+                "completion_reviews": "reviews_curator_2_completion.tsv",
+            }
+            for key, filename in preserved_files.items():
+                shutil.copyfile(snapshot_paths[key], staging_dir / filename)
+
+            full_secondary_path = staging_dir / "reviews_curator_2.tsv"
+            full_comparison_path = staging_dir / "review_comparison.tsv"
+            full_manifest_path = staging_dir / "dual_review_manifest.json"
+            combined_secondary.to_csv(
+                full_secondary_path,
+                sep="\t",
+                index=False,
+                lineterminator="\n",
+            )
+            comparison.to_csv(
+                full_comparison_path,
+                sep="\t",
+                index=False,
+                lineterminator="\n",
+            )
+
+            # The authenticated raw partial and completion cells, including
+            # surrounding whitespace, must survive the full-table write exactly.
+            written_secondary = _read_table_text_cells(full_secondary_path)
+            written_by_queue = written_secondary.set_index("queue_id", drop=False)
+            for role, source in (
+                ("partial", partial_secondary_raw),
+                ("progress", progress_aligned),
+                ("completion", completion_aligned),
+            ):
+                written_subset = written_by_queue.loc[
+                    source["queue_id"].astype(str), raw_columns
+                ].reset_index(drop=True)
+                source_text = source.loc[:, raw_columns].fillna("").astype(str)
+                written_text = written_subset.fillna("").astype(str)
+                if not written_text.equals(source_text.reset_index(drop=True)):
+                    raise RuntimeError(
+                        f"completed reviews did not preserve {role} raw cells"
+                    )
+
+            manifest = build_dual_review_manifest(
+                staging_dir / "reviews.tsv",
+                full_secondary_path,
+                staging_dir / "selection.tsv",
+                full_comparison_path,
+                assessed_date=completion_date,
+            )
+            if manifest["status"] != (
+                "dual_review_complete_requires_human_adjudication"
+            ):
+                raise RuntimeError(
+                    "completed bundle did not reach the complete review state"
+                )
+            manifest.update(
+                {
+                    "schema_version": 2,
+                    "human_adjudication_required": True,
+                    "adjudication_status": "pending_human_adjudication",
+                    "adjudicated_gene_count": 0,
+                    "released_label_count": 0,
+                    "benchmark_ready_count": 0,
+                    "predecessor_checkpoint": {
+                        "manifest": {
+                            "filename": preserved_files["partial_manifest"],
+                            "sha256": input_sha["partial_manifest"],
+                        },
+                        "secondary_reviews": {
+                            "filename": preserved_files["partial_secondary_reviews"],
+                            "sha256": input_sha["partial_secondary_reviews"],
+                        },
+                        "comparison": {
+                            "filename": preserved_files["partial_comparison"],
+                            "sha256": input_sha["partial_comparison"],
+                        },
+                        "second_reviewed_screen_count": len(partial_valid),
+                        "queue_ranks": partial_ranks,
+                    },
+                    "progress_checkpoint": {
+                        "manifest": {
+                            "filename": preserved_files["progress_manifest"],
+                            "sha256": input_sha["progress_manifest"],
+                        },
+                        "secondary_reviews": {
+                            "filename": preserved_files["progress_reviews"],
+                            "sha256": input_sha["progress_reviews"],
+                        },
+                        "second_reviewed_screen_count": len(progress_valid),
+                        "queue_ranks": sorted(
+                            progress_valid["queue_rank"].astype(int).tolist()
+                        ),
+                    },
+                    "completion_lineage": {
+                        "input": {
+                            "filename": preserved_files["completion_reviews"],
+                            "sha256": input_sha["completion_reviews"],
+                        },
+                        "completed_screen_count": len(completion_valid),
+                        "queue_ranks": completion_ranks,
+                    },
+                }
+            )
+            full_manifest_path.write_text(
+                json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+
+            if _path_lexists(output_dir):
+                raise FileExistsError(
+                    "completed dual-review destination appeared while staging: "
+                    f"{output_dir}"
+                )
+            staging_dir.rename(output_dir)
+        return manifest
+    finally:
+        os.close(lock_fd)
+        try:
+            lock_path.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def build_run_accession_map_manifest(

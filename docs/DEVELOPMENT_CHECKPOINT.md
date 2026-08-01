@@ -77,10 +77,11 @@ selection. Its biological context and results remain outside Git history and
 are reserved for evaluation after the public-data model and selection rules
 are frozen.
 
-The ORCS pilot now records a partial dual review for queue ranks 6-10 and an
-accession-level map for all 24 `SRP158611` amplicon runs. Seven gene-level
-assessments agree provisionally, but ranks 1-5 and human adjudication remain
-pending. A public Findlay supplementary matrix was also identified; its
+The ORCS pilot now records a frozen partial dual review for queue ranks 6-10,
+a checksum-bound second-review progress addendum for ranks 1, 3, 4, and 5, and
+an accession-level map for all 24 `SRP158611` amplicon runs. Seven gene-level
+assessments from the frozen checkpoint agree provisionally; rank 2 and human
+adjudication remain pending. A public Findlay supplementary matrix was also identified; its
 two-replicate count columns conflict with triplicate wording in the methods.
 These discoveries improve provenance but do not create training rows:
 `benchmark_ready` remains zero.

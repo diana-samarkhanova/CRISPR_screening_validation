@@ -30,13 +30,15 @@ The checked-in files are:
 - `derived_manifest.json`: record counts and checksums for the two derived
   queue artifacts.
 - `curation_batches/batch_001/`: the frozen outcome-blind ranks 1-10 selection,
-  its separate full-text review, and portable checksum manifests.
+  its separate full-text review, a frozen ranks 6-10 dual-review checkpoint,
+  and a checksum-bound completion-progress addendum for ranks 1, 3, 4, and 5.
 
 ORCS `HIT` values are deliberately absent from queue prioritization and are
 never interpreted as validation outcomes. The ORCS MIT license covers the
 ORCS-distributed files only; it does not establish redistribution rights for
 authors' upstream sequencing or count-level data.
 
-Batch 001 remains a single-curator development review. All ten screens are
-still `metadata_only`; candidate validation grades require independent
-curation and formal event adjudication before they can become labels.
+Batch 001 has a primary review for all ten screens and independent second-review
+records for nine; rank 2 remains pending. All ten screens are still
+`metadata_only`; candidate validation grades require full independent review
+and formal event adjudication before they can become labels.
