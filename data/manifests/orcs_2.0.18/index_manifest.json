@@ -1,0 +1,20 @@
+{
+  "archive_sha256": "39222a9650eed083edf193debe45eedc4aabc779ca04ea70107b6bd1efd9b8d7",
+  "available_date": "2025-10-07",
+  "byte_size": 1328911,
+  "data_rows": 1952,
+  "filename": "BIOGRID-ORCS-SCREEN_INDEX-2.0.18.index.tab.txt",
+  "inventory": {
+    "max_member_bytes": 3934397,
+    "regular_member_count": 1953,
+    "screen_ids_sha256": "4666ff1d6edf10e0bc5ab0e3d4a6d328285e0ab416a7b0344ff82c14ee18d6a2",
+    "screen_member_count": 1952,
+    "total_uncompressed_bytes": 2883261168
+  },
+  "license_scope": "BioGRID ORCS-distributed files only",
+  "license_spdx": "MIT",
+  "screen_ids_sha256": "4666ff1d6edf10e0bc5ab0e3d4a6d328285e0ab416a7b0344ff82c14ee18d6a2",
+  "sha256": "6754e87ef758a3525ab7d690b183338f2ee6de72a36dde6e85fe19dee165f02d",
+  "source_name": "BioGRID ORCS",
+  "source_version": "2.0.18"
+}

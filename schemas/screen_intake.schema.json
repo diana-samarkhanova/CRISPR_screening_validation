@@ -70,6 +70,9 @@
         "properties": {
           "status": {
             "const": "benchmark_ready"
+          },
+          "candidate_for_full_curation": {
+            "const": true
           }
         }
       }
@@ -141,7 +144,7 @@
       "type": "string"
     },
     "policy_version": {
-      "minimum": 1,
+      "const": 2,
       "title": "Policy Version",
       "type": "integer"
     },

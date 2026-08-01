@@ -1,0 +1,591 @@
+{
+  "$defs": {
+    "EligibilityOutcome": {
+      "enum": [
+        "pass",
+        "fail",
+        "unknown"
+      ],
+      "title": "EligibilityOutcome",
+      "type": "string"
+    },
+    "QuantitativeDataStatus": {
+      "enum": [
+        "raw_reads_public",
+        "raw_counts_public",
+        "derived_counts_public",
+        "author_scores_public",
+        "available_from_authors",
+        "not_found",
+        "unresolved"
+      ],
+      "title": "QuantitativeDataStatus",
+      "type": "string"
+    },
+    "ReviewCompleteness": {
+      "enum": [
+        "complete",
+        "partial",
+        "unresolved",
+        "not_applicable"
+      ],
+      "title": "ReviewCompleteness",
+      "type": "string"
+    },
+    "ValidationReviewStatus": {
+      "enum": [
+        "candidate_v3",
+        "candidate_v2",
+        "candidate_v1",
+        "nonqualifying_only",
+        "none_reported",
+        "unresolved"
+      ],
+      "title": "ValidationReviewStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "quantitative_data_status": {
+            "enum": [
+              "raw_reads_public",
+              "raw_counts_public"
+            ]
+          }
+        },
+        "required": [
+          "quantitative_data_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data_accession": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "raw_data_family_id": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "data_accession",
+          "raw_data_family_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "validation_status": {
+            "const": "candidate_v3"
+          }
+        },
+        "required": [
+          "validation_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "candidate_v3_genes": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "candidate_v3_genes"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "validation_status": {
+            "const": "candidate_v2"
+          }
+        },
+        "required": [
+          "validation_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "candidate_v2_genes": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "candidate_v2_genes"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "validation_status": {
+            "const": "candidate_v1"
+          }
+        },
+        "required": [
+          "validation_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "candidate_v1_genes": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "candidate_v1_genes"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "validation_status": {
+            "const": "nonqualifying_only"
+          }
+        },
+        "required": [
+          "validation_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "nonqualifying_validation_genes": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "nonqualifying_validation_genes"
+        ]
+      }
+    },
+    {
+      "else": {
+        "properties": {
+          "scope_outcome": {
+            "enum": [
+              "pass",
+              "unknown"
+            ]
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "disposition": {
+            "const": "exclude"
+          }
+        },
+        "required": [
+          "disposition"
+        ]
+      },
+      "then": {
+        "properties": {
+          "scope_outcome": {
+            "const": "fail"
+          }
+        },
+        "required": [
+          "scope_outcome"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "validation_status": {
+            "const": "candidate_v2"
+          }
+        },
+        "required": [
+          "validation_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "candidate_v3_genes": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "validation_status": {
+            "const": "candidate_v1"
+          }
+        },
+        "required": [
+          "validation_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "candidate_v3_genes": {
+            "type": "null"
+          },
+          "candidate_v2_genes": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "validation_status": {
+            "enum": [
+              "nonqualifying_only",
+              "none_reported",
+              "unresolved"
+            ]
+          }
+        },
+        "required": [
+          "validation_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "candidate_v3_genes": {
+            "type": "null"
+          },
+          "candidate_v2_genes": {
+            "type": "null"
+          },
+          "candidate_v1_genes": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "validation_status": {
+            "enum": [
+              "none_reported",
+              "unresolved"
+            ]
+          }
+        },
+        "required": [
+          "validation_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "nonqualifying_validation_genes": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ],
+  "description": "Outcome-aware review kept downstream of the frozen curation queue.\n\nThis record deliberately has no ``benchmark_ready`` field. Readiness is\nestablished only by ``ScreenIntakeRecord`` plus linked registry facts and\n``validate_registry_integrity``.",
+  "properties": {
+    "review_id": {
+      "minLength": 1,
+      "title": "Review Id",
+      "type": "string"
+    },
+    "batch_id": {
+      "minLength": 1,
+      "title": "Batch Id",
+      "type": "string"
+    },
+    "queue_id": {
+      "minLength": 1,
+      "title": "Queue Id",
+      "type": "string"
+    },
+    "queue_rank": {
+      "minimum": 1,
+      "title": "Queue Rank",
+      "type": "integer"
+    },
+    "screen_id": {
+      "minLength": 1,
+      "title": "Screen Id",
+      "type": "string"
+    },
+    "external_screen_id": {
+      "minLength": 1,
+      "title": "External Screen Id",
+      "type": "string"
+    },
+    "source_family_id": {
+      "minLength": 1,
+      "title": "Source Family Id",
+      "type": "string"
+    },
+    "quantitative_asset_family_id": {
+      "minLength": 1,
+      "title": "Quantitative Asset Family Id",
+      "type": "string"
+    },
+    "raw_data_family_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Raw Data Family Id"
+    },
+    "source_id": {
+      "minLength": 1,
+      "title": "Source Id",
+      "type": "string"
+    },
+    "doi": {
+      "minLength": 1,
+      "title": "Doi",
+      "type": "string"
+    },
+    "paper_url": {
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Paper Url",
+      "type": "string"
+    },
+    "full_text_url": {
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Full Text Url",
+      "type": "string"
+    },
+    "supplement_url": {
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Supplement Url",
+      "type": "string"
+    },
+    "full_text_reviewed": {
+      "title": "Full Text Reviewed",
+      "type": "boolean"
+    },
+    "supplement_review": {
+      "$ref": "#/$defs/ReviewCompleteness"
+    },
+    "scope_outcome": {
+      "$ref": "#/$defs/EligibilityOutcome"
+    },
+    "design_review": {
+      "$ref": "#/$defs/ReviewCompleteness"
+    },
+    "sample_map_review": {
+      "$ref": "#/$defs/ReviewCompleteness"
+    },
+    "screen_model": {
+      "minLength": 1,
+      "title": "Screen Model",
+      "type": "string"
+    },
+    "library_design": {
+      "minLength": 1,
+      "title": "Library Design",
+      "type": "string"
+    },
+    "treatment_contrast": {
+      "minLength": 1,
+      "title": "Treatment Contrast",
+      "type": "string"
+    },
+    "screen_replication": {
+      "minLength": 1,
+      "title": "Screen Replication",
+      "type": "string"
+    },
+    "analysis_method": {
+      "minLength": 1,
+      "title": "Analysis Method",
+      "type": "string"
+    },
+    "quantitative_data_status": {
+      "$ref": "#/$defs/QuantitativeDataStatus"
+    },
+    "quantitative_asset_locator": {
+      "minLength": 1,
+      "title": "Quantitative Asset Locator",
+      "type": "string"
+    },
+    "data_accession": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Data Accession"
+    },
+    "rights_outcome": {
+      "$ref": "#/$defs/EligibilityOutcome"
+    },
+    "rights_basis": {
+      "minLength": 1,
+      "title": "Rights Basis",
+      "type": "string"
+    },
+    "validation_status": {
+      "$ref": "#/$defs/ValidationReviewStatus"
+    },
+    "candidate_v3_genes": {
+      "anyOf": [
+        {
+          "pattern": "^[^|\\s]+(?:\\|[^|\\s]+)*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Candidate V3 Genes"
+    },
+    "candidate_v2_genes": {
+      "anyOf": [
+        {
+          "pattern": "^[^|\\s]+(?:\\|[^|\\s]+)*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Candidate V2 Genes"
+    },
+    "candidate_v1_genes": {
+      "anyOf": [
+        {
+          "pattern": "^[^|\\s]+(?:\\|[^|\\s]+)*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Candidate V1 Genes"
+    },
+    "nonqualifying_validation_genes": {
+      "anyOf": [
+        {
+          "pattern": "^[^|\\s]+(?:\\|[^|\\s]+)*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Nonqualifying Validation Genes"
+    },
+    "validation_source_locator": {
+      "minLength": 1,
+      "title": "Validation Source Locator",
+      "type": "string"
+    },
+    "disposition": {
+      "enum": [
+        "metadata_only",
+        "exclude"
+      ],
+      "title": "Disposition",
+      "type": "string"
+    },
+    "blocker_codes": {
+      "minLength": 1,
+      "pattern": "^[^|]+(?:\\|[^|]+)*$",
+      "title": "Blocker Codes",
+      "type": "string"
+    },
+    "assessed_date": {
+      "format": "date",
+      "title": "Assessed Date",
+      "type": "string"
+    },
+    "curator": {
+      "minLength": 1,
+      "title": "Curator",
+      "type": "string"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "review_id",
+    "batch_id",
+    "queue_id",
+    "queue_rank",
+    "screen_id",
+    "external_screen_id",
+    "source_family_id",
+    "quantitative_asset_family_id",
+    "source_id",
+    "doi",
+    "paper_url",
+    "full_text_url",
+    "supplement_url",
+    "full_text_reviewed",
+    "supplement_review",
+    "scope_outcome",
+    "design_review",
+    "sample_map_review",
+    "screen_model",
+    "library_design",
+    "treatment_contrast",
+    "screen_replication",
+    "analysis_method",
+    "quantitative_data_status",
+    "quantitative_asset_locator",
+    "rights_outcome",
+    "rights_basis",
+    "validation_status",
+    "validation_source_locator",
+    "disposition",
+    "blocker_codes",
+    "assessed_date",
+    "curator"
+  ],
+  "title": "FullTextReviewRecord",
+  "type": "object",
+  "x-semantic-rules": [
+    "Pipe-delimited blocker and gene lists are sorted and unique.",
+    "A gene cannot appear at multiple validation evidence levels.",
+    "Blocker codes must be policy-v2 rules and agree with raw-family resolution."
+  ]
+}

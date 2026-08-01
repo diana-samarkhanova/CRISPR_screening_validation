@@ -1,0 +1,123 @@
+{
+  "additionalProperties": false,
+  "description": "Pinned repository inventory used to prove that a run map is complete.",
+  "properties": {
+    "bioproject_accession": {
+      "minLength": 1,
+      "title": "Bioproject Accession",
+      "type": "string"
+    },
+    "study_accession": {
+      "minLength": 1,
+      "title": "Study Accession",
+      "type": "string"
+    },
+    "run_accession": {
+      "minLength": 1,
+      "title": "Run Accession",
+      "type": "string"
+    },
+    "experiment_accession": {
+      "minLength": 1,
+      "title": "Experiment Accession",
+      "type": "string"
+    },
+    "sample_accession": {
+      "minLength": 1,
+      "title": "Sample Accession",
+      "type": "string"
+    },
+    "secondary_sample_accession": {
+      "minLength": 1,
+      "title": "Secondary Sample Accession",
+      "type": "string"
+    },
+    "source_sample_id": {
+      "minLength": 1,
+      "title": "Source Sample Id",
+      "type": "string"
+    },
+    "repository_sample_alias": {
+      "minLength": 1,
+      "title": "Repository Sample Alias",
+      "type": "string"
+    },
+    "repository_screen_group": {
+      "minLength": 1,
+      "title": "Repository Screen Group",
+      "type": "string"
+    },
+    "library_strategy": {
+      "minLength": 1,
+      "title": "Library Strategy",
+      "type": "string"
+    },
+    "library_source": {
+      "minLength": 1,
+      "title": "Library Source",
+      "type": "string"
+    },
+    "library_selection": {
+      "minLength": 1,
+      "title": "Library Selection",
+      "type": "string"
+    },
+    "library_layout": {
+      "minLength": 1,
+      "title": "Library Layout",
+      "type": "string"
+    },
+    "instrument_model": {
+      "minLength": 1,
+      "title": "Instrument Model",
+      "type": "string"
+    },
+    "donor_id": {
+      "minLength": 1,
+      "title": "Donor Id",
+      "type": "string"
+    },
+    "phenotype_bin": {
+      "enum": [
+        "dividing",
+        "nondividing"
+      ],
+      "title": "Phenotype Bin",
+      "type": "string"
+    },
+    "repository_metadata_url": {
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Repository Metadata Url",
+      "type": "string"
+    },
+    "retrieved_date": {
+      "format": "date",
+      "title": "Retrieved Date",
+      "type": "string"
+    }
+  },
+  "required": [
+    "bioproject_accession",
+    "study_accession",
+    "run_accession",
+    "experiment_accession",
+    "sample_accession",
+    "secondary_sample_accession",
+    "source_sample_id",
+    "repository_sample_alias",
+    "repository_screen_group",
+    "library_strategy",
+    "library_source",
+    "library_selection",
+    "library_layout",
+    "instrument_model",
+    "donor_id",
+    "phenotype_bin",
+    "repository_metadata_url",
+    "retrieved_date"
+  ],
+  "title": "RunAccessionInventoryRecord",
+  "type": "object"
+}

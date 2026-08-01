@@ -14,14 +14,18 @@ import pandas as pd
 from .contracts import (
     INTAKE_POLICY_RULE_IDS,
     AssessmentStage,
+    CurationQueueBucket,
+    CurationQueueRecord,
     EligibilityCheckRecord,
     EligibilityOutcome,
     IntakeStatus,
+    PerturbationModality,
     ScreenIntakeRecord,
     StrictRecord,
 )
 from .orcs import (
     OrcsIndexParseResult,
+    classify_orcs_modality,
     orcs_screen_id,
     parse_orcs_index,
 )
@@ -36,6 +40,7 @@ class OrcsIntakeResult:
     parsed: OrcsIndexParseResult
     screen_intake: pd.DataFrame
     eligibility_checks: pd.DataFrame
+    curation_queue: pd.DataFrame
     candidate_screen_ids: tuple[str, ...]
     summary: dict[str, object]
 
@@ -191,38 +196,80 @@ def derive_intake_decision(
     )
 
 
-def _organism_check(value: object) -> tuple[EligibilityOutcome, str]:
-    normalized = _normalized(value)
-    if normalized is None:
-        return EligibilityOutcome.UNKNOWN, "organism_unreported"
-    if normalized in {"human", "homo sapiens", "9606"}:
-        return EligibilityOutcome.PASS, "human_scope_confirmed"
-    return EligibilityOutcome.FAIL, "non_human_organism"
+def _organism_check(
+    organism_official: object,
+    organism_id: object,
+) -> tuple[EligibilityOutcome, str, str | None]:
+    official = _normalized(organism_official)
+    taxonomy_id = _normalized(organism_id)
+    observed = " | ".join(
+        value
+        for value in (
+            f"name={official}" if official else None,
+            f"taxon={taxonomy_id}" if taxonomy_id else None,
+        )
+        if value
+    )
+    if not observed:
+        return EligibilityOutcome.UNKNOWN, "organism_unreported", None
+
+    human_names = {"human", "homo sapiens", "h. sapiens", "h sapiens"}
+    name_is_human = official in human_names if official else None
+    id_is_human = taxonomy_id == "9606" if taxonomy_id else None
+    if (
+        name_is_human is not None
+        and id_is_human is not None
+        and name_is_human != id_is_human
+    ):
+        return (
+            EligibilityOutcome.UNKNOWN,
+            "organism_fields_conflict",
+            observed,
+        )
+    if name_is_human is True or id_is_human is True:
+        return EligibilityOutcome.PASS, "human_scope_confirmed", observed
+    return EligibilityOutcome.FAIL, "non_human_organism", observed
 
 
 def _modality_check(
     library_type: object, methodology: object
 ) -> tuple[EligibilityOutcome, str, str | None]:
-    values = [
-        value
-        for value in (_normalized(library_type), _normalized(methodology))
-        if value
-    ]
-    combined = " | ".join(values) if values else None
-    searchable = " ".join(values)
-    if "knockout" in searchable or "crisprn" in searchable or "crispr ko" in searchable:
-        return EligibilityOutcome.PASS, "crispr_ko_confirmed", combined
-    explicit_other = (
-        "activation",
-        "inhibition",
-        "crispra",
-        "crispri",
-        "base editing",
-        "prime editing",
+    assessment = classify_orcs_modality(library_type, methodology)
+    if assessment.conflict:
+        return (
+            EligibilityOutcome.UNKNOWN,
+            "perturbation_metadata_conflict",
+            assessment.observed_value,
+        )
+    if assessment.modality == PerturbationModality.CRISPRA:
+        return (
+            EligibilityOutcome.FAIL,
+            "non_ko_perturbation_crispra",
+            assessment.observed_value,
+        )
+    if assessment.modality == PerturbationModality.CRISPRI:
+        return (
+            EligibilityOutcome.FAIL,
+            "non_ko_perturbation_crispri",
+            assessment.observed_value,
+        )
+    if assessment.explicit_non_ko:
+        return (
+            EligibilityOutcome.FAIL,
+            "non_ko_perturbation_other_editing",
+            assessment.observed_value,
+        )
+    if assessment.modality == PerturbationModality.CRISPR_KO:
+        return (
+            EligibilityOutcome.PASS,
+            "crispr_ko_confirmed",
+            assessment.observed_value,
+        )
+    return (
+        EligibilityOutcome.UNKNOWN,
+        "perturbation_unresolved",
+        assessment.observed_value,
     )
-    if any(term in searchable for term in explicit_other):
-        return EligibilityOutcome.FAIL, "non_ko_perturbation", combined
-    return EligibilityOutcome.UNKNOWN, "perturbation_unresolved", combined
 
 
 def _setup_check(value: object) -> tuple[EligibilityOutcome, str]:
@@ -262,11 +309,162 @@ def _format_check(value: object) -> tuple[EligibilityOutcome, str]:
     return EligibilityOutcome.UNKNOWN, "screen_format_unresolved"
 
 
+def _natural_identifier_key(value: object) -> tuple[int, int, str]:
+    text = _text(value) or ""
+    if text.isdecimal():
+        return (0, int(text), "")
+    return (1, 0, text.casefold())
+
+
+def build_orcs_curation_queue(
+    parsed: OrcsIndexParseResult,
+    screen_intake: pd.DataFrame,
+    eligibility_checks: pd.DataFrame,
+    *,
+    policy_version: int,
+) -> pd.DataFrame:
+    """Build an outcome-blind queue invariant to source-index row order."""
+
+    scope_rule_ids, _ = INTAKE_POLICY_RULE_IDS[policy_version]
+    candidates = screen_intake.loc[
+        screen_intake["candidate_for_full_curation"].eq(True)
+    ].copy()
+    if candidates.empty:
+        return pd.DataFrame(columns=list(CurationQueueRecord.model_fields))
+
+    checks_by_screen = {
+        screen_id: {str(row["rule_id"]): row for row in group.to_dict(orient="records")}
+        for screen_id, group in eligibility_checks.groupby("screen_id", sort=False)
+    }
+    source_family_by_screen = dict(
+        zip(
+            parsed.screens["screen_id"],
+            parsed.screens["source_family_id"],
+            strict=True,
+        )
+    )
+    intake_by_screen = {
+        str(row["screen_id"]): row for row in candidates.to_dict(orient="records")
+    }
+
+    queue_rows: list[dict[str, object]] = []
+    for row in parsed.normalized_index.to_dict(orient="records"):
+        external_screen_id = _text(row.get("screen_id"))
+        if external_screen_id is None:
+            continue
+        screen_id = orcs_screen_id(parsed.release, external_screen_id)
+        intake_row = intake_by_screen.get(screen_id)
+        if intake_row is None:
+            continue
+        checks = checks_by_screen[screen_id]
+        scope_unknown_count = sum(
+            checks[rule_id]["outcome"] != EligibilityOutcome.PASS.value
+            for rule_id in scope_rule_ids
+        )
+        bucket = (
+            CurationQueueBucket.CONFIRMED_SCOPE
+            if scope_unknown_count == 0
+            else CurationQueueBucket.MANUAL_SCOPE_REVIEW
+        )
+        full_size_value = _normalized(row.get("full_size_available"))
+        if full_size_value in {"yes", "true", "1"}:
+            full_score_set: bool | None = True
+        elif full_size_value in {"no", "false", "0"}:
+            full_score_set = False
+        else:
+            full_score_set = None
+
+        metadata_completeness = [
+            checks["metadata.identifiable_drug"]["outcome"]
+            == EligibilityOutcome.PASS.value,
+            checks["metadata.identifiable_cell_context"]["outcome"]
+            == EligibilityOutcome.PASS.value,
+            full_score_set is True,
+            _text(row.get("source_id")) is not None,
+            _text(row.get("condition_dosage")) is not None,
+            _text(row.get("duration")) is not None,
+            _text(row.get("library")) is not None,
+            _text(row.get("analysis")) is not None,
+        ]
+        source_id = _text(row.get("source_id"))
+        source_type = _text(row.get("source_type"))
+        source_group = (
+            f"{(source_type or 'unknown').casefold()}:{source_id}"
+            if source_id
+            else f"provisional-screen:{external_screen_id}"
+        )
+        queue_rows.append(
+            {
+                "queue_id": (
+                    f"orcs:{parsed.release}:curation-queue:"
+                    f"v{policy_version}:{external_screen_id}"
+                ),
+                "queue_rank": 1,
+                "source_round": 1,
+                "source_version": parsed.release,
+                "policy_version": policy_version,
+                "bucket": bucket,
+                "screen_id": screen_id,
+                "external_screen_id": external_screen_id,
+                "source_id": source_id,
+                "source_type": source_type,
+                "source_family_id": source_family_by_screen.get(screen_id),
+                "author": _text(row.get("author")),
+                "screen_name": _text(row.get("screen_name")),
+                "experimental_setup": _text(row.get("experimental_setup")),
+                "condition_name": _text(row.get("condition_name")),
+                "cell_line": _text(row.get("cell_line")),
+                "scope_unknown_count": scope_unknown_count,
+                "metadata_completeness_count": int(sum(metadata_completeness)),
+                "full_gene_score_set_available": full_score_set,
+                "reason_codes": _text(intake_row.get("reason_codes")),
+                "_source_group": source_group,
+                "_bucket_order": (
+                    0 if bucket == CurationQueueBucket.CONFIRMED_SCOPE else 1
+                ),
+                "_screen_key": _natural_identifier_key(external_screen_id),
+                "_source_key": _natural_identifier_key(source_id or source_group),
+            }
+        )
+
+    queue_rows.sort(
+        key=lambda item: (
+            item["_bucket_order"],
+            -(item["full_gene_score_set_available"] is True),
+            -int(item["metadata_completeness_count"]),
+            item["_screen_key"],
+        )
+    )
+    rounds: Counter[str] = Counter()
+    for row in queue_rows:
+        rounds[str(row["_source_group"])] += 1
+        row["source_round"] = rounds[str(row["_source_group"])]
+
+    queue_rows.sort(
+        key=lambda item: (
+            item["_bucket_order"],
+            int(item["source_round"]),
+            -(item["full_gene_score_set_available"] is True),
+            -int(item["metadata_completeness_count"]),
+            item["_source_key"],
+            item["_screen_key"],
+        )
+    )
+    records: list[dict[str, object]] = []
+    for rank, row in enumerate(queue_rows, start=1):
+        row["queue_rank"] = rank
+        records.append(
+            {field: row[field] for field in CurationQueueRecord.model_fields}
+        )
+    return _record_frame(records, CurationQueueRecord)
+
+
 def triage_orcs_index(
     source: str | Path | TextIO | pd.DataFrame,
     *,
     release: str,
     retrieved_date: date | str,
+    available_date: date | str | None = None,
     organism_scope: str | None = None,
     policy_version: int = 2,
 ) -> OrcsIntakeResult:
@@ -291,6 +489,7 @@ def triage_orcs_index(
         source,
         release=release,
         retrieved_date=retrieved_date,
+        available_date=available_date,
         organism_scope=organism_scope,
     )
     assessed_date = (
@@ -300,7 +499,6 @@ def triage_orcs_index(
     )
     intake_records: list[dict[str, object]] = []
     check_records: list[dict[str, object]] = []
-    candidate_external_ids: list[str] = []
     failed_scope_rules: Counter[str] = Counter()
 
     for row in parsed.normalized_index.to_dict(orient="records"):
@@ -328,14 +526,21 @@ def triage_orcs_index(
             ]
         ] = []
 
-        organism_value = _text(row.get("organism_official")) or organism_scope
-        organism_outcome, organism_reason = _organism_check(organism_value)
+        organism_name = _text(row.get("organism_official"))
+        organism_id = _text(row.get("organism_id"))
+        if organism_name is None and organism_id is None:
+            organism_name = organism_scope
+        (
+            organism_outcome,
+            organism_reason,
+            organism_value,
+        ) = _organism_check(organism_name, organism_id)
         rules.append(
             (
                 "scope.organism_human",
                 organism_outcome,
                 organism_value,
-                _normalized(organism_value),
+                organism_value,
                 True,
                 True,
                 organism_reason,
@@ -454,13 +659,26 @@ def triage_orcs_index(
             [
                 (
                     "metadata.gene_level_mapping",
-                    EligibilityOutcome.PASS,
-                    "ORCS standardized per-screen gene scores",
-                    "orcs_gene_scores",
+                    EligibilityOutcome.UNKNOWN,
+                    None,
+                    None,
                     False,
                     True,
-                    "gene_level_mapping_available",
-                    "ORCS author scores are not validation labels.",
+                    "gene_mapping_requires_screen_file_audit",
+                    (
+                        "The ORCS index alone cannot establish mapping coverage, "
+                        "ambiguous identifiers, missing symbols, or duplicates."
+                    ),
+                ),
+                (
+                    "metadata.orcs_gene_score_file",
+                    EligibilityOutcome.PASS,
+                    "ORCS standardized per-screen gene-score file",
+                    "orcs_gene_score_file",
+                    False,
+                    False,
+                    "orcs_gene_score_file_expected",
+                    "ORCS author scores are screen evidence, not validation labels.",
                 ),
                 (
                     "metadata.full_gene_score_set",
@@ -606,9 +824,6 @@ def triage_orcs_index(
             if required_for_scope and outcome == EligibilityOutcome.FAIL
         ]
         failed_scope_rules.update(explicit_scope_failures)
-        if decision.candidate_for_full_curation:
-            candidate_external_ids.append(external_screen_id)
-
         intake_records.append(
             {
                 "intake_id": intake_id,
@@ -630,6 +845,13 @@ def triage_orcs_index(
 
     screen_intake = _record_frame(intake_records, ScreenIntakeRecord)
     eligibility_checks = _record_frame(check_records, EligibilityCheckRecord)
+    curation_queue = build_orcs_curation_queue(
+        parsed,
+        screen_intake,
+        eligibility_checks,
+        policy_version=policy_version,
+    )
+    candidate_screen_ids = tuple(curation_queue["screen_id"].astype(str))
     status_counts = {
         str(status): int(count)
         for status, count in screen_intake["status"].value_counts().items()
@@ -640,7 +862,15 @@ def triage_orcs_index(
         "assessment_stage": AssessmentStage.INDEX.value,
         "total_screens": int(len(screen_intake)),
         "status_counts": status_counts,
-        "candidate_screen_count": int(len(candidate_external_ids)),
+        "candidate_screen_count": int(len(candidate_screen_ids)),
+        "confirmed_scope_count": int(
+            curation_queue["bucket"].eq(CurationQueueBucket.CONFIRMED_SCOPE.value).sum()
+        ),
+        "manual_scope_review_count": int(
+            curation_queue["bucket"]
+            .eq(CurationQueueBucket.MANUAL_SCOPE_REVIEW.value)
+            .sum()
+        ),
         "benchmark_ready_count": int(screen_intake["benchmark_ready"].sum()),
         "failed_scope_rule_counts": dict(sorted(failed_scope_rules.items())),
     }
@@ -648,6 +878,7 @@ def triage_orcs_index(
         parsed=parsed,
         screen_intake=screen_intake,
         eligibility_checks=eligibility_checks,
-        candidate_screen_ids=tuple(candidate_external_ids),
+        curation_queue=curation_queue,
+        candidate_screen_ids=candidate_screen_ids,
         summary=summary,
     )

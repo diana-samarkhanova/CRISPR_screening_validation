@@ -1,0 +1,19 @@
+{
+  "assessment_stage": "index",
+  "benchmark_ready_count": 0,
+  "candidate_screen_count": 1674,
+  "confirmed_scope_count": 435,
+  "failed_scope_rule_counts": {
+    "scope.drug_exposure": 163,
+    "scope.perturbation_crispr_ko": 129,
+    "scope.pooled_format": 3
+  },
+  "manual_scope_review_count": 1239,
+  "policy_version": 2,
+  "release": "2.0.18",
+  "status_counts": {
+    "exclude": 278,
+    "metadata_only": 1674
+  },
+  "total_screens": 1952
+}

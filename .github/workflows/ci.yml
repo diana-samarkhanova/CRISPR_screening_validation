@@ -16,6 +16,8 @@ jobs:
   test:
     name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
     strategy:
       fail-fast: false
       matrix:
@@ -38,6 +40,7 @@ jobs:
             --locked \
             --all-extras \
             --python "${{ matrix.python-version }}"
+          uv run python -c 'import os, sys; assert ".".join(map(str, sys.version_info[:2])) == os.environ["UV_PYTHON"]'
 
       - name: Guard repository contents
         run: uv run python scripts/check_repository.py

@@ -1,0 +1,122 @@
+{
+  "adjudicated_gene_count": 0,
+  "adjudication_status": "pending_human_adjudication",
+  "assessed_date": "2026-08-02",
+  "batch_id": "orcs-2.0.18-batch-001",
+  "benchmark_ready_count": 0,
+  "compared_gene_count": 20,
+  "comparison": {
+    "filename": "review_comparison.tsv",
+    "sha256": "203da9c7a4f904df61a71940f99c883c1b5c67afac200a2af2686fb685b6660b"
+  },
+  "comparison_status_counts": {
+    "label_disagreement": 1,
+    "provisional_agreement": 17,
+    "single_curator_only": 2
+  },
+  "completion_lineage": {
+    "completed_screen_count": 5,
+    "input": {
+      "filename": "reviews_curator_2_completion.tsv",
+      "sha256": "8ac8060a509a50522710a1e9e497c4396357041f9a95d23f093d1f7394e0c5ef"
+    },
+    "queue_ranks": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
+  },
+  "critical_field_disagreement_counts": {
+    "analysis_method": 2,
+    "blocker_codes": 1,
+    "data_accession": 1,
+    "design_review": 0,
+    "disposition": 0,
+    "doi": 0,
+    "full_text_reviewed": 0,
+    "full_text_url": 0,
+    "library_design": 5,
+    "paper_url": 0,
+    "quantitative_asset_family_id": 1,
+    "quantitative_asset_locator": 9,
+    "quantitative_data_status": 1,
+    "raw_data_family_id": 1,
+    "rights_basis": 6,
+    "rights_outcome": 2,
+    "sample_map_review": 1,
+    "scope_outcome": 0,
+    "screen_model": 2,
+    "screen_replication": 7,
+    "supplement_review": 1,
+    "supplement_url": 0,
+    "treatment_contrast": 4,
+    "validation_source_locator": 9,
+    "validation_status": 0
+  },
+  "human_adjudication_required": true,
+  "pending_second_review_screen_count": 0,
+  "predecessor_checkpoint": {
+    "comparison": {
+      "filename": "review_comparison_partial.tsv",
+      "sha256": "fdff57b0a900a46b61acc615fd17fe26c5bc48c2d63c1103051d0f5816aeafe4"
+    },
+    "manifest": {
+      "filename": "dual_review_manifest_partial.json",
+      "sha256": "324995f7de042e0c7e79049eea702bd2afbe38da9ac79ea2586b7b9880ec8785"
+    },
+    "queue_ranks": [
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "second_reviewed_screen_count": 5,
+    "secondary_reviews": {
+      "filename": "reviews_curator_2_partial.tsv",
+      "sha256": "3fe697a9c5e24cdbb636155d163d8ac01772ccea5bbd92beefbd9bcd1883c0c2"
+    }
+  },
+  "primary_curators": [
+    "Codex-assisted single-curator review"
+  ],
+  "primary_reviews": {
+    "filename": "reviews.tsv",
+    "sha256": "b44822515c4236593d4910e4f0160c5114691cd220fc2d4b2c2d98fa0bb9eb6f"
+  },
+  "progress_checkpoint": {
+    "manifest": {
+      "filename": "secondary_review_progress_manifest.json",
+      "sha256": "d429f461874809309dfe45f58ffb96767133c6305705f2f4ca3ba7c3631d3ab7"
+    },
+    "queue_ranks": [
+      1,
+      3,
+      4,
+      5
+    ],
+    "second_reviewed_screen_count": 4,
+    "secondary_reviews": {
+      "filename": "reviews_curator_2_completion_progress.tsv",
+      "sha256": "8e2cac6205eaeab8ea05be623e207be4d805b50fc96d71f49d9121d5c0ac2507"
+    }
+  },
+  "released_label_count": 0,
+  "schema_version": 2,
+  "second_reviewed_screen_count": 10,
+  "secondary_curators": [
+    "Independent Codex literature reviewer; per-study outcome mapping withheld"
+  ],
+  "secondary_reviews": {
+    "filename": "reviews_curator_2.tsv",
+    "sha256": "e75e9fe42159098fe861fca46d27cbfe849a14c2c2166a241de778759b8ab4a5"
+  },
+  "selected_screen_count": 10,
+  "selection": {
+    "filename": "selection.tsv",
+    "sha256": "b3f2de96e2b29999522ca7086d855f4ef8dd5e248f0f0e79b22aaeb7789afd8c"
+  },
+  "status": "dual_review_complete_requires_human_adjudication"
+}

@@ -4,11 +4,18 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import date
 from pathlib import Path
+from typing import get_args
 
 import pandas as pd
 
 from .contracts import CONTRACTS, validate_records
+from .curation import (
+    write_completed_dual_review_bundle,
+    write_curation_batch,
+    write_dual_review_bundle,
+)
 from .features import featurize_count_table, featurize_experimental_design
 from .intake import SUPPORTED_POLICY_VERSIONS, triage_orcs_index
 from .io import read_table
@@ -18,6 +25,8 @@ from .modeling import (
     grouped_oof_predictions,
 )
 from .orcs import parse_orcs_index, parse_orcs_screen_scores
+from .orcs_prepare import prepare_orcs_release
+from .orcs_release import load_orcs_release_spec
 
 
 def _write_frame(frame: pd.DataFrame, path: str | Path) -> None:
@@ -32,7 +41,13 @@ def _write_frame(frame: pd.DataFrame, path: str | Path) -> None:
 
 
 def command_validate(args: argparse.Namespace) -> int:
-    frame = read_table(args.table)
+    model = CONTRACTS[args.contract]
+    string_fields = {
+        name: "string"
+        for name, field in model.model_fields.items()
+        if field.annotation is str or str in get_args(field.annotation)
+    }
+    frame = read_table(args.table, dtype=string_fields)
     valid, errors = validate_records(frame, args.contract)
     report = {
         "contract": args.contract,
@@ -93,6 +108,7 @@ def command_ingest_orcs_index(args: argparse.Namespace) -> int:
         args.table,
         release=args.release,
         retrieved_date=args.retrieved_date,
+        available_date=args.available_date,
         organism_scope=args.organism_scope,
     )
     frames = {
@@ -128,6 +144,7 @@ def command_triage_orcs_index(args: argparse.Namespace) -> int:
         args.table,
         release=args.release,
         retrieved_date=args.retrieved_date,
+        available_date=args.available_date,
         organism_scope=args.organism_scope,
         policy_version=args.policy_version,
     )
@@ -138,6 +155,7 @@ def command_triage_orcs_index(args: argparse.Namespace) -> int:
         result.eligibility_checks,
         output_dir / "eligibility_checks.tsv",
     )
+    _write_frame(result.curation_queue, output_dir / "curation_queue.tsv")
     candidate_text = "".join(
         f"{screen_id}\n" for screen_id in result.candidate_screen_ids
     )
@@ -150,6 +168,67 @@ def command_triage_orcs_index(args: argparse.Namespace) -> int:
         encoding="utf-8",
     )
     print(json.dumps(result.summary, indent=2, sort_keys=True))
+    return 0
+
+
+def command_prepare_orcs_release(args: argparse.Namespace) -> int:
+    spec = load_orcs_release_spec(args.release_registry, release=args.release)
+    prepared = prepare_orcs_release(
+        spec,
+        args.output_dir,
+        retrieved_date=args.retrieved_date,
+        policy_version=args.policy_version,
+        archive_path=args.archive,
+        cache_dir=args.cache_dir,
+        timeout_seconds=args.timeout_seconds,
+    )
+    print(json.dumps(prepared.summary, indent=2, sort_keys=True))
+    return 0
+
+
+def command_select_curation_batch(args: argparse.Namespace) -> int:
+    manifest = write_curation_batch(
+        args.queue,
+        args.output_dir,
+        batch_id=args.batch_id,
+        selected_date=args.selected_date,
+        start_rank=args.start_rank,
+        batch_size=args.batch_size,
+        require_unique_source_families=not args.allow_repeated_source_families,
+    )
+    print(json.dumps(manifest, indent=2, sort_keys=True))
+    return 0
+
+
+def command_compare_curation_reviews(args: argparse.Namespace) -> int:
+    manifest = write_dual_review_bundle(
+        args.primary_reviews,
+        args.secondary_reviews,
+        args.selection,
+        args.output_dir,
+        assessed_date=args.assessed_date,
+        allow_partial_secondary=args.allow_partial_secondary,
+    )
+    print(json.dumps(manifest, indent=2, sort_keys=True))
+    return 0
+
+
+def command_complete_curation_reviews(args: argparse.Namespace) -> int:
+    manifest = write_completed_dual_review_bundle(
+        args.primary_reviews,
+        args.completion_reviews,
+        args.progress_reviews,
+        args.progress_manifest,
+        args.selection,
+        args.partial_secondary_reviews,
+        args.partial_comparison,
+        args.partial_manifest,
+        args.output_dir,
+        assessed_date=args.assessed_date,
+        expected_checkpoint_manifest_sha256=(args.expected_checkpoint_manifest_sha256),
+        expected_progress_manifest_sha256=(args.expected_progress_manifest_sha256),
+    )
+    print(json.dumps(manifest, indent=2, sort_keys=True))
     return 0
 
 
@@ -255,6 +334,7 @@ def build_parser() -> argparse.ArgumentParser:
     orcs_index.add_argument("--table", required=True)
     orcs_index.add_argument("--release", required=True)
     orcs_index.add_argument("--retrieved-date", required=True)
+    orcs_index.add_argument("--available-date")
     orcs_index.add_argument("--organism-scope")
     orcs_index.add_argument("--output-dir", required=True)
     orcs_index.set_defaults(func=command_ingest_orcs_index)
@@ -266,6 +346,7 @@ def build_parser() -> argparse.ArgumentParser:
     orcs_triage.add_argument("--table", required=True)
     orcs_triage.add_argument("--release", required=True)
     orcs_triage.add_argument("--retrieved-date", required=True)
+    orcs_triage.add_argument("--available-date")
     orcs_triage.add_argument("--organism-scope")
     orcs_triage.add_argument(
         "--policy-version",
@@ -275,6 +356,32 @@ def build_parser() -> argparse.ArgumentParser:
     )
     orcs_triage.add_argument("--output-dir", required=True)
     orcs_triage.set_defaults(func=command_triage_orcs_index)
+
+    orcs_prepare = subparsers.add_parser(
+        "prepare-orcs-release",
+        help="verify and atomically prepare one pinned BioGRID ORCS release",
+    )
+    orcs_prepare.add_argument(
+        "--release-registry",
+        default="config/orcs_releases.yaml",
+    )
+    orcs_prepare.add_argument("--release", default="2.0.18")
+    orcs_prepare.add_argument(
+        "--retrieved-date",
+        type=date.fromisoformat,
+        required=True,
+    )
+    orcs_prepare.add_argument("--archive")
+    orcs_prepare.add_argument("--cache-dir", default="data/external/orcs")
+    orcs_prepare.add_argument(
+        "--policy-version",
+        type=int,
+        choices=sorted(SUPPORTED_POLICY_VERSIONS),
+        default=2,
+    )
+    orcs_prepare.add_argument("--timeout-seconds", type=float, default=60.0)
+    orcs_prepare.add_argument("--output-dir", required=True)
+    orcs_prepare.set_defaults(func=command_prepare_orcs_release)
 
     orcs_screen = subparsers.add_parser(
         "ingest-orcs-screen",
@@ -286,6 +393,67 @@ def build_parser() -> argparse.ArgumentParser:
     orcs_screen.add_argument("--contrast-id")
     orcs_screen.add_argument("--output-dir", required=True)
     orcs_screen.set_defaults(func=command_ingest_orcs_screen)
+
+    curation_batch = subparsers.add_parser(
+        "select-curation-batch",
+        help="freeze a contiguous outcome-blind full-text curation batch",
+    )
+    curation_batch.add_argument("--queue", required=True)
+    curation_batch.add_argument("--output-dir", required=True)
+    curation_batch.add_argument("--batch-id", required=True)
+    curation_batch.add_argument(
+        "--selected-date", type=date.fromisoformat, required=True
+    )
+    curation_batch.add_argument("--start-rank", type=int, default=1)
+    curation_batch.add_argument("--batch-size", type=int, default=10)
+    curation_batch.add_argument(
+        "--allow-repeated-source-families",
+        action="store_true",
+    )
+    curation_batch.set_defaults(func=command_select_curation_batch)
+
+    review_comparison = subparsers.add_parser(
+        "compare-curation-reviews",
+        help="compare two review sets without releasing benchmark labels",
+    )
+    review_comparison.add_argument("--primary-reviews", required=True)
+    review_comparison.add_argument("--secondary-reviews", required=True)
+    review_comparison.add_argument("--selection", required=True)
+    review_comparison.add_argument("--output-dir", required=True)
+    review_comparison.add_argument(
+        "--assessed-date", type=date.fromisoformat, required=True
+    )
+    review_comparison.add_argument(
+        "--allow-partial-secondary",
+        action="store_true",
+        help="explicitly permit a checksum-bound incomplete secondary review",
+    )
+    review_comparison.set_defaults(func=command_compare_curation_reviews)
+
+    review_completion = subparsers.add_parser(
+        "complete-curation-reviews",
+        help=(
+            "complete checksum-pinned review checkpoints atomically for "
+            "cooperating CLI writers"
+        ),
+    )
+    review_completion.add_argument("--primary-reviews", required=True)
+    review_completion.add_argument("--completion-reviews", required=True)
+    review_completion.add_argument("--progress-reviews", required=True)
+    review_completion.add_argument("--progress-manifest", required=True)
+    review_completion.add_argument("--selection", required=True)
+    review_completion.add_argument("--partial-secondary-reviews", required=True)
+    review_completion.add_argument("--partial-comparison", required=True)
+    review_completion.add_argument("--partial-manifest", required=True)
+    review_completion.add_argument(
+        "--expected-checkpoint-manifest-sha256", required=True
+    )
+    review_completion.add_argument("--expected-progress-manifest-sha256", required=True)
+    review_completion.add_argument("--output-dir", required=True)
+    review_completion.add_argument(
+        "--assessed-date", type=date.fromisoformat, required=True
+    )
+    review_completion.set_defaults(func=command_complete_curation_reviews)
 
     benchmark = subparsers.add_parser(
         "benchmark", help="run grouped out-of-fold baseline evaluation"

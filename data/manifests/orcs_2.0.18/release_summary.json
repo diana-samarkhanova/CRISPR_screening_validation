@@ -1,0 +1,31 @@
+{
+  "archive_sha256": "39222a9650eed083edf193debe45eedc4aabc779ca04ea70107b6bd1efd9b8d7",
+  "available_date": "2025-10-07",
+  "compiled_date": "2025-09-09",
+  "index_sha256": "6754e87ef758a3525ab7d690b183338f2ee6de72a36dde6e85fe19dee165f02d",
+  "release": "2.0.18",
+  "retrieved_date": "2026-07-31",
+  "screen_count": 1952,
+  "source_name": "BioGRID ORCS",
+  "study_count": 358,
+  "training_readiness": "not_trainable_index_intake_requires_full_text_curation",
+  "triage": {
+    "assessment_stage": "index",
+    "benchmark_ready_count": 0,
+    "candidate_screen_count": 1674,
+    "confirmed_scope_count": 435,
+    "failed_scope_rule_counts": {
+      "scope.drug_exposure": 163,
+      "scope.perturbation_crispr_ko": 129,
+      "scope.pooled_format": 3
+    },
+    "manual_scope_review_count": 1239,
+    "policy_version": 2,
+    "release": "2.0.18",
+    "status_counts": {
+      "exclude": 278,
+      "metadata_only": 1674
+    },
+    "total_screens": 1952
+  }
+}

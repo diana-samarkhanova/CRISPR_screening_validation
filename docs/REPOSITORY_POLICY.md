@@ -20,6 +20,36 @@ Private GitHub visibility is not a substitute for data governance. Third-party
 or unpublished material is kept outside Git history even when the repository
 is private.
 
+## ORCS 2.0.18 intake checkpoint
+
+The reproducible intake is pinned to the ORCS `2.0.18` human archive, compiled
+on `2025-09-09` and publicly available on `2025-10-07`. Git may contain the
+release registry, source URL, project-computed SHA-256, retrieval timestamp,
+small normalized manifests, audit summaries, and an outcome-blind curation
+queue. The 717.79 MB source archive, extracted per-screen files, and other
+large downloaded assets remain outside Git history.
+
+The project-computed SHA-256 verifies the bytes retrieved by this pipeline; it
+must not be described as a checksum published by BioGRID. The retrieval date
+must remain distinct from the compiled and public-availability dates.
+
+MIT terms for ORCS-distributed files do not confer redistribution rights for
+linked publisher supplements, GEO/SRA objects, FASTQ files, author count
+matrices, or other upstream datasets. Those assets require independent
+rights records and remain excluded unless redistribution is affirmatively
+verified.
+
+The observed index triage contains 1,952 records: 278 `exclude`, 1,674
+`metadata_only`, 435 confirmed-scope curation candidates, 1,239 manual-review
+candidates, and zero `benchmark_ready`. Queue order is outcome-blind and must
+not use ORCS `HIT`, author scores, validation outcomes, or future evidence.
+These records are a curation intake, not a trainable corpus.
+
+The checked-in pilot batch freezes queue ranks 1-10 independently of its
+downstream review. Its candidate validation grades are single-curator states,
+not released labels. All ten records remain `metadata_only`, and the repository
+still contains no biological benchmark corpus.
+
 ## Stage 2 — pilot data checkpoint
 
 Create the next development tag only after at least six public human

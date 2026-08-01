@@ -48,11 +48,21 @@ def test_orcs_index_triage_is_conservative_and_never_benchmark_ready():
     assert by_external.loc["5", "status"] == "metadata_only"
     assert by_external.loc["6", "status"] == "exclude"
     assert not result.screen_intake["benchmark_ready"].any()
-    assert set(result.candidate_screen_ids) == {"1", "3", "5"}
+    assert set(result.candidate_screen_ids) == {
+        "orcs:2.0.18:screen:1",
+        "orcs:2.0.18:screen:3",
+        "orcs:2.0.18:screen:5",
+    }
     assert result.summary["status_counts"] == {
         "exclude": 3,
         "metadata_only": 3,
     }
+    queue = result.curation_queue.set_index("external_screen_id")
+    assert queue.loc["1", "bucket"] == "confirmed_scope"
+    assert queue.loc["3", "bucket"] == "manual_scope_review"
+    assert queue.loc["5", "bucket"] == "manual_scope_review"
+    assert result.summary["confirmed_scope_count"] == 1
+    assert result.summary["manual_scope_review_count"] == 2
 
     unknown_checks = result.eligibility_checks.loc[
         result.eligibility_checks["screen_id"].str.endswith(":5")
@@ -119,6 +129,106 @@ def test_declared_human_archive_scope_fills_missing_row_organism():
     assert result.parsed.studies.iloc[0]["organism"] == "Homo sapiens"
 
 
+def test_orcs_human_taxon_and_abbreviated_name_are_consistent():
+    source = StringIO(
+        "#SCREEN ID\tSOURCE ID\tSOURCE TYPE\tSCREEN FORMAT\t"
+        "EXPERIMENTAL SETUP\tCONDITION NAME\tLIBRARY TYPE\t"
+        "LIBRARY METHODOLOGY\tCELL LINE\tORGANISM ID\t"
+        "ORGANISM OFFICIAL\n"
+        "7\t1007\tpubmed\tPool\tDrug Exposure\tDrug A\t"
+        "CRISPRn\tKnockout\tA375\t9606\tH. sapiens\n"
+    )
+    result = triage_orcs_index(
+        source,
+        release="2.0.18",
+        retrieved_date="2026-07-31",
+    )
+    organism_check = result.eligibility_checks.loc[
+        result.eligibility_checks["rule_id"] == "scope.organism_human"
+    ].iloc[0]
+    assert organism_check["outcome"] == "pass"
+    assert organism_check["reason_code"] == "human_scope_confirmed"
+
+
+def test_archive_scope_does_not_override_explicit_nonhuman_taxonomy():
+    source = StringIO(
+        "#SCREEN ID\tSOURCE ID\tSOURCE TYPE\tSCREEN FORMAT\t"
+        "EXPERIMENTAL SETUP\tCONDITION NAME\tLIBRARY TYPE\t"
+        "LIBRARY METHODOLOGY\tCELL LINE\tORGANISM ID\n"
+        "7\t1007\tpubmed\tPool\tDrug Exposure\tDrug A\t"
+        "CRISPRn\tKnockout\tA375\t10090\n"
+    )
+    result = triage_orcs_index(
+        source,
+        release="2.0.18",
+        retrieved_date="2026-07-31",
+        organism_scope="Homo sapiens",
+    )
+    organism_check = result.eligibility_checks.loc[
+        result.eligibility_checks["rule_id"] == "scope.organism_human"
+    ].iloc[0]
+    assert organism_check["outcome"] == "fail"
+    assert result.screen_intake.iloc[0]["status"] == "exclude"
+
+
+def test_conflicting_modality_metadata_is_never_promoted_to_ko():
+    source = StringIO(
+        "#SCREEN ID\tSOURCE ID\tSOURCE TYPE\tSCREEN FORMAT\t"
+        "EXPERIMENTAL SETUP\tCONDITION NAME\tLIBRARY TYPE\t"
+        "LIBRARY METHODOLOGY\tCELL LINE\tORGANISM ID\n"
+        "7\t1007\tpubmed\tPool\tDrug Exposure\tDrug A\t"
+        "CRISPRa\tKnockout\tA375\t9606\n"
+    )
+    result = triage_orcs_index(
+        source,
+        release="2.0.18",
+        retrieved_date="2026-07-31",
+    )
+    modality_check = result.eligibility_checks.loc[
+        result.eligibility_checks["rule_id"] == "scope.perturbation_crispr_ko"
+    ].iloc[0]
+    assert modality_check["outcome"] == "unknown"
+    assert modality_check["reason_code"] == "perturbation_metadata_conflict"
+    assert result.parsed.screens.iloc[0]["perturbation_modality"] == "other"
+    assert result.curation_queue.iloc[0]["bucket"] == "manual_scope_review"
+
+
+def test_curation_queue_is_input_order_invariant_and_naturally_sorted():
+    header = (
+        "#SCREEN ID\tSOURCE ID\tSOURCE TYPE\tSCREEN FORMAT\t"
+        "EXPERIMENTAL SETUP\tCONDITION NAME\tLIBRARY TYPE\t"
+        "LIBRARY METHODOLOGY\tCELL LINE\tORGANISM ID\t"
+        "FULL SIZE AVAILABLE\n"
+    )
+    rows = [
+        "10\t1001\tpubmed\tPool\tDrug Exposure\tDrug A\t"
+        "CRISPRn\tKnockout\tA375\t9606\tYes\n",
+        "2\t1001\tpubmed\tPool\tDrug Exposure\tDrug B\t"
+        "CRISPRn\tKnockout\tA375\t9606\tYes\n",
+        "1\t1001\tpubmed\tPool\tDrug Exposure\tDrug C\t"
+        "CRISPRn\tKnockout\tA375\t9606\tYes\n",
+    ]
+    forward = triage_orcs_index(
+        StringIO(header + "".join(rows)),
+        release="2.0.18",
+        retrieved_date="2026-07-31",
+    )
+    reversed_result = triage_orcs_index(
+        StringIO(header + "".join(reversed(rows))),
+        release="2.0.18",
+        retrieved_date="2026-07-31",
+    )
+    assert forward.candidate_screen_ids == (
+        "orcs:2.0.18:screen:1",
+        "orcs:2.0.18:screen:2",
+        "orcs:2.0.18:screen:10",
+    )
+    pd.testing.assert_frame_equal(
+        forward.curation_queue,
+        reversed_result.curation_queue,
+    )
+
+
 def test_triage_cli_writes_all_audit_outputs(tmp_path):
     source = tmp_path / "orcs_index.tsv"
     source.write_text(MIXED_INDEX, encoding="utf-8")
@@ -140,11 +250,42 @@ def test_triage_cli_writes_all_audit_outputs(tmp_path):
     assert args.func(args) == 0
     assert (output_dir / "screen_intake.tsv").exists()
     assert (output_dir / "eligibility_checks.tsv").exists()
+    assert (output_dir / "curation_queue.tsv").exists()
     assert (output_dir / "triage_summary.json").exists()
     candidates = (output_dir / "candidate_screen_ids.txt").read_text(encoding="utf-8")
-    assert candidates.splitlines() == ["1", "3", "5"]
+    assert candidates.splitlines() == [
+        "orcs:2.0.18:screen:1",
+        "orcs:2.0.18:screen:3",
+        "orcs:2.0.18:screen:5",
+    ]
     intake = pd.read_csv(output_dir / "screen_intake.tsv", sep="\t")
     assert set(intake["status"]) == {"exclude", "metadata_only"}
+    queue = pd.read_csv(output_dir / "curation_queue.tsv", sep="\t")
+    assert queue["external_screen_id"].astype(str).tolist() == ["1", "3", "5"]
+
+
+def test_validate_cli_preserves_numeric_external_identifiers(tmp_path, capsys):
+    queue = triage_orcs_index(
+        StringIO(MIXED_INDEX),
+        release="2.0.18",
+        retrieved_date="2026-07-31",
+    ).curation_queue
+    path = tmp_path / "queue.tsv"
+    queue.to_csv(path, sep="\t", index=False)
+    args = build_parser().parse_args(
+        [
+            "validate",
+            "--table",
+            str(path),
+            "--contract",
+            "curation_queue",
+        ]
+    )
+
+    assert args.func(args) == 0
+    report = capsys.readouterr().out
+    assert '"valid_records": 3' in report
+    assert '"errors": []' in report
 
 
 def _curated_check(

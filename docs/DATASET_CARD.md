@@ -12,6 +12,15 @@ Version `0.2.0.dev0` contains schemas, curation rules, an intake manifest, and
 synthetic fixtures. It does not contain a completed biological training
 dataset, a pretrained model, or calibrated probabilities.
 
+The first ten ORCS queue records have completed primary and independent second
+full-text review. Eight expose only author-derived score tables, one exposes a
+public sgRNA count matrix, and one exposes raw amplicon reads. The authenticated
+full comparison contains 20 gene-level rows: 17 provisional agreements, one
+evidence-level disagreement, and two single-curator observations. All require
+human adjudication; no adjudicated or released label has been created. No screen
+currently satisfies the count-level, rights, sample-map, and label-adjudication
+gates together. The pilot adds no `benchmark_ready` rows.
+
 ## Unit of prediction
 
 `gene × screen × contrast × direction`, linked through the normalized
@@ -48,8 +57,9 @@ treating untested genes as negatives.
 Git contains manifests and redistributable derived records only. Raw
 sequencing files, private workbooks, copied supplements, and the held-out
 unpublished case study remain outside Git history. Every external asset
-requires a version, checksum, source locator, rights record, and transformation
-provenance.
+requires a version, source locator, rights record, and transformation
+provenance. Retrieved byte assets also require checksum and size; accession-only
+pointers are explicitly marked not retrieved and carry no invented checksum.
 
 ## Release gate
 

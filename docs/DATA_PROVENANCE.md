@@ -10,6 +10,12 @@ Every external datum must be traceable to:
 - checksum for downloaded files;
 - study, screen, sample, guide, gene, and validation-event identifiers.
 
+The checked-in Git commit and `uv.lock` identify the code and environment that
+generated a bundle. The bundle manifest checksum-binds its data inputs and
+outputs but does not embed its own Git commit, which would be self-referential.
+A standalone export must therefore travel with a release tag or recorded Git
+tree identifier in its archival metadata.
+
 ## Normalized experimental levels
 
 Provenance is attached to four distinct levels:
@@ -57,7 +63,24 @@ structured metadata, and author-method gene scores. Record its release,
 retrieval date, ORCS screen ID, original publication, scoring method, and
 source/raw-family mapping. ORCS ranks and hit calls are screen evidence, not
 orthogonal-validation labels. Versioned releases are available from the
-[official ORCS download repository](https://downloads.thebiogrid.org/BioGRID-ORCS/Latest-Release/).
+[official ORCS release archive](https://downloads.thebiogrid.org/BioGRID-ORCS/Release-Archive/).
+
+The current intake pins the human screen archive to ORCS `2.0.18`, compiled on
+`2025-09-09` and publicly available on `2025-10-07`. Its retrieval date and UTC
+retrieval timestamp are recorded separately; neither may substitute for the
+release's availability date in temporal evaluation. The SHA-256 stored in the
+manifest is computed by this project from the downloaded bytes. It is a local
+integrity value, not a publisher-supplied checksum. For the observed
+752,653,348-byte archive, that digest is
+`39222a9650eed083edf193debe45eedc4aabc779ca04ea70107b6bd1efd9b8d7`.
+
+The MIT terms recorded for this asset apply only to files distributed by
+BioGRID ORCS. They must not be inherited by publisher supplements, SRA/GEO
+objects, FASTQ files, author count matrices, or other upstream data linked from
+an ORCS record. Each upstream asset requires its own rights holder, terms,
+redistribution decision, and provenance row. Retrieved bytes require a local
+or publisher checksum; an accession-only pointer must be marked not retrieved
+and must not claim a checksum for bytes the project did not acquire.
 
 Primary methods, supplements, raw-repository metadata, and author files verify
 historical conditions. A library-design paper, including Joung et al., may
@@ -75,3 +98,37 @@ Cross-screen recurrence and other source-derived features are reconstructed
 inside each outer training fold after source/raw-family deduplication. The
 held-out family and any evidence first available after the test cutoff are
 excluded.
+
+## ORCS intake and curation queue
+
+The ORCS 2.0.18 human index contains 1,952 observed screen records. Automated
+index triage yields 278 `exclude` and 1,674 `metadata_only` records. The
+outcome-blind curation queue contains 435 confirmed-scope candidates and 1,239
+manual-scope-review candidates; no index-only record is `benchmark_ready`.
+
+Queue ordering may use only eligibility scope and metadata completeness. It
+must not use ORCS `HIT`, author score magnitude, validation labels, or evidence
+that became available after the screen. ORCS `HIT` remains an author-reported
+screen call and can never supply a `V2`, `V3`, `F0`, or `D` validation event.
+The queue is a worklist for full-text and data-rights curation, not a training
+dataset.
+
+The first frozen pilot batch covers queue ranks 1-10 from ten distinct source
+families. Selection and review are stored separately with independent SHA-256
+checksums. Full-text review found eight author-score-only screens, one public
+sgRNA count matrix, and one screen with public raw reads (`SRP158611`). The SRA
+study contains 24 amplicon runs; eight are conditionally mapped to the relevant
+two-donor drug contrast, with vehicle identities supported by the article
+rather than explicit repository aliases. No reviewed screen yet has completed
+ingestion, QC, rights, sample mapping, and validation adjudication together.
+Consequently all ten remain `metadata_only` and the batch contributes zero
+benchmark rows.
+
+Candidate `V1/V2/V3` grades in this batch are downstream review states. The
+second review now covers all ten screens through a checksum-bound completion
+lineage that preserves the frozen ranks 6-10 checkpoint and ranks 1, 3, 4, and
+5 progress rows. The full comparison contains 17 provisional agreements, one
+evidence-level disagreement, and two single-curator observations across 20
+gene-level rows. Every row still requires named human adjudication; comparison
+is excluded from selection, design features, readiness derivation, and released
+labels.

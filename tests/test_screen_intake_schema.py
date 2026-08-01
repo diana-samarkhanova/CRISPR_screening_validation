@@ -42,6 +42,20 @@ def base_screen_intake() -> dict[str, object]:
         ),
         (
             {
+                "status": "benchmark_ready",
+                "benchmark_ready": True,
+                "candidate_for_full_curation": False,
+            },
+            False,
+        ),
+        (
+            {
+                "policy_version": 3,
+            },
+            False,
+        ),
+        (
+            {
                 "status": "exclude",
                 "candidate_for_full_curation": False,
             },

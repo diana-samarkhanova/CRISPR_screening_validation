@@ -1,0 +1,17 @@
+{
+  "archive_filename": "BIOGRID-ORCS-ALL-homo_sapiens-2.0.18.screens.tar.gz",
+  "available_date": "2025-10-07",
+  "byte_size": 752653348,
+  "cache_hit": true,
+  "checksum_provenance": "locally_computed_not_publisher_provided",
+  "license_scope": "BioGRID ORCS-distributed files only",
+  "license_spdx": "MIT",
+  "license_url": "https://biogrid-downloads.nyc3.digitaloceanspaces.com/LICENSE.txt",
+  "resolved_url": "https://downloads.thebiogrid.org/Download/BioGRID-ORCS/Release-Archive/BIOGRID-ORCS-2.0.18/BIOGRID-ORCS-ALL-homo_sapiens-2.0.18.screens.tar.gz",
+  "retrieved_date": "2026-07-31",
+  "sha256": "39222a9650eed083edf193debe45eedc4aabc779ca04ea70107b6bd1efd9b8d7",
+  "source_name": "BioGRID ORCS",
+  "source_url": "https://downloads.thebiogrid.org/Download/BioGRID-ORCS/Release-Archive/BIOGRID-ORCS-2.0.18/BIOGRID-ORCS-ALL-homo_sapiens-2.0.18.screens.tar.gz",
+  "source_version": "2.0.18",
+  "upstream_raw_data_rights_established": false
+}

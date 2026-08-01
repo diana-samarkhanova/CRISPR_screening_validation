@@ -1,0 +1,198 @@
+{
+  "$defs": {
+    "CurationQueueBucket": {
+      "enum": [
+        "confirmed_scope",
+        "manual_scope_review"
+      ],
+      "title": "CurationQueueBucket",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Deterministic, outcome-blind ordering for full-text screen curation.",
+  "properties": {
+    "queue_id": {
+      "minLength": 1,
+      "title": "Queue Id",
+      "type": "string"
+    },
+    "queue_rank": {
+      "minimum": 1,
+      "title": "Queue Rank",
+      "type": "integer"
+    },
+    "source_round": {
+      "minimum": 1,
+      "title": "Source Round",
+      "type": "integer"
+    },
+    "source_version": {
+      "minLength": 1,
+      "title": "Source Version",
+      "type": "string"
+    },
+    "policy_version": {
+      "const": 2,
+      "title": "Policy Version",
+      "type": "integer"
+    },
+    "bucket": {
+      "$ref": "#/$defs/CurationQueueBucket"
+    },
+    "screen_id": {
+      "minLength": 1,
+      "title": "Screen Id",
+      "type": "string"
+    },
+    "external_screen_id": {
+      "minLength": 1,
+      "title": "External Screen Id",
+      "type": "string"
+    },
+    "source_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Id"
+    },
+    "source_type": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Type"
+    },
+    "source_family_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Family Id"
+    },
+    "author": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Author"
+    },
+    "screen_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Screen Name"
+    },
+    "experimental_setup": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Experimental Setup"
+    },
+    "condition_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Condition Name"
+    },
+    "cell_line": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cell Line"
+    },
+    "scope_unknown_count": {
+      "minimum": 0,
+      "title": "Scope Unknown Count",
+      "type": "integer"
+    },
+    "metadata_completeness_count": {
+      "minimum": 0,
+      "title": "Metadata Completeness Count",
+      "type": "integer"
+    },
+    "full_gene_score_set_available": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Full Gene Score Set Available"
+    },
+    "reason_codes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reason Codes"
+    }
+  },
+  "required": [
+    "queue_id",
+    "queue_rank",
+    "source_round",
+    "source_version",
+    "policy_version",
+    "bucket",
+    "screen_id",
+    "external_screen_id",
+    "scope_unknown_count",
+    "metadata_completeness_count"
+  ],
+  "title": "CurationQueueRecord",
+  "type": "object"
+}

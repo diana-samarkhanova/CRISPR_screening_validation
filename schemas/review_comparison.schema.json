@@ -1,0 +1,150 @@
+{
+  "$defs": {
+    "ReviewComparisonStatus": {
+      "description": "Relationship between two independently produced review records.",
+      "enum": [
+        "provisional_agreement",
+        "label_disagreement",
+        "single_curator_only"
+      ],
+      "title": "ReviewComparisonStatus",
+      "type": "string"
+    },
+    "ReviewEvidenceLevel": {
+      "description": "Per-gene evidence level extracted from one full-text review.",
+      "enum": [
+        "candidate_v3",
+        "candidate_v2",
+        "candidate_v1",
+        "nonqualifying",
+        "not_annotated"
+      ],
+      "title": "ReviewEvidenceLevel",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "properties": {
+        "human_adjudication_required": {
+          "const": true
+        }
+      }
+    }
+  ],
+  "description": "Gene-level comparison of two reviews, never a released label.\n\nThe record intentionally has no final label or benchmark-readiness field.\nEven exact agreement remains provisional until a named human adjudicator\nverifies the source evidence and creates a separate validation event.",
+  "properties": {
+    "comparison_id": {
+      "minLength": 1,
+      "title": "Comparison Id",
+      "type": "string"
+    },
+    "batch_id": {
+      "minLength": 1,
+      "title": "Batch Id",
+      "type": "string"
+    },
+    "queue_id": {
+      "minLength": 1,
+      "title": "Queue Id",
+      "type": "string"
+    },
+    "queue_rank": {
+      "minimum": 1,
+      "title": "Queue Rank",
+      "type": "integer"
+    },
+    "screen_id": {
+      "minLength": 1,
+      "title": "Screen Id",
+      "type": "string"
+    },
+    "external_screen_id": {
+      "minLength": 1,
+      "title": "External Screen Id",
+      "type": "string"
+    },
+    "gene_symbol": {
+      "minLength": 1,
+      "title": "Gene Symbol",
+      "type": "string"
+    },
+    "primary_review_id": {
+      "minLength": 1,
+      "title": "Primary Review Id",
+      "type": "string"
+    },
+    "secondary_review_id": {
+      "minLength": 1,
+      "title": "Secondary Review Id",
+      "type": "string"
+    },
+    "primary_evidence_level": {
+      "$ref": "#/$defs/ReviewEvidenceLevel"
+    },
+    "secondary_evidence_level": {
+      "$ref": "#/$defs/ReviewEvidenceLevel"
+    },
+    "comparison_status": {
+      "$ref": "#/$defs/ReviewComparisonStatus"
+    },
+    "primary_source_locator": {
+      "minLength": 1,
+      "title": "Primary Source Locator",
+      "type": "string"
+    },
+    "secondary_source_locator": {
+      "minLength": 1,
+      "title": "Secondary Source Locator",
+      "type": "string"
+    },
+    "human_adjudication_required": {
+      "default": true,
+      "title": "Human Adjudication Required",
+      "type": "boolean"
+    },
+    "assessed_date": {
+      "format": "date",
+      "title": "Assessed Date",
+      "type": "string"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "comparison_id",
+    "batch_id",
+    "queue_id",
+    "queue_rank",
+    "screen_id",
+    "external_screen_id",
+    "gene_symbol",
+    "primary_review_id",
+    "secondary_review_id",
+    "primary_evidence_level",
+    "secondary_evidence_level",
+    "comparison_status",
+    "primary_source_locator",
+    "secondary_source_locator",
+    "assessed_date"
+  ],
+  "title": "ReviewComparisonRecord",
+  "type": "object",
+  "x-semantic-rules": [
+    "Primary and secondary review identifiers must differ.",
+    "comparison_status is derived from the two evidence levels.",
+    "Both evidence levels cannot be not_annotated.",
+    "This record cannot establish a benchmark label."
+  ]
+}

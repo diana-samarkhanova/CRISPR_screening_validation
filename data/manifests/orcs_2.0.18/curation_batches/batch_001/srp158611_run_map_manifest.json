@@ -1,0 +1,64 @@
+{
+  "benchmark_ready_count": 0,
+  "bioproject_accession": "PRJNA487352",
+  "contrast_id": "orcs:2.0.18:screen:1110:contrast:cgs-21680",
+  "contrast_scope": {
+    "filename": "srp158611_contrast_scope.tsv",
+    "included_repository_screen_groups": [
+      "CGS-21680",
+      "SecondaryGW"
+    ],
+    "mapping_evidence_counts": {
+      "article_supported": 1,
+      "not_applicable": 2,
+      "repository_explicit": 1
+    },
+    "rule_count": 4,
+    "sha256": "ad57b069eae0ba004aa8e33df6dd9e7517908ee461a42ca237940c0455ccf920"
+  },
+  "design_estimand": "donor-blocked treatment-by-phenotype-bin interaction; not a single treatment-versus-control bin comparison",
+  "excluded_other_screen_run_count": 16,
+  "included_condition_role_counts": {
+    "control": 4,
+    "treatment": 4
+  },
+  "included_donor_count": 2,
+  "included_phenotype_bin_counts": {
+    "dividing": 4,
+    "nondividing": 4
+  },
+  "included_run_count": 8,
+  "included_treatment_names_by_role": {
+    "control": "vehicle",
+    "treatment": "CGS-21680"
+  },
+  "inclusion_status_counts": {
+    "excluded_other_screen": 16,
+    "included_drug_contrast": 8
+  },
+  "mapping_evidence_counts": {
+    "article_supported": 4,
+    "repository_explicit": 4
+  },
+  "raw_reads_ingested": false,
+  "record_count": 24,
+  "run_map": {
+    "filename": "srp158611_run_map.tsv",
+    "sha256": "4dbf9ac0bed51c1f1a0dfcb6550df5f4d71fc34b8969139c541790c18b0269a4"
+  },
+  "schema_version": 1,
+  "screen_id": "orcs:2.0.18:screen:1110",
+  "source_inventory": {
+    "filename": "srp158611_run_inventory.tsv",
+    "record_count": 24,
+    "repository_screen_group_counts": {
+      "CGS-21680": 4,
+      "Pilot CellSurf": 4,
+      "PrimaryGW": 12,
+      "SecondaryGW": 4
+    },
+    "sha256": "705784963e6fba2f6a3c2a7c11309dc4c3348bcbcdb941fdb7c922ae82cd4320"
+  },
+  "status": "conditional_article_supported_condition_mapping",
+  "study_accession": "SRP158611"
+}

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -10,14 +12,18 @@ import pandas as pd
 COUNT_ID_COLUMNS = ("sgrna_id", "gene_symbol")
 
 
-def read_table(path: str | Path) -> pd.DataFrame:
+def read_table(
+    path: str | Path,
+    *,
+    dtype: Mapping[str, Any] | None = None,
+) -> pd.DataFrame:
     """Read CSV or TSV based on the file suffix."""
 
     path = Path(path)
     if path.suffix.lower() == ".csv":
-        return pd.read_csv(path)
+        return pd.read_csv(path, dtype=dtype)
     if path.suffix.lower() in {".tsv", ".txt"}:
-        return pd.read_csv(path, sep="\t")
+        return pd.read_csv(path, sep="\t", dtype=dtype)
     raise ValueError(f"unsupported table extension: {path.suffix}")
 
 
