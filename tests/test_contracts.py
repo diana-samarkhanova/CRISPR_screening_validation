@@ -207,12 +207,26 @@ def test_data_asset_manifest_matches_contract_and_validates():
     )
     assert list(manifest.columns) == list(DataAssetRecord.model_fields)
     valid, errors = validate_records(manifest, DataAssetRecord)
-    assert len(valid) == 2
+    assert len(valid) == 4
     assert errors.empty
-    assert set(valid["checksum_provenance"]) == {
+    checksummed = valid.loc[valid["sha256"].notna()]
+    assert set(checksummed["checksum_provenance"]) == {
         "locally_computed_not_publisher_provided",
+        "locally_computed_from_retrieved_publisher_supplement",
         "project_computed_from_verified_archive",
     }
+    by_id = valid.set_index("asset_id")
+    sra = by_id.loc["srp158611:public-raw-reads"]
+    findlay = by_id.loc["pmid30154076:supplementary-dataset-ev3"]
+    assert pd.isna(sra["sha256"])
+    assert sra["checksum_provenance"] == "not_retrieved_no_local_checksum"
+    assert sra["curator_status"] == "accession_verified_not_retrieved"
+    assert not bool(sra["redistribution_raw"])
+    assert findlay["sha256"] == (
+        "0e6bf30164160dee495eb11e4bbbb7aebce9768121603c7f52ea3192265ed0b1"
+    )
+    assert findlay["byte_size"] == 6_574_038
+    assert bool(findlay["redistribution_raw"])
 
 
 def test_data_asset_rejects_incomplete_checksum_or_invalid_dates():

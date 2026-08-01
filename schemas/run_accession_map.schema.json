@@ -1,0 +1,327 @@
+{
+  "$defs": {
+    "MappingEvidence": {
+      "enum": [
+        "repository_explicit",
+        "article_supported",
+        "not_applicable"
+      ],
+      "title": "MappingEvidence",
+      "type": "string"
+    },
+    "RunInclusionStatus": {
+      "enum": [
+        "included_drug_contrast",
+        "excluded_other_screen"
+      ],
+      "title": "RunInclusionStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "inclusion_status": {
+            "const": "included_drug_contrast"
+          }
+        },
+        "required": [
+          "inclusion_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "screen_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "contrast_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "condition_role": {
+            "enum": [
+              "control",
+              "treatment"
+            ]
+          },
+          "treatment_name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "donor_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "phenotype_bin": {
+            "enum": [
+              "dividing",
+              "nondividing"
+            ]
+          },
+          "treatment_mapping_evidence": {
+            "enum": [
+              "repository_explicit",
+              "article_supported"
+            ]
+          }
+        },
+        "required": [
+          "screen_id",
+          "contrast_id",
+          "condition_role",
+          "treatment_name"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "inclusion_status": {
+            "const": "excluded_other_screen"
+          }
+        },
+        "required": [
+          "inclusion_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "screen_id": {
+            "type": "null"
+          },
+          "contrast_id": {
+            "type": "null"
+          },
+          "condition_role": {
+            "type": "null"
+          },
+          "treatment_name": {
+            "type": "null"
+          },
+          "treatment_mapping_evidence": {
+            "const": "not_applicable"
+          }
+        }
+      }
+    }
+  ],
+  "description": "Accession-level run map with explicit evidence for condition labels.",
+  "properties": {
+    "map_id": {
+      "minLength": 1,
+      "title": "Map Id",
+      "type": "string"
+    },
+    "bioproject_accession": {
+      "minLength": 1,
+      "title": "Bioproject Accession",
+      "type": "string"
+    },
+    "study_accession": {
+      "minLength": 1,
+      "title": "Study Accession",
+      "type": "string"
+    },
+    "run_accession": {
+      "minLength": 1,
+      "title": "Run Accession",
+      "type": "string"
+    },
+    "experiment_accession": {
+      "minLength": 1,
+      "title": "Experiment Accession",
+      "type": "string"
+    },
+    "sample_accession": {
+      "minLength": 1,
+      "title": "Sample Accession",
+      "type": "string"
+    },
+    "secondary_sample_accession": {
+      "minLength": 1,
+      "title": "Secondary Sample Accession",
+      "type": "string"
+    },
+    "source_sample_id": {
+      "minLength": 1,
+      "title": "Source Sample Id",
+      "type": "string"
+    },
+    "repository_sample_alias": {
+      "minLength": 1,
+      "title": "Repository Sample Alias",
+      "type": "string"
+    },
+    "repository_screen_group": {
+      "minLength": 1,
+      "title": "Repository Screen Group",
+      "type": "string"
+    },
+    "library_strategy": {
+      "minLength": 1,
+      "title": "Library Strategy",
+      "type": "string"
+    },
+    "library_source": {
+      "minLength": 1,
+      "title": "Library Source",
+      "type": "string"
+    },
+    "library_selection": {
+      "minLength": 1,
+      "title": "Library Selection",
+      "type": "string"
+    },
+    "library_layout": {
+      "minLength": 1,
+      "title": "Library Layout",
+      "type": "string"
+    },
+    "instrument_model": {
+      "minLength": 1,
+      "title": "Instrument Model",
+      "type": "string"
+    },
+    "inclusion_status": {
+      "$ref": "#/$defs/RunInclusionStatus"
+    },
+    "screen_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Screen Id"
+    },
+    "contrast_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Contrast Id"
+    },
+    "condition_role": {
+      "anyOf": [
+        {
+          "enum": [
+            "control",
+            "treatment"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Condition Role"
+    },
+    "treatment_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Treatment Name"
+    },
+    "donor_id": {
+      "minLength": 1,
+      "title": "Donor Id",
+      "type": "string"
+    },
+    "phenotype_bin": {
+      "enum": [
+        "dividing",
+        "nondividing"
+      ],
+      "title": "Phenotype Bin",
+      "type": "string"
+    },
+    "treatment_mapping_evidence": {
+      "$ref": "#/$defs/MappingEvidence"
+    },
+    "repository_metadata_url": {
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Repository Metadata Url",
+      "type": "string"
+    },
+    "article_url": {
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Article Url",
+      "type": "string"
+    },
+    "source_locator": {
+      "minLength": 1,
+      "title": "Source Locator",
+      "type": "string"
+    },
+    "retrieved_date": {
+      "format": "date",
+      "title": "Retrieved Date",
+      "type": "string"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "map_id",
+    "bioproject_accession",
+    "study_accession",
+    "run_accession",
+    "experiment_accession",
+    "sample_accession",
+    "secondary_sample_accession",
+    "source_sample_id",
+    "repository_sample_alias",
+    "repository_screen_group",
+    "library_strategy",
+    "library_source",
+    "library_selection",
+    "library_layout",
+    "instrument_model",
+    "inclusion_status",
+    "donor_id",
+    "phenotype_bin",
+    "treatment_mapping_evidence",
+    "repository_metadata_url",
+    "article_url",
+    "source_locator",
+    "retrieved_date"
+  ],
+  "title": "RunAccessionMapRecord",
+  "type": "object",
+  "x-semantic-rules": [
+    "Repository-explicit and article-supported condition mappings are distinct.",
+    "Runs from other screens cannot be attached to the drug contrast."
+  ]
+}

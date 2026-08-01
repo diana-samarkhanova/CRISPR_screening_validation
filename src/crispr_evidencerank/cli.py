@@ -11,7 +11,7 @@ from typing import get_args
 import pandas as pd
 
 from .contracts import CONTRACTS, validate_records
-from .curation import write_curation_batch
+from .curation import write_curation_batch, write_dual_review_bundle
 from .features import featurize_count_table, featurize_experimental_design
 from .intake import SUPPORTED_POLICY_VERSIONS, triage_orcs_index
 from .io import read_table
@@ -196,6 +196,19 @@ def command_select_curation_batch(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_compare_curation_reviews(args: argparse.Namespace) -> int:
+    manifest = write_dual_review_bundle(
+        args.primary_reviews,
+        args.secondary_reviews,
+        args.selection,
+        args.output_dir,
+        assessed_date=args.assessed_date,
+        allow_partial_secondary=args.allow_partial_secondary,
+    )
+    print(json.dumps(manifest, indent=2, sort_keys=True))
+    return 0
+
+
 def command_ingest_orcs_screen(args: argparse.Namespace) -> int:
     metadata = read_table(args.index_metadata) if args.index_metadata else None
     parsed = parse_orcs_screen_scores(
@@ -375,6 +388,24 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
     )
     curation_batch.set_defaults(func=command_select_curation_batch)
+
+    review_comparison = subparsers.add_parser(
+        "compare-curation-reviews",
+        help="compare two review sets without releasing benchmark labels",
+    )
+    review_comparison.add_argument("--primary-reviews", required=True)
+    review_comparison.add_argument("--secondary-reviews", required=True)
+    review_comparison.add_argument("--selection", required=True)
+    review_comparison.add_argument("--output-dir", required=True)
+    review_comparison.add_argument(
+        "--assessed-date", type=date.fromisoformat, required=True
+    )
+    review_comparison.add_argument(
+        "--allow-partial-secondary",
+        action="store_true",
+        help="explicitly permit a checksum-bound incomplete secondary review",
+    )
+    review_comparison.set_defaults(func=command_compare_curation_reviews)
 
     benchmark = subparsers.add_parser(
         "benchmark", help="run grouped out-of-fold baseline evaluation"

@@ -180,6 +180,7 @@ def test_full_text_review_contract_rejects_misgraded_candidates_and_raw_data():
             False,
         ),
         ({"candidate_v3_genes": "GENE1"}, False),
+        ({"candidate_v2_genes": "CDK6 |TOP2A"}, False),
         ({"disposition": "exclude", "scope_outcome": "pass"}, False),
         ({"disposition": "metadata_only", "scope_outcome": "fail"}, False),
     ],

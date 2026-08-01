@@ -27,6 +27,19 @@ suffix and are not claims of a trained biological model.
 - Recorded the observed human-index intake: 1,952 total screens, 278
   `exclude`, 1,674 `metadata_only`, 435 confirmed-scope candidates, 1,239
   manual-review candidates, and zero `benchmark_ready`.
+- Added a checksum-bound partial dual-review workflow. Ranks 6-10 have seven
+  provisional gene-level agreements; ranks 1-5 and human adjudication remain
+  explicitly pending, all adjudication-relevant metadata disagreements remain
+  recorded field by field, and agreement cannot release a benchmark label.
+- Added a complete 24-run accession map for `SRP158611`, with eight runs
+  conditionally assigned to the two-donor CGS-21680 contrast and the other 16
+  excluded as different screens. A separately checksummed ENA inventory
+  prevents truncated maps from appearing complete, while a distinct curated
+  scope table preserves article-supported inclusion decisions. Raw reads remain
+  external to Git.
+- Registered the public Findlay Supplementary Dataset EV3 sgRNA count matrix
+  and retained its methods-versus-matrix replicate conflict as an unresolved
+  sample-map blocker.
 - Kept the checkpoint explicitly non-trainable: full-text design curation,
   comparator/sample reconstruction, count-level evidence, data-rights review,
   and independent validation-event adjudication remain required.

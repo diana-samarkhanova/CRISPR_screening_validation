@@ -1,0 +1,210 @@
+{
+  "$defs": {
+    "MappingEvidence": {
+      "enum": [
+        "repository_explicit",
+        "article_supported",
+        "not_applicable"
+      ],
+      "title": "MappingEvidence",
+      "type": "string"
+    },
+    "RunInclusionStatus": {
+      "enum": [
+        "included_drug_contrast",
+        "excluded_other_screen"
+      ],
+      "title": "RunInclusionStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "inclusion_status": {
+            "const": "included_drug_contrast"
+          }
+        },
+        "required": [
+          "inclusion_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "screen_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "contrast_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "condition_role": {
+            "enum": [
+              "control",
+              "treatment"
+            ]
+          },
+          "treatment_name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "treatment_mapping_evidence": {
+            "enum": [
+              "repository_explicit",
+              "article_supported"
+            ]
+          }
+        },
+        "required": [
+          "screen_id",
+          "contrast_id",
+          "condition_role",
+          "treatment_name"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "inclusion_status": {
+            "const": "excluded_other_screen"
+          }
+        },
+        "required": [
+          "inclusion_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "screen_id": {
+            "type": "null"
+          },
+          "contrast_id": {
+            "type": "null"
+          },
+          "condition_role": {
+            "type": "null"
+          },
+          "treatment_name": {
+            "type": "null"
+          },
+          "treatment_mapping_evidence": {
+            "const": "not_applicable"
+          }
+        }
+      }
+    }
+  ],
+  "description": "Curated rule linking a repository group to one contrast or exclusion.",
+  "properties": {
+    "scope_rule_id": {
+      "minLength": 1,
+      "title": "Scope Rule Id",
+      "type": "string"
+    },
+    "study_accession": {
+      "minLength": 1,
+      "title": "Study Accession",
+      "type": "string"
+    },
+    "repository_screen_group": {
+      "minLength": 1,
+      "title": "Repository Screen Group",
+      "type": "string"
+    },
+    "inclusion_status": {
+      "$ref": "#/$defs/RunInclusionStatus"
+    },
+    "screen_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Screen Id"
+    },
+    "contrast_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Contrast Id"
+    },
+    "condition_role": {
+      "anyOf": [
+        {
+          "enum": [
+            "control",
+            "treatment"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Condition Role"
+    },
+    "treatment_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Treatment Name"
+    },
+    "treatment_mapping_evidence": {
+      "$ref": "#/$defs/MappingEvidence"
+    },
+    "evidence_url": {
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Evidence Url",
+      "type": "string"
+    },
+    "source_locator": {
+      "minLength": 1,
+      "title": "Source Locator",
+      "type": "string"
+    },
+    "assessed_date": {
+      "format": "date",
+      "title": "Assessed Date",
+      "type": "string"
+    }
+  },
+  "required": [
+    "scope_rule_id",
+    "study_accession",
+    "repository_screen_group",
+    "inclusion_status",
+    "treatment_mapping_evidence",
+    "evidence_url",
+    "source_locator",
+    "assessed_date"
+  ],
+  "title": "RunContrastScopeRecord",
+  "type": "object",
+  "x-semantic-rules": [
+    "Contrast inclusion is a curated decision, not repository truth.",
+    "Article-supported and repository-explicit mappings remain distinct."
+  ]
+}

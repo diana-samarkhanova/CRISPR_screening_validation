@@ -1,0 +1,63 @@
+{
+  "assessed_date": "2026-08-01",
+  "batch_id": "orcs-2.0.18-batch-001",
+  "benchmark_ready_count": 0,
+  "compared_gene_count": 7,
+  "comparison": {
+    "filename": "review_comparison_partial.tsv",
+    "sha256": "fdff57b0a900a46b61acc615fd17fe26c5bc48c2d63c1103051d0f5816aeafe4"
+  },
+  "comparison_status_counts": {
+    "provisional_agreement": 7
+  },
+  "critical_field_disagreement_counts": {
+    "analysis_method": 0,
+    "blocker_codes": 1,
+    "data_accession": 1,
+    "design_review": 0,
+    "disposition": 0,
+    "doi": 0,
+    "full_text_reviewed": 0,
+    "full_text_url": 0,
+    "library_design": 0,
+    "paper_url": 0,
+    "quantitative_asset_family_id": 0,
+    "quantitative_asset_locator": 4,
+    "quantitative_data_status": 1,
+    "raw_data_family_id": 1,
+    "rights_basis": 1,
+    "rights_outcome": 1,
+    "sample_map_review": 1,
+    "scope_outcome": 0,
+    "screen_model": 0,
+    "screen_replication": 2,
+    "supplement_review": 1,
+    "supplement_url": 0,
+    "treatment_contrast": 0,
+    "validation_source_locator": 4,
+    "validation_status": 0
+  },
+  "pending_second_review_screen_count": 5,
+  "primary_curators": [
+    "Codex-assisted single-curator review"
+  ],
+  "primary_reviews": {
+    "filename": "reviews.tsv",
+    "sha256": "b44822515c4236593d4910e4f0160c5114691cd220fc2d4b2c2d98fa0bb9eb6f"
+  },
+  "schema_version": 1,
+  "second_reviewed_screen_count": 5,
+  "secondary_curators": [
+    "Independent Codex literature reviewer; per-study outcome mapping withheld"
+  ],
+  "secondary_reviews": {
+    "filename": "reviews_curator_2_partial.tsv",
+    "sha256": "3fe697a9c5e24cdbb636155d163d8ac01772ccea5bbd92beefbd9bcd1883c0c2"
+  },
+  "selected_screen_count": 10,
+  "selection": {
+    "filename": "selection.tsv",
+    "sha256": "b3f2de96e2b29999522ca7086d855f4ef8dd5e248f0f0e79b22aaeb7789afd8c"
+  },
+  "status": "partial_dual_review_requires_completion_and_human_adjudication"
+}

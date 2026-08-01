@@ -77,6 +77,14 @@ selection. Its biological context and results remain outside Git history and
 are reserved for evaluation after the public-data model and selection rules
 are frozen.
 
+The ORCS pilot now records a partial dual review for queue ranks 6-10 and an
+accession-level map for all 24 `SRP158611` amplicon runs. Seven gene-level
+assessments agree provisionally, but ranks 1-5 and human adjudication remain
+pending. A public Findlay supplementary matrix was also identified; its
+two-replicate count columns conflict with triplicate wording in the methods.
+These discoveries improve provenance but do not create training rows:
+`benchmark_ready` remains zero.
+
 ## Next gate
 
 The next release gate is a manually adjudicated pilot containing:

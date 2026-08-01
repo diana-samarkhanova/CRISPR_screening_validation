@@ -52,11 +52,15 @@ an outcome-blind curation queue, not a harmonized or trainable biological
 corpus.
 
 The first full-text pilot freezes queue ranks 1-10 from ten publication
-families before outcome review. Nine screens provide author-derived score
-tables only; one has public raw sequencing reads (`SRP158611`). All ten remain
-`metadata_only` because count-level ingestion, rights, raw-data-family, and/or
-independent validation adjudication are incomplete. Candidate validation
-grades are stored downstream of selection and are not yet training labels.
+families before outcome review. Eight screens provide author-derived score
+tables only, one has a public sgRNA count matrix, and one has public amplicon
+reads (`SRP158611`). Independent second review is complete for ranks 6-10 only;
+seven gene-level agreements remain provisional and require human adjudication.
+Adjudication-relevant disagreements are reported field by field across source,
+design, quantitative-data, rights, validation, and blocker metadata.
+All ten screens remain `metadata_only` because count ingestion/QC, rights,
+sample mapping, and/or adjudication are incomplete. Candidate validation
+grades are stored downstream of selection and are not training labels.
 
 Development from v0.2 onward is versioned in a private GitHub repository.
 Public visibility is a later release gate, not a prerequisite for using Git

@@ -455,7 +455,7 @@
     "candidate_v3_genes": {
       "anyOf": [
         {
-          "pattern": "^[^|]+(?:\\|[^|]+)*$",
+          "pattern": "^[^|\\s]+(?:\\|[^|\\s]+)*$",
           "type": "string"
         },
         {
@@ -468,7 +468,7 @@
     "candidate_v2_genes": {
       "anyOf": [
         {
-          "pattern": "^[^|]+(?:\\|[^|]+)*$",
+          "pattern": "^[^|\\s]+(?:\\|[^|\\s]+)*$",
           "type": "string"
         },
         {
@@ -481,7 +481,7 @@
     "candidate_v1_genes": {
       "anyOf": [
         {
-          "pattern": "^[^|]+(?:\\|[^|]+)*$",
+          "pattern": "^[^|\\s]+(?:\\|[^|\\s]+)*$",
           "type": "string"
         },
         {
@@ -494,7 +494,7 @@
     "nonqualifying_validation_genes": {
       "anyOf": [
         {
-          "pattern": "^[^|]+(?:\\|[^|]+)*$",
+          "pattern": "^[^|\\s]+(?:\\|[^|\\s]+)*$",
           "type": "string"
         },
         {

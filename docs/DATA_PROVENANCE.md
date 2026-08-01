@@ -72,7 +72,9 @@ The MIT terms recorded for this asset apply only to files distributed by
 BioGRID ORCS. They must not be inherited by publisher supplements, SRA/GEO
 objects, FASTQ files, author count matrices, or other upstream data linked from
 an ORCS record. Each upstream asset requires its own rights holder, terms,
-redistribution decision, checksum, and provenance row.
+redistribution decision, and provenance row. Retrieved bytes require a local
+or publisher checksum; an accession-only pointer must be marked not retrieved
+and must not claim a checksum for bytes the project did not acquire.
 
 Primary methods, supplements, raw-repository metadata, and author files verify
 historical conditions. A library-design paper, including Joung et al., may
@@ -107,13 +109,17 @@ dataset.
 
 The first frozen pilot batch covers queue ranks 1-10 from ten distinct source
 families. Selection and review are stored separately with independent SHA-256
-checksums. Full-text review found nine author-score-only screens and one screen
-with public raw reads (`SRP158611`), but no reviewed screen yet has an ingested
-count matrix, completed raw-data rights record, and independently adjudicated
-validation event together. Consequently all ten remain `metadata_only` and
-the batch contributes zero benchmark rows.
+checksums. Full-text review found eight author-score-only screens, one public
+sgRNA count matrix, and one screen with public raw reads (`SRP158611`). The SRA
+study contains 24 amplicon runs; eight are conditionally mapped to the relevant
+two-donor drug contrast, with vehicle identities supported by the article
+rather than explicit repository aliases. No reviewed screen yet has completed
+ingestion, QC, rights, sample mapping, and validation adjudication together.
+Consequently all ten remain `metadata_only` and the batch contributes zero
+benchmark rows.
 
-Candidate `V1/V2/V3` grades in this batch are downstream single-curator review
-states. They are excluded from selection, design features, and readiness
-derivation until a second outcome-blind curator and adjudication step are
-complete.
+Candidate `V1/V2/V3` grades in this batch are downstream review states. A
+second reviewer has completed ranks 6-10, yielding seven provisional gene-level
+agreements; ranks 1-5 remain pending. Agreement is excluded from selection,
+design features, readiness derivation, and released labels until a named human
+adjudicator verifies the evidence.
