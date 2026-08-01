@@ -133,6 +133,12 @@ are resolved without seeing model predictions. Each event records:
 - technical adequacy;
 - exact source locator.
 
+Checksums, distinct review IDs, and distinct curator identifiers preserve the
+two review streams but cannot prove cognitive independence. Blinding is a
+documented process control, not a cryptographic property. A named human
+adjudicator must therefore inspect the source evidence and reviewer differences
+before any candidate grade becomes a released label.
+
 `F0` requires a successful perturbation and adequate assay. A failed edit or
 missing assay is `T`, not a biological negative.
 

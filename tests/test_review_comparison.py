@@ -30,6 +30,10 @@ PARTIAL_COMPARISON = BATCH_DIR / "review_comparison_partial.tsv"
 PARTIAL_MANIFEST = BATCH_DIR / "dual_review_manifest_partial.json"
 COMPLETION_PROGRESS = BATCH_DIR / "reviews_curator_2_completion_progress.tsv"
 COMPLETION_PROGRESS_MANIFEST = BATCH_DIR / "secondary_review_progress_manifest.json"
+COMPLETION_REVIEWS = BATCH_DIR / "reviews_curator_2_completion.tsv"
+FULL_SECONDARY = BATCH_DIR / "reviews_curator_2.tsv"
+FULL_COMPARISON = BATCH_DIR / "review_comparison.tsv"
+FULL_MANIFEST = BATCH_DIR / "dual_review_manifest.json"
 
 
 def _reviews() -> pd.DataFrame:
@@ -964,6 +968,73 @@ def test_checked_in_secondary_review_progress_is_exact_and_checksum_bound():
     assert observed["adjudicated_gene_count"] == 0
     assert observed["released_label_count"] == 0
     assert observed["benchmark_ready_count"] == 0
+
+
+def test_checked_in_completed_dual_review_bundle_is_exact_and_unreleased(tmp_path):
+    output_dir = tmp_path / "completed"
+    manifest = write_completed_dual_review_bundle(
+        BATCH_DIR / "reviews.tsv",
+        COMPLETION_REVIEWS,
+        COMPLETION_PROGRESS,
+        COMPLETION_PROGRESS_MANIFEST,
+        BATCH_DIR / "selection.tsv",
+        PARTIAL_SECONDARY,
+        PARTIAL_COMPARISON,
+        PARTIAL_MANIFEST,
+        output_dir,
+        assessed_date=date(2026, 8, 2),
+        expected_checkpoint_manifest_sha256=hashlib.sha256(
+            PARTIAL_MANIFEST.read_bytes()
+        ).hexdigest(),
+        expected_progress_manifest_sha256=hashlib.sha256(
+            COMPLETION_PROGRESS_MANIFEST.read_bytes()
+        ).hexdigest(),
+    )
+
+    bundle_filenames = {
+        "dual_review_manifest.json",
+        "dual_review_manifest_partial.json",
+        "review_comparison.tsv",
+        "review_comparison_partial.tsv",
+        "reviews.tsv",
+        "reviews_curator_2.tsv",
+        "reviews_curator_2_completion.tsv",
+        "reviews_curator_2_completion_progress.tsv",
+        "reviews_curator_2_partial.tsv",
+        "secondary_review_progress_manifest.json",
+        "selection.tsv",
+    }
+    assert {path.name for path in output_dir.iterdir()} == bundle_filenames
+    for filename in bundle_filenames:
+        assert (output_dir / filename).read_bytes() == (
+            BATCH_DIR / filename
+        ).read_bytes()
+
+    assert manifest == json.loads(FULL_MANIFEST.read_text(encoding="utf-8"))
+    assert manifest["status"] == "dual_review_complete_requires_human_adjudication"
+    assert manifest["second_reviewed_screen_count"] == 10
+    assert manifest["pending_second_review_screen_count"] == 0
+    assert manifest["compared_gene_count"] == 20
+    assert manifest["comparison_status_counts"] == {
+        "label_disagreement": 1,
+        "provisional_agreement": 17,
+        "single_curator_only": 2,
+    }
+    assert manifest["adjudication_status"] == "pending_human_adjudication"
+    assert manifest["adjudicated_gene_count"] == 0
+    assert manifest["released_label_count"] == 0
+    assert manifest["benchmark_ready_count"] == 0
+
+    completion = pd.read_csv(COMPLETION_REVIEWS, sep="\t", dtype=str)
+    assert completion["queue_rank"].astype(int).tolist() == [1, 2, 3, 4, 5]
+    rank_two = pd.read_csv(FULL_COMPARISON, sep="\t", dtype=str).loc[
+        lambda frame: frame["queue_rank"].eq("2")
+    ]
+    assert rank_two["comparison_status"].value_counts().to_dict() == {
+        "provisional_agreement": 4,
+        "single_curator_only": 1,
+    }
+    assert rank_two["human_adjudication_required"].eq("True").all()
 
 
 def test_secondary_review_progress_rejects_overlap_and_complete_set(tmp_path):

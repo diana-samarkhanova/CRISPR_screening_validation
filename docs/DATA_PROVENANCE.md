@@ -10,6 +10,12 @@ Every external datum must be traceable to:
 - checksum for downloaded files;
 - study, screen, sample, guide, gene, and validation-event identifiers.
 
+The checked-in Git commit and `uv.lock` identify the code and environment that
+generated a bundle. The bundle manifest checksum-binds its data inputs and
+outputs but does not embed its own Git commit, which would be self-referential.
+A standalone export must therefore travel with a release tag or recorded Git
+tree identifier in its archival metadata.
+
 ## Normalized experimental levels
 
 Provenance is attached to four distinct levels:
@@ -118,10 +124,11 @@ ingestion, QC, rights, sample mapping, and validation adjudication together.
 Consequently all ten remain `metadata_only` and the batch contributes zero
 benchmark rows.
 
-Candidate `V1/V2/V3` grades in this batch are downstream review states. A
-second reviewer has completed frozen ranks 6-10, yielding seven provisional
-gene-level agreements, and a separately checksummed progress addendum preserves
-ranks 1, 3, 4, and 5 without comparing them to the primary review. Rank 2
-remains pending. Agreement is excluded from selection, design features,
-readiness derivation, and released labels until a named human adjudicator
-verifies the evidence.
+Candidate `V1/V2/V3` grades in this batch are downstream review states. The
+second review now covers all ten screens through a checksum-bound completion
+lineage that preserves the frozen ranks 6-10 checkpoint and ranks 1, 3, 4, and
+5 progress rows. The full comparison contains 17 provisional agreements, one
+evidence-level disagreement, and two single-curator observations across 20
+gene-level rows. Every row still requires named human adjudication; comparison
+is excluded from selection, design features, readiness derivation, and released
+labels.

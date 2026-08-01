@@ -54,12 +54,13 @@ corpus.
 The first full-text pilot freezes queue ranks 1-10 from ten publication
 families before outcome review. Eight screens provide author-derived score
 tables only, one has a public sgRNA count matrix, and one has public amplicon
-reads (`SRP158611`). Independent second review is recorded for nine screens:
-the frozen ranks 6-10 checkpoint plus a checksum-bound progress addendum for
-ranks 1, 3, 4, and 5. Rank 2 remains pending. The seven comparisons already
-materialized from ranks 6-10 remain provisional and require human adjudication;
-the addendum is deliberately not compared until the exact complement is
-complete. Adjudication-relevant disagreements are reported field by field
+reads (`SRP158611`). Independent second review is complete for all ten screens:
+the frozen ranks 6-10 checkpoint, its checksum-bound ranks 1, 3, 4, and 5
+progress addendum, and an independently reviewed rank 2 were combined through
+the authenticated completion workflow. The full comparison contains 20
+gene-level rows: 17 provisional agreements, one evidence-level disagreement,
+and two single-curator observations. All require human adjudication.
+Adjudication-relevant metadata disagreements remain reported field by field
 across source, design, quantitative-data, rights, validation, and blocker
 metadata.
 All ten screens remain `metadata_only` because count ingestion/QC, rights,

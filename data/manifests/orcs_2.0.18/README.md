@@ -31,14 +31,16 @@ The checked-in files are:
   queue artifacts.
 - `curation_batches/batch_001/`: the frozen outcome-blind ranks 1-10 selection,
   its separate full-text review, a frozen ranks 6-10 dual-review checkpoint,
-  and a checksum-bound completion-progress addendum for ranks 1, 3, 4, and 5.
+  a checksum-bound completion-progress addendum for ranks 1, 3, 4, and 5, and
+  the authenticated eleven-file full dual-review bundle.
 
 ORCS `HIT` values are deliberately absent from queue prioritization and are
 never interpreted as validation outcomes. The ORCS MIT license covers the
 ORCS-distributed files only; it does not establish redistribution rights for
 authors' upstream sequencing or count-level data.
 
-Batch 001 has a primary review for all ten screens and independent second-review
-records for nine; rank 2 remains pending. All ten screens are still
-`metadata_only`; candidate validation grades require full independent review
-and formal event adjudication before they can become labels.
+Batch 001 has primary and independent second-review records for all ten
+screens. Its 20 gene-level comparison rows comprise 17 provisional agreements,
+one evidence-level disagreement, and two single-curator observations. All ten
+screens remain `metadata_only`; formal human event adjudication is required
+before any candidate grade can become a label.
