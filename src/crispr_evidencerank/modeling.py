@@ -123,6 +123,7 @@ FORBIDDEN_SUCCESS_FEATURES = {
 
 def validate_success_feature_columns(feature_columns: list[str]) -> None:
     forbidden_tokens = (
+        "report_only",
         "validation",
         "phenotype_reproduced",
         "opposite_direction",
@@ -473,6 +474,7 @@ class ReproducibilityModel:
         selection_weighting: bool = False,
         selection_groups: pd.Series | None = None,
     ) -> ReproducibilityModel:
+        validate_success_feature_columns(self.feature_columns)
         frame = _prepare_direction_features(frame)
         missing = set(self.feature_columns) - set(frame.columns)
         if missing:

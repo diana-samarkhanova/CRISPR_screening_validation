@@ -1,0 +1,63 @@
+version: 1
+
+sources:
+  icraft:
+    name: Immune-related CRISPR screen Analyzer of Functional Targets
+    status: adapter_contract_and_report_engine_only
+    article:
+      doi: https://doi.org/10.1016/j.immuni.2025.02.007
+      journal: Immunity
+      year: 2025
+    portal: https://icraft.pku-genomics.org/
+    public_code: https://github.com/zenglab-pku/ICRAFT_A20_paper
+    paper_reported_coverage:
+      studies: 90
+      comparisons: 558
+      cancer_cell_comparisons: 397
+      immune_cell_comparisons: 161
+      in_vivo_comparisons: 168
+      in_vitro_comparisons: 390
+    permitted_project_roles:
+      - report_only_cross_screen_recurrence
+      - tumor_immune_dual_action_hypothesis
+      - immune_liability_context
+    prohibited_project_roles:
+      - validation_label
+      - validation_probability
+      - direct_success_model_feature_from_current_snapshot
+    transformation_registry:
+      crispra_display_sign_inversion:
+        id: icraft_crispra_display_sign_inversion_v1
+        input: native_crispra_lfc
+        input_sign_semantics: positive_is_enrichment
+        output: ko_equivalent_display_lfc
+        rule: output_equals_negative_input
+        interpretation_use: prohibited
+    dual_action_group_policy:
+      version_required: true
+      review_required: true
+      allowed_tumor_consequences:
+        - tumor_immune_escape
+        - tumor_immune_sensitization
+      allowed_immune_consequences:
+        - immune_effector_gain
+        - immune_effector_loss
+        - immune_fitness_gain
+        - immune_fitness_loss
+      prohibited_as_functional_support:
+        - drug_response_only
+        - marker_only
+        - generic_selection
+        - ambiguous
+    import_policy:
+      frozen_export_required: true
+      export_checksum_required: true
+      row_level_source_provenance_required: true
+      source_and_raw_family_mapping_required: true
+      redistribution_rights_review_required: true
+      note: >-
+        The repository does not redistribute an ICRAFT database export. The
+        cited public repository exposes crawler/parser code, not a guaranteed
+        frozen copy of the complete portal or analysis backend. Only a
+        separately obtained, rights-reviewed, checksum-pinned export may be
+        imported into the canonical immune_screen_evidence contract.

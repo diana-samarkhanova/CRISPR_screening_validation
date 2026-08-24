@@ -4,6 +4,41 @@ All notable project changes are recorded here. The project follows semantic
 versioning once public releases begin; development checkpoints use a `.devN`
 suffix and are not claims of a trained biological model.
 
+## 0.3.0.dev0 — screen report and immune-context engine
+
+- Added `rank-screen`, a one-command bundle for MAGeCK gene summaries, raw
+  count tables, or both. It writes ranked candidates, QC, input checksums, run
+  parameters, and a human-readable report.
+- Required explicit semantics for the MAGeCK positive tail and positive count
+  LFC. The software does not guess whether a sign means resistance or
+  sensitization.
+- Kept the new-screen output explicitly named `screen_signal_baseline`; zero
+  released real-data labels means it is not a validation probability.
+- Added the `immune_screen_evidence` contract and generated JSON Schema with
+  exact modality, compartment, setting, phenotype, contrast, native direction,
+  orthology, rank-list, provenance, cutoff, and transformation fields.
+- Added `summarize-immuno-context` as a report-only post-ranking method with
+  tumor, immune, and in-vivo evidence lanes; dual-action/liability categories;
+  source/raw-family collapse; temporal and self-family exclusion; and explicit
+  missingness.
+- Preserved native CRISPRa effects independently of ICRAFT's KO-equivalent
+  display inversion, required a registered numeric LFC sign-pair for that
+  display transform, added controlled raw-effect sign semantics, and kept KO,
+  CRISPRi, and CRISPRa in separate queries.
+- Restricted de novo RRA to checksum-identified rank lists whose complete
+  `1..N` roster is observed, and required at least two independent provenance
+  components. Ineligible lists produce a null p-value and reason-coded
+  abstention.
+- Blocked every `report_only_*` immune column from the validation-success model
+  and prohibited ICRAFT recurrence, dual-action classes, and expression or
+  clinical associations from supplying validation labels.
+- Made both report bundles input- and output-checksum-bound and atomic, preserved identifier
+  strings and all primary screen axes, required versioned dual-action grouping,
+  and added explicit replicate/guide-coverage warnings.
+- Documented the ICRAFT comparison, adopted methods, scientific boundaries,
+  current lack of a redistributable frozen ICRAFT export, and remaining
+  limitations.
+
 ## Unreleased — ORCS 2.0.18 intake checkpoint
 
 - Pinned the human-screen intake to BioGRID ORCS `2.0.18`, compiled on

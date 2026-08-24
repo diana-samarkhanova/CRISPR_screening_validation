@@ -67,5 +67,27 @@ jobs:
       - name: Run smoke test
         run: uv run python scripts/smoke_test.py
 
+      - name: Run installed CLI reports end to end
+        run: |
+          uv run crispr-evidencerank rank-screen \
+            --mageck-summary examples/synthetic/mageck_gene_summary.tsv \
+            --screen-id synthetic_olaparib \
+            --contrast-id olaparib_vs_vehicle \
+            --positive-tail-means resistance \
+            --output-dir /tmp/screen-report
+          uv run crispr-evidencerank summarize-immuno-context \
+            --evidence examples/immune_context/evidence.tsv \
+            --candidates /tmp/screen-report/ranked_candidates.tsv \
+            --cutoff-date 2025-04-08 \
+            --target-modality CRISPR_KO \
+            --dual-action-group-id ko_antitumor_function \
+            --dual-action-group-version synthetic-v1 \
+            --output-dir /tmp/immune-context
+          test -s /tmp/screen-report/ranked_candidates.tsv
+          test -s /tmp/screen-report/run_manifest.json
+          test -s /tmp/immune-context/immune_context.tsv
+          test -s /tmp/immune-context/immune_context_used_evidence.tsv
+          test -s /tmp/immune-context/summary.json
+
       - name: Build distribution
         run: uv build

@@ -58,6 +58,23 @@ Do not commit by default:
 DepMap/Project Score, tumor multi-omics, pathway resources, and literature are
 features or contextual evidence, not ground-truth validation labels.
 
+ICRAFT and related immune-screen resources are versioned external context
+providers. A canonical immune comparison records its original study, screen,
+comparison, source family, raw-data family, modality, perturbed compartment,
+native contrast direction, endpoint polarity, source snapshot, evidence
+availability date, transformation availability date, and retrieval date. The
+ICRAFT CRISPRa sign inversion is source-display metadata; a restored native
+effect is stored separately and never overwritten. Every numeric raw effect
+declares controlled sign semantics rather than relying on a free-text metric
+name.
+
+The mutable ICRAFT portal is not a reproducible snapshot. Import requires a
+frozen export checksum, row-level links to original sources, source/raw-family
+mapping, and an independent rights decision. The public crawler/parser
+software license must not be inherited by collected papers, counts, FASTQ,
+clinical cohorts, or portal database content. This repository currently ships
+the contract and report engine, not an ICRAFT export.
+
 [BioGRID ORCS](https://orcs.thebiogrid.org/) is used for screen discovery,
 structured metadata, and author-method gene scores. Record its release,
 retrieval date, ORCS screen ID, original publication, scoring method, and
@@ -98,6 +115,16 @@ Cross-screen recurrence and other source-derived features are reconstructed
 inside each outer training fold after source/raw-family deduplication. The
 held-out family and any evidence first available after the test cutoff are
 excluded.
+
+The v0.3 immune-context output is report-only. It applies the cutoff to the
+latest of source evidence, provider snapshot, and transformation availability;
+supports explicit target source/raw-family exclusion; and blocks all
+`report_only_*` columns from the current validation-success model. A declared
+full rank list is accepted for RRA only after the complete row roster, exact
+`1..N` ranks, declared ranking semantics, and canonical roster SHA-256 are
+verified against its gene count. CLI bundles are computed from exact byte
+snapshots, re-hash inputs before atomic publication, and refuse to overwrite an
+existing output directory.
 
 ## ORCS intake and curation queue
 

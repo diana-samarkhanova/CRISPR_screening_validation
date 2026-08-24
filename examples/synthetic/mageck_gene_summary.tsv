@@ -1,0 +1,4 @@
+id	pos|score	pos|fdr	pos|rank	pos|lfc	neg|score	neg|fdr	neg|rank	neg|lfc
+GENE1	0.001	0.01	1	2.0	0.4	0.7	3	0.0
+GENE2	0.02	0.05	2	1.0	0.03	0.08	2	-1.0
+GENE3	0.5	0.8	3	0.0	0.002	0.02	1	-2.0

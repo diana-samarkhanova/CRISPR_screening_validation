@@ -245,6 +245,50 @@ Report:
 This prevents a biologically popular gene from appearing reproducible solely
 because it has more papers.
 
+## Auxiliary immune-context analysis
+
+Apply immune-context analysis only after the primary screen-signal ranking and
+retain it as a separate report. The query unit is
+`gene × modality × compartment × phenotype stratum × analysis tail`.
+
+For every comparison, curate the perturbed compartment, exact cell model,
+species and orthology, in-vitro/in-vivo setting, treatment and comparator,
+phenotype endpoint, timepoint, native effect direction, endpoint polarity,
+source/raw-data families, source snapshot, and transformation date. A sign is
+interpretable only after the contrast and endpoint polarity are explicit.
+ICRAFT's CRISPRa display inversion is never used as a native biological effect.
+
+Quantitative support is restricted to human evidence or versioned one-to-one
+orthology. Collapse reanalyses first through raw-data families and then through
+source families; report record, raw-family, source-family, and conservative
+independent-component counts separately. Exclude the target screen and every
+sibling source/raw family before recurrence. For historical evaluation, use
+only rows whose source, provider snapshot, and transformation were all
+available by the cutoff.
+
+De novo order-statistic RRA is permitted only within one explicitly selected
+recurrence stratum. A rank-list declaration must be verified by observing one
+unique gene at every rank from 1 through the declared gene-universe size. At
+least two independent provenance components are required. Top-hit subsets,
+incomplete lists, mixed tails, or unverified rosters return an abstention with
+a null p-value.
+
+Dual-action classification requires an explicit `dual_action_group_id` plus a
+versioned, reviewed `dual_action_group_version`, the same perturbation modality
+in both compartments, functional CRISPR evidence in both tumor and immune
+cells, and no unresolved within-family conflict. Use
+`dual_benefit_candidate`, not “validated dual-action target.” scRNA-seq,
+DepMap/CCLE, TCGA, and ICB-response associations annotate expression, safety,
+or clinical context but do not count as functional support or validation.
+The software verifies the declared group version and semantic compatibility;
+it cannot authenticate the claimed human review, which remains a provenance
+and governance requirement.
+
+For olaparib KO screens, keep the drug-response axis independent. KO enrichment
+under olaparib denotes candidate loss-induced resistance; favorable immune
+evidence does not turn that gene into an inhibitor target. Report the result as
+a PARPi–immune trade-off when the two axes disagree.
+
 ## Prospective experiment
 
 After model freeze, select genes from:

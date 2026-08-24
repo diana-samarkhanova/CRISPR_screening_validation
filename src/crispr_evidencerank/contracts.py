@@ -31,6 +31,163 @@ class PhenotypeDirection(StrEnum):
     UNKNOWN = "unknown"
 
 
+class PerturbedCompartment(StrEnum):
+    """Cell compartment in which the perturbation was introduced."""
+
+    TUMOR_CELL = "tumor_cell"
+    IMMUNE_CELL = "immune_cell"
+    OTHER = "other"
+    UNKNOWN = "unknown"
+
+
+class ExperimentalSetting(StrEnum):
+    IN_VITRO = "in_vitro"
+    IN_VIVO = "in_vivo"
+    EX_VIVO = "ex_vivo"
+    UNKNOWN = "unknown"
+
+
+class ImmuneScreenCategory(StrEnum):
+    """Phenotype strata adapted from, but not restricted to, ICRAFT."""
+
+    CELL_VIABILITY_PROLIFERATION = "cell_viability_proliferation"
+    MARKER_EXPRESSION = "marker_expression"
+    COCULTURE_IMMUNE_KILLING = "coculture_immune_killing"
+    IMMUNE_CELL_FUNCTION = "immune_cell_function"
+    IN_VIVO_SELECTION = "in_vivo_selection"
+    OTHER = "other"
+
+
+class AssayConsequence(StrEnum):
+    DRUG_RESISTANCE = "drug_resistance"
+    DRUG_SENSITIZATION = "drug_sensitization"
+    TUMOR_IMMUNE_ESCAPE = "tumor_immune_escape"
+    TUMOR_IMMUNE_SENSITIZATION = "tumor_immune_sensitization"
+    IMMUNE_EFFECTOR_GAIN = "immune_effector_gain"
+    IMMUNE_EFFECTOR_LOSS = "immune_effector_loss"
+    IMMUNE_FITNESS_GAIN = "immune_fitness_gain"
+    IMMUNE_FITNESS_LOSS = "immune_fitness_loss"
+    MARKER_INCREASED = "marker_increased"
+    MARKER_DECREASED = "marker_decreased"
+    IN_VIVO_POSITIVE_SELECTION = "in_vivo_positive_selection"
+    IN_VIVO_NEGATIVE_SELECTION = "in_vivo_negative_selection"
+    NEUTRAL = "neutral"
+    AMBIGUOUS = "ambiguous"
+
+
+ALLOWED_CONSEQUENCES_BY_SCREEN_CATEGORY = {
+    ImmuneScreenCategory.CELL_VIABILITY_PROLIFERATION: {
+        AssayConsequence.DRUG_RESISTANCE,
+        AssayConsequence.DRUG_SENSITIZATION,
+        AssayConsequence.IMMUNE_FITNESS_GAIN,
+        AssayConsequence.IMMUNE_FITNESS_LOSS,
+    },
+    ImmuneScreenCategory.MARKER_EXPRESSION: {
+        AssayConsequence.MARKER_INCREASED,
+        AssayConsequence.MARKER_DECREASED,
+    },
+    ImmuneScreenCategory.COCULTURE_IMMUNE_KILLING: {
+        AssayConsequence.TUMOR_IMMUNE_ESCAPE,
+        AssayConsequence.TUMOR_IMMUNE_SENSITIZATION,
+        AssayConsequence.IMMUNE_EFFECTOR_GAIN,
+        AssayConsequence.IMMUNE_EFFECTOR_LOSS,
+    },
+    ImmuneScreenCategory.IMMUNE_CELL_FUNCTION: {
+        AssayConsequence.IMMUNE_EFFECTOR_GAIN,
+        AssayConsequence.IMMUNE_EFFECTOR_LOSS,
+        AssayConsequence.IMMUNE_FITNESS_GAIN,
+        AssayConsequence.IMMUNE_FITNESS_LOSS,
+    },
+    ImmuneScreenCategory.IN_VIVO_SELECTION: {
+        AssayConsequence.IN_VIVO_POSITIVE_SELECTION,
+        AssayConsequence.IN_VIVO_NEGATIVE_SELECTION,
+    },
+    ImmuneScreenCategory.OTHER: set(),
+}
+
+
+class NativeEffectDirection(StrEnum):
+    """Direction in the source's native, non-display-inverted contrast."""
+
+    ENRICHED = "enriched"
+    DEPLETED = "depleted"
+    NEUTRAL = "neutral"
+    UNKNOWN = "unknown"
+
+
+class EndpointPolarity(StrEnum):
+    """Whether enrichment or depletion is favorable for antitumor activity."""
+
+    ENRICHMENT_IS_FAVORABLE = "enrichment_is_favorable"
+    DEPLETION_IS_FAVORABLE = "depletion_is_favorable"
+    UNKNOWN = "unknown"
+
+
+class AntitumorDirection(StrEnum):
+    FAVORABLE = "favorable"
+    UNFAVORABLE = "unfavorable"
+    NEUTRAL = "neutral"
+    DISCORDANT = "discordant"
+    UNKNOWN = "unknown"
+
+
+class DirectionMappingStatus(StrEnum):
+    EXACT = "exact"
+    CONDITIONAL = "conditional"
+    UNRESOLVED = "unresolved"
+
+
+EXACT_DIRECTION_RULE_BY_POLARITY = {
+    EndpointPolarity.ENRICHMENT_IS_FAVORABLE: ("native_enrichment_is_favorable_v1"),
+    EndpointPolarity.DEPLETION_IS_FAVORABLE: ("native_depletion_is_favorable_v1"),
+}
+
+ICRAFT_CRISPRA_DISPLAY_TRANSFORMATION_ID = "icraft_crispra_display_sign_inversion_v1"
+
+
+class SourceEffectSemantics(StrEnum):
+    NATIVE = "native"
+    ICRAFT_KO_EQUIVALENT_DISPLAY = "icraft_ko_equivalent_display"
+    OTHER = "other"
+
+
+class RawEffectSignSemantics(StrEnum):
+    POSITIVE_IS_ENRICHMENT = "positive_is_enrichment"
+    POSITIVE_IS_DEPLETION = "positive_is_depletion"
+    UNSIGNED_OR_NOT_APPLICABLE = "unsigned_or_not_applicable"
+
+
+def _is_lfc_metric_label(value: str) -> bool:
+    normalized = "".join(
+        character for character in value.casefold() if character.isalnum()
+    )
+    return any(
+        token in normalized
+        for token in ("lfc", "logfc", "logfoldchange", "log2foldchange")
+    )
+
+
+class OrthologyMappingStatus(StrEnum):
+    NOT_NEEDED = "not_needed"
+    ONE_TO_ONE = "one_to_one"
+    AMBIGUOUS = "ambiguous"
+    UNMAPPED = "unmapped"
+
+
+class RankListCompleteness(StrEnum):
+    FULL_RANKED_LIST = "full_ranked_list"
+    TOP_HITS_ONLY = "top_hits_only"
+    UNKNOWN = "unknown"
+
+
+class InputDataLevel(StrEnum):
+    FASTQ = "fastq"
+    RAW_COUNTS = "raw_counts"
+    NORMALIZED_COUNTS = "normalized_counts"
+    DERIVED_GENE_SCORES = "derived_gene_scores"
+    UNKNOWN = "unknown"
+
+
 class SampleRole(StrEnum):
     CONTROL = "control"
     TREATMENT = "treatment"
@@ -1316,7 +1473,7 @@ class GeneScoreRecord(StrictRecord):
                             }
                         },
                     },
-                }
+                },
             ],
             "anyOf": [
                 {
@@ -1783,6 +1940,599 @@ class EvidenceRecord(StrictRecord):
         return self
 
 
+class ImmuneScreenEvidenceRecord(StrictRecord):
+    """Canonical comparison-by-gene evidence for immune-context reporting.
+
+    This contract deliberately stores the native source direction separately
+    from endpoint desirability. It is auxiliary evidence: it cannot create a
+    validation label or enter the success model as a current-snapshot feature.
+    """
+
+    primary_key = ("evidence_id",)
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True,
+        allow_inf_nan=False,
+        json_schema_extra={
+            "anyOf": [
+                {
+                    "required": ["raw_effect"],
+                    "properties": {"raw_effect": {"type": "number"}},
+                },
+                {
+                    "required": ["source_score"],
+                    "properties": {"source_score": {"type": "number"}},
+                },
+                {
+                    "required": ["source_fdr"],
+                    "properties": {"source_fdr": {"type": "number"}},
+                },
+                {
+                    "required": ["source_rank"],
+                    "properties": {"source_rank": {"type": "integer"}},
+                },
+            ],
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "rank_list_completeness": {"const": "full_ranked_list"}
+                        },
+                        "required": ["rank_list_completeness"],
+                    },
+                    "then": {
+                        "required": [
+                            "rank_list_id",
+                            "rank_list_sha256",
+                            "source_rank",
+                            "gene_universe_size",
+                            "analysis_tail",
+                            "rank_metric_type",
+                            "rank_ordering",
+                            "rank_tie_policy",
+                        ],
+                        "properties": {
+                            "rank_list_id": {"type": "string", "minLength": 1},
+                            "rank_list_sha256": {
+                                "type": "string",
+                                "pattern": "^[0-9a-f]{64}$",
+                            },
+                            "source_rank": {"type": "integer", "minimum": 1},
+                            "gene_universe_size": {
+                                "type": "integer",
+                                "minimum": 1,
+                            },
+                            "analysis_tail": {
+                                "type": "string",
+                                "minLength": 1,
+                            },
+                            "rank_metric_type": {
+                                "type": "string",
+                                "minLength": 1,
+                            },
+                            "rank_ordering": {"enum": ["ascending", "descending"]},
+                            "rank_tie_policy": {
+                                "type": "string",
+                                "minLength": 1,
+                            },
+                        },
+                    },
+                },
+                {
+                    "if": {
+                        "required": ["raw_effect"],
+                        "properties": {"raw_effect": {"type": "number"}},
+                    },
+                    "then": {
+                        "required": [
+                            "raw_effect_type",
+                            "raw_effect_sign_semantics",
+                        ],
+                        "properties": {
+                            "raw_effect_type": {
+                                "type": "string",
+                                "minLength": 1,
+                            },
+                            "raw_effect_sign_semantics": {
+                                "enum": [
+                                    "positive_is_enrichment",
+                                    "positive_is_depletion",
+                                    "unsigned_or_not_applicable",
+                                ]
+                            },
+                        },
+                    },
+                },
+                {
+                    "if": {
+                        "required": ["raw_effect_type"],
+                        "properties": {"raw_effect_type": {"type": "string"}},
+                    },
+                    "then": {
+                        "required": [
+                            "raw_effect",
+                            "raw_effect_sign_semantics",
+                        ],
+                        "properties": {
+                            "raw_effect": {"type": "number"},
+                            "raw_effect_sign_semantics": {
+                                "enum": [
+                                    "positive_is_enrichment",
+                                    "positive_is_depletion",
+                                    "unsigned_or_not_applicable",
+                                ]
+                            },
+                        },
+                    },
+                },
+                {
+                    "if": {
+                        "required": ["raw_effect_sign_semantics"],
+                        "properties": {
+                            "raw_effect_sign_semantics": {
+                                "enum": [
+                                    "positive_is_enrichment",
+                                    "positive_is_depletion",
+                                    "unsigned_or_not_applicable",
+                                ]
+                            }
+                        },
+                    },
+                    "then": {
+                        "required": ["raw_effect", "raw_effect_type"],
+                        "properties": {
+                            "raw_effect": {"type": "number"},
+                            "raw_effect_type": {
+                                "type": "string",
+                                "minLength": 1,
+                            },
+                        },
+                    },
+                },
+                {
+                    "if": {
+                        "required": ["source_score"],
+                        "properties": {"source_score": {"type": "number"}},
+                    },
+                    "then": {
+                        "required": ["source_score_type"],
+                        "properties": {
+                            "source_score_type": {
+                                "type": "string",
+                                "minLength": 1,
+                            }
+                        },
+                    },
+                },
+                {
+                    "if": {
+                        "required": ["source_score_type"],
+                        "properties": {"source_score_type": {"type": "string"}},
+                    },
+                    "then": {
+                        "required": ["source_score"],
+                        "properties": {"source_score": {"type": "number"}},
+                    },
+                },
+                {
+                    "if": {
+                        "required": ["dual_action_group_id"],
+                        "properties": {"dual_action_group_id": {"type": "string"}},
+                    },
+                    "then": {
+                        "required": ["dual_action_group_version"],
+                        "properties": {
+                            "dual_action_group_version": {
+                                "type": "string",
+                                "minLength": 1,
+                            }
+                        },
+                    },
+                },
+                {
+                    "if": {
+                        "required": ["dual_action_group_version"],
+                        "properties": {"dual_action_group_version": {"type": "string"}},
+                    },
+                    "then": {
+                        "required": ["dual_action_group_id"],
+                        "properties": {
+                            "dual_action_group_id": {
+                                "type": "string",
+                                "minLength": 1,
+                            }
+                        },
+                    },
+                },
+            ],
+            "x-semantic-rules": [
+                "raw_effect is always native and is never overwritten by an "
+                "ICRAFT CRISPRa display inversion",
+                "a full_ranked_list row requires checksum-bound rank-list ID, "
+                "source rank, universe, tail, metric, ordering, and tie policy",
+                "full-list completeness is verified across the complete input "
+                "table before RRA; the row declaration alone is insufficient",
+                "used_for_label is always false",
+                "ambiguous or unmapped orthology remains annotation-only",
+                "raw effect sign is interpreted only through the controlled "
+                "raw_effect_sign_semantics field",
+            ],
+        },
+    )
+
+    evidence_id: str = Field(min_length=1)
+    source_name: str = Field(min_length=1)
+    source_version: str = Field(min_length=1)
+    source_snapshot_date: date
+    external_study_id: str = Field(min_length=1)
+    external_screen_id: str = Field(min_length=1)
+    external_comparison_id: str = Field(min_length=1)
+    source_family_id: str = Field(min_length=1)
+    raw_data_family_id: str = Field(min_length=1)
+    gene_symbol: str = Field(min_length=1)
+    source_organism: str = Field(min_length=1)
+    mapped_human_gene_symbol: str | None = None
+    orthology_mapping_status: OrthologyMappingStatus
+    orthology_source: str | None = None
+    orthology_version: str | None = None
+    perturbation_modality: PerturbationModality
+    perturbed_compartment: PerturbedCompartment
+    experimental_setting: ExperimentalSetting
+    screen_category: ImmuneScreenCategory
+    cell_model: str | None = None
+    immune_cell_type: str | None = None
+    cancer_type: str | None = None
+    treatment: str = Field(min_length=1)
+    comparator: str = Field(min_length=1)
+    contrast_definition: str = Field(min_length=1)
+    phenotype_endpoint: str = Field(min_length=1)
+    assay_consequence: AssayConsequence
+    timepoint: str = Field(min_length=1)
+    recurrence_stratum_id: str = Field(min_length=1)
+    dual_action_group_id: str | None = Field(default=None, min_length=1)
+    dual_action_group_version: str | None = Field(default=None, min_length=1)
+    native_effect_direction: NativeEffectDirection
+    endpoint_polarity: EndpointPolarity
+    direction_mapping_status: DirectionMappingStatus
+    direction_mapping_rule: str | None = Field(default=None, min_length=1)
+    raw_effect: float | None = None
+    raw_effect_type: str | None = Field(default=None, min_length=1)
+    raw_effect_sign_semantics: RawEffectSignSemantics | None = None
+    source_score: float | None = None
+    source_score_type: str | None = Field(default=None, min_length=1)
+    source_fdr: float | None = Field(default=None, ge=0.0, le=1.0)
+    source_rank: int | None = Field(default=None, ge=1)
+    rank_list_id: str | None = Field(default=None, min_length=1)
+    rank_list_sha256: str | None = Field(
+        default=None,
+        pattern=r"^[0-9a-f]{64}$",
+        description=(
+            "SHA-256 of the canonical UTF-8 roster sorted by source rank as "
+            "gene_symbol<TAB>source_rank<LF>"
+        ),
+    )
+    gene_universe_size: int | None = Field(default=None, ge=1)
+    analysis_tail: str | None = Field(default=None, min_length=1)
+    rank_metric_type: str | None = Field(default=None, min_length=1)
+    rank_ordering: Literal["ascending", "descending"] | None = Field(
+        default=None,
+        description=(
+            "Ordering of the source metric used to derive the ordinal rank; "
+            "source_rank=1 must always denote the best-ranked gene"
+        ),
+    )
+    rank_tie_policy: str | None = Field(default=None, min_length=1)
+    rank_list_completeness: RankListCompleteness
+    source_effect_semantics: SourceEffectSemantics = SourceEffectSemantics.NATIVE
+    published_sign_inverted: bool = False
+    input_data_level: InputDataLevel = InputDataLevel.UNKNOWN
+    source_url: HttpUrl
+    source_locator: str = Field(min_length=1)
+    available_date: date
+    transformation_available_date: date
+    retrieved_date: date
+    transformation_id: str | None = None
+    used_for_label: Literal[False] = False
+    notes: str | None = None
+
+    @model_validator(mode="after")
+    def immune_evidence_is_fail_closed(self) -> ImmuneScreenEvidenceRecord:
+        if self.retrieved_date < self.available_date:
+            raise ValueError("retrieved_date cannot precede available_date")
+        if self.source_snapshot_date > self.retrieved_date:
+            raise ValueError("source_snapshot_date cannot follow retrieved_date")
+        if self.transformation_available_date > self.retrieved_date:
+            raise ValueError(
+                "transformation_available_date cannot follow retrieved_date"
+            )
+        if all(
+            value is None
+            for value in (
+                self.raw_effect,
+                self.source_score,
+                self.source_fdr,
+                self.source_rank,
+            )
+        ):
+            raise ValueError("immune evidence requires an effect, score, FDR, or rank")
+        if (self.raw_effect is None) != (self.raw_effect_type is None):
+            raise ValueError("raw_effect and raw_effect_type must be supplied together")
+        if (self.raw_effect is None) != (self.raw_effect_sign_semantics is None):
+            raise ValueError(
+                "raw_effect and raw_effect_sign_semantics must be supplied together"
+            )
+        if (self.source_score is None) != (self.source_score_type is None):
+            raise ValueError(
+                "source_score and source_score_type must be supplied together"
+            )
+        if self.raw_effect is not None and self.raw_effect_sign_semantics in {
+            RawEffectSignSemantics.POSITIVE_IS_ENRICHMENT,
+            RawEffectSignSemantics.POSITIVE_IS_DEPLETION,
+        }:
+            positive_direction = (
+                NativeEffectDirection.ENRICHED
+                if self.raw_effect_sign_semantics
+                == RawEffectSignSemantics.POSITIVE_IS_ENRICHMENT
+                else NativeEffectDirection.DEPLETED
+            )
+            negative_direction = (
+                NativeEffectDirection.DEPLETED
+                if positive_direction == NativeEffectDirection.ENRICHED
+                else NativeEffectDirection.ENRICHED
+            )
+            expected_native_direction = (
+                positive_direction
+                if self.raw_effect > 0
+                else negative_direction
+                if self.raw_effect < 0
+                else NativeEffectDirection.NEUTRAL
+            )
+            if self.native_effect_direction != expected_native_direction:
+                raise ValueError(
+                    "raw effect sign conflicts with native_effect_direction under "
+                    "the declared sign semantics"
+                )
+        if (self.dual_action_group_id is None) != (
+            self.dual_action_group_version is None
+        ):
+            raise ValueError(
+                "dual_action_group_id and dual_action_group_version must be "
+                "supplied together"
+            )
+
+        is_human = self.source_organism.casefold() in {
+            "human",
+            "homo sapiens",
+            "9606",
+        }
+        if is_human and self.orthology_mapping_status != (
+            OrthologyMappingStatus.NOT_NEEDED
+        ):
+            raise ValueError("human evidence must use not_needed orthology")
+        if (
+            is_human
+            and self.mapped_human_gene_symbol
+            and self.mapped_human_gene_symbol.casefold() != self.gene_symbol.casefold()
+        ):
+            raise ValueError(
+                "human evidence cannot be renamed through an orthology field"
+            )
+        if (
+            not is_human
+            and self.orthology_mapping_status == OrthologyMappingStatus.ONE_TO_ONE
+        ):
+            if not all(
+                (
+                    self.mapped_human_gene_symbol,
+                    self.orthology_source,
+                    self.orthology_version,
+                )
+            ):
+                raise ValueError(
+                    "one-to-one non-human mapping requires a human symbol and "
+                    "versioned orthology source"
+                )
+        if not is_human and self.orthology_mapping_status == (
+            OrthologyMappingStatus.NOT_NEEDED
+        ):
+            raise ValueError("non-human evidence requires an orthology decision")
+        if (
+            self.orthology_mapping_status
+            in {
+                OrthologyMappingStatus.AMBIGUOUS,
+                OrthologyMappingStatus.UNMAPPED,
+            }
+            and self.mapped_human_gene_symbol
+        ):
+            raise ValueError("ambiguous/unmapped orthology cannot claim one human gene")
+
+        if self.rank_list_completeness == RankListCompleteness.FULL_RANKED_LIST:
+            required = {
+                "rank_list_id": self.rank_list_id,
+                "rank_list_sha256": self.rank_list_sha256,
+                "source_rank": self.source_rank,
+                "gene_universe_size": self.gene_universe_size,
+                "analysis_tail": self.analysis_tail,
+                "rank_metric_type": self.rank_metric_type,
+                "rank_ordering": self.rank_ordering,
+                "rank_tie_policy": self.rank_tie_policy,
+            }
+            missing = sorted(name for name, value in required.items() if value is None)
+            if missing:
+                raise ValueError(
+                    "full_ranked_list rows require fields: " + ", ".join(missing)
+                )
+            if self.source_rank is not None and self.gene_universe_size is not None:
+                if self.source_rank > self.gene_universe_size:
+                    raise ValueError("source_rank cannot exceed gene_universe_size")
+
+        if self.source_effect_semantics == SourceEffectSemantics.NATIVE:
+            if self.published_sign_inverted:
+                raise ValueError("native source semantics cannot be sign-inverted")
+        elif not self.transformation_id:
+            raise ValueError("non-native source semantics require transformation_id")
+
+        if (
+            self.source_effect_semantics
+            == SourceEffectSemantics.ICRAFT_KO_EQUIVALENT_DISPLAY
+        ):
+            if self.perturbation_modality != PerturbationModality.CRISPRA:
+                raise ValueError(
+                    "ICRAFT KO-equivalent display semantics apply only to CRISPRa"
+                )
+            if not self.published_sign_inverted:
+                raise ValueError(
+                    "ICRAFT KO-equivalent display semantics require the inversion flag"
+                )
+            if self.transformation_id != ICRAFT_CRISPRA_DISPLAY_TRANSFORMATION_ID:
+                raise ValueError(
+                    "ICRAFT CRISPRa display semantics require the registered "
+                    f"transformation {ICRAFT_CRISPRA_DISPLAY_TRANSFORMATION_ID!r}"
+                )
+            if self.raw_effect is None or self.source_score is None:
+                raise ValueError(
+                    "ICRAFT CRISPRa display semantics require paired native and "
+                    "display effects"
+                )
+            if self.raw_effect_sign_semantics != (
+                RawEffectSignSemantics.POSITIVE_IS_ENRICHMENT
+            ):
+                raise ValueError(
+                    "ICRAFT native CRISPRa LFC requires positive_is_enrichment "
+                    "sign semantics"
+                )
+            effect_types = (
+                self.raw_effect_type or "",
+                self.source_score_type or "",
+            )
+            if not all(_is_lfc_metric_label(value) for value in effect_types):
+                raise ValueError(
+                    "ICRAFT CRISPRa display inversion is defined only for paired "
+                    "LFC values"
+                )
+            if abs(self.source_score + self.raw_effect) > 1e-12:
+                raise ValueError(
+                    "ICRAFT CRISPRa display LFC must be the negative native LFC"
+                )
+            expected_direction = (
+                NativeEffectDirection.ENRICHED
+                if self.raw_effect > 0
+                else NativeEffectDirection.DEPLETED
+                if self.raw_effect < 0
+                else NativeEffectDirection.NEUTRAL
+            )
+            if self.native_effect_direction != expected_direction:
+                raise ValueError(
+                    "native CRISPRa direction conflicts with the native LFC sign"
+                )
+
+        if self.endpoint_polarity == EndpointPolarity.UNKNOWN:
+            if self.direction_mapping_status != DirectionMappingStatus.UNRESOLVED:
+                raise ValueError("unknown endpoint polarity must remain unresolved")
+        elif self.direction_mapping_status == DirectionMappingStatus.UNRESOLVED:
+            raise ValueError("known endpoint polarity cannot be marked unresolved")
+        if (
+            self.direction_mapping_status == DirectionMappingStatus.CONDITIONAL
+            and not self.direction_mapping_rule
+        ):
+            raise ValueError("conditional direction mapping requires an explicit rule")
+
+        if self.direction_mapping_status == DirectionMappingStatus.EXACT:
+            expected_rule = EXACT_DIRECTION_RULE_BY_POLARITY.get(self.endpoint_polarity)
+            if self.direction_mapping_rule != expected_rule:
+                raise ValueError(
+                    "exact direction mapping requires the registered rule "
+                    f"{expected_rule!r}"
+                )
+
+        if (
+            self.assay_consequence
+            in {
+                AssayConsequence.AMBIGUOUS,
+                AssayConsequence.NEUTRAL,
+            }
+            and self.direction_mapping_status != DirectionMappingStatus.UNRESOLVED
+        ):
+            raise ValueError(
+                "ambiguous/neutral assay consequences must remain unresolved"
+            )
+
+        immune_consequences = {
+            AssayConsequence.IMMUNE_EFFECTOR_GAIN,
+            AssayConsequence.IMMUNE_EFFECTOR_LOSS,
+            AssayConsequence.IMMUNE_FITNESS_GAIN,
+            AssayConsequence.IMMUNE_FITNESS_LOSS,
+        }
+        tumor_consequences = {
+            AssayConsequence.TUMOR_IMMUNE_ESCAPE,
+            AssayConsequence.TUMOR_IMMUNE_SENSITIZATION,
+        }
+        non_directional_consequences = {
+            AssayConsequence.AMBIGUOUS,
+            AssayConsequence.NEUTRAL,
+        }
+        allowed_consequences = (
+            ALLOWED_CONSEQUENCES_BY_SCREEN_CATEGORY[self.screen_category]
+            | non_directional_consequences
+        )
+        if self.assay_consequence not in allowed_consequences:
+            raise ValueError(
+                "assay consequence is incompatible with the screen category"
+            )
+        if (
+            self.assay_consequence in immune_consequences
+            and self.perturbed_compartment != PerturbedCompartment.IMMUNE_CELL
+        ):
+            raise ValueError(
+                "immune-cell consequences require immune-cell perturbation"
+            )
+        if (
+            self.assay_consequence in tumor_consequences
+            and self.perturbed_compartment != PerturbedCompartment.TUMOR_CELL
+        ):
+            raise ValueError(
+                "tumor-immune consequences require tumor-cell perturbation"
+            )
+
+        favorable_consequences = {
+            AssayConsequence.DRUG_SENSITIZATION,
+            AssayConsequence.TUMOR_IMMUNE_SENSITIZATION,
+            AssayConsequence.IMMUNE_EFFECTOR_GAIN,
+            AssayConsequence.IMMUNE_FITNESS_GAIN,
+        }
+        unfavorable_consequences = {
+            AssayConsequence.DRUG_RESISTANCE,
+            AssayConsequence.TUMOR_IMMUNE_ESCAPE,
+            AssayConsequence.IMMUNE_EFFECTOR_LOSS,
+            AssayConsequence.IMMUNE_FITNESS_LOSS,
+        }
+        if (
+            self.direction_mapping_status == DirectionMappingStatus.EXACT
+            and self.native_effect_direction
+            in {NativeEffectDirection.ENRICHED, NativeEffectDirection.DEPLETED}
+        ):
+            mapped_favorable = (
+                self.native_effect_direction == NativeEffectDirection.ENRICHED
+                and self.endpoint_polarity == EndpointPolarity.ENRICHMENT_IS_FAVORABLE
+            ) or (
+                self.native_effect_direction == NativeEffectDirection.DEPLETED
+                and self.endpoint_polarity == EndpointPolarity.DEPLETION_IS_FAVORABLE
+            )
+            if self.assay_consequence in favorable_consequences and not (
+                mapped_favorable
+            ):
+                raise ValueError(
+                    "assay consequence conflicts with the exact direction mapping"
+                )
+            if self.assay_consequence in unfavorable_consequences and (
+                mapped_favorable
+            ):
+                raise ValueError(
+                    "assay consequence conflicts with the exact direction mapping"
+                )
+        return self
+
+
 class DataAssetRecord(StrictRecord):
     """Versioned pointer to raw or derived data without redistributing it."""
 
@@ -1924,6 +2674,7 @@ CONTRACTS: dict[str, type[StrictRecord]] = {
     "validation_event": ValidationEventRecord,
     "candidate": CandidateRecord,
     "evidence": EvidenceRecord,
+    "immune_screen_evidence": ImmuneScreenEvidenceRecord,
     "external_screen_map": ExternalScreenMapRecord,
     "screen_intake": ScreenIntakeRecord,
     "curation_queue": CurationQueueRecord,

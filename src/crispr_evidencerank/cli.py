@@ -3,20 +3,32 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
-from datetime import date
+import os
+import shutil
+import tempfile
+from datetime import UTC, date, datetime
+from io import BytesIO
 from pathlib import Path
 from typing import get_args
 
 import pandas as pd
 
-from .contracts import CONTRACTS, validate_records
+from . import __version__
+from .contracts import (
+    CONTRACTS,
+    ImmuneScreenEvidenceRecord,
+    PerturbationModality,
+    validate_records,
+)
 from .curation import (
     write_completed_dual_review_bundle,
     write_curation_batch,
     write_dual_review_bundle,
 )
 from .features import featurize_count_table, featurize_experimental_design
+from .immuno_context import ImmunoContextResult, summarize_immuno_context
 from .intake import SUPPORTED_POLICY_VERSIONS, triage_orcs_index
 from .io import read_table
 from .modeling import (
@@ -27,6 +39,7 @@ from .modeling import (
 from .orcs import parse_orcs_index, parse_orcs_screen_scores
 from .orcs_prepare import prepare_orcs_release
 from .orcs_release import load_orcs_release_spec
+from .screen_report import ScreenReportResult, rank_screen
 
 
 def _write_frame(frame: pd.DataFrame, path: str | Path) -> None:
@@ -40,14 +53,53 @@ def _write_frame(frame: pd.DataFrame, path: str | Path) -> None:
         raise ValueError("output must be CSV or TSV")
 
 
-def command_validate(args: argparse.Namespace) -> int:
-    model = CONTRACTS[args.contract]
-    string_fields = {
+def _contract_string_fields(contract: type) -> dict[str, str]:
+    return {
         name: "string"
-        for name, field in model.model_fields.items()
+        for name, field in contract.model_fields.items()
         if field.annotation is str or str in get_args(field.annotation)
     }
-    frame = read_table(args.table, dtype=string_fields)
+
+
+def _read_contract_table(path: str | Path, contract: type) -> pd.DataFrame:
+    return read_table(path, dtype=_contract_string_fields(contract))
+
+
+def _read_table_snapshot(
+    path: str | Path,
+    *,
+    dtype: dict[str, object] | None = None,
+) -> tuple[pd.DataFrame, dict[str, str]]:
+    path = Path(path)
+    content = path.read_bytes()
+    if path.suffix.lower() == ".csv":
+        frame = pd.read_csv(BytesIO(content), dtype=dtype)
+    elif path.suffix.lower() in {".tsv", ".txt"}:
+        frame = pd.read_csv(BytesIO(content), sep="\t", dtype=dtype)
+    else:
+        raise ValueError(f"unsupported table extension: {path.suffix}")
+    return frame, {
+        "path": str(path),
+        "filename": path.name,
+        "sha256": hashlib.sha256(content).hexdigest(),
+    }
+
+
+def _assert_input_snapshots_unchanged(
+    snapshots: dict[str, dict[str, str]],
+) -> None:
+    changed = sorted(
+        role
+        for role, snapshot in snapshots.items()
+        if _file_sha256(snapshot["path"]) != snapshot["sha256"]
+    )
+    if changed:
+        raise ValueError(f"input files changed during the run: {changed}")
+
+
+def command_validate(args: argparse.Namespace) -> int:
+    model = CONTRACTS[args.contract]
+    frame = _read_contract_table(args.table, model)
     valid, errors = validate_records(frame, args.contract)
     report = {
         "contract": args.contract,
@@ -84,6 +136,284 @@ def command_featurize_design(args: argparse.Namespace) -> int:
     )
     _write_frame(features, args.output)
     print(json.dumps({"output": str(args.output), "rows": len(features)}, indent=2))
+    return 0
+
+
+def _write_immuno_context_bundle(
+    result: ImmunoContextResult,
+    output_dir: str | Path,
+    *,
+    input_paths: tuple[str | Path, ...],
+) -> None:
+    output_dir = Path(output_dir)
+    output_paths = {
+        output_dir / "immune_context.tsv",
+        output_dir / "immune_context_exclusions.tsv",
+        output_dir / "immune_context_used_evidence.tsv",
+        output_dir / "rank_list_audit.tsv",
+        output_dir / "summary.json",
+    }
+    resolved_inputs = {Path(path).resolve() for path in input_paths}
+    if any(path.resolve() in resolved_inputs for path in output_paths):
+        raise ValueError("immune-context outputs cannot overwrite an input file")
+    if output_dir.exists():
+        raise FileExistsError(f"immune-context output directory exists: {output_dir}")
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(
+        tempfile.mkdtemp(
+            prefix=f".{output_dir.name}.staging-",
+            dir=output_dir.parent,
+        )
+    )
+    try:
+        _write_frame(result.summary, staging / "immune_context.tsv")
+        _write_frame(
+            result.exclusions,
+            staging / "immune_context_exclusions.tsv",
+        )
+        _write_frame(
+            result.used_evidence,
+            staging / "immune_context_used_evidence.tsv",
+        )
+        _write_frame(result.rank_list_audit, staging / "rank_list_audit.tsv")
+        result.metadata["outputs"] = {
+            name: {
+                "filename": filename,
+                "sha256": _file_sha256(staging / filename),
+            }
+            for name, filename in (
+                ("summary", "immune_context.tsv"),
+                ("exclusions", "immune_context_exclusions.tsv"),
+                ("used_evidence", "immune_context_used_evidence.tsv"),
+                ("rank_list_audit", "rank_list_audit.tsv"),
+            )
+        }
+        (staging / "summary.json").write_text(
+            json.dumps(result.metadata, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        os.replace(staging, output_dir)
+    except Exception:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+
+
+def command_summarize_immuno_context(args: argparse.Namespace) -> int:
+    evidence, evidence_snapshot = _read_table_snapshot(
+        args.evidence,
+        dtype=_contract_string_fields(ImmuneScreenEvidenceRecord),
+    )
+    candidate_string_columns = {
+        args.gene_column: "string",
+        "screen_id": "string",
+        "contrast_id": "string",
+        "phenotype_direction": "string",
+        "analysis_tail": "string",
+        "screen_signal_percentile_scope": "string",
+        "ranking_type": "string",
+    }
+    candidates, candidates_snapshot = _read_table_snapshot(
+        args.candidates,
+        dtype=candidate_string_columns,
+    )
+    result = summarize_immuno_context(
+        evidence,
+        candidates,
+        cutoff_date=args.cutoff_date,
+        target_modality=args.target_modality,
+        candidate_gene_column=args.gene_column,
+        excluded_source_families=args.exclude_source_family,
+        excluded_raw_data_families=args.exclude_raw_data_family,
+        recurrence_stratum_id=args.recurrence_stratum_id,
+        dual_action_group_id=args.dual_action_group_id,
+        dual_action_group_version=args.dual_action_group_version,
+        max_source_fdr=args.max_source_fdr,
+        target_absence_attested=args.target_not_in_compendium,
+    )
+    result.metadata.update(
+        {
+            "package_version": __version__,
+            "created_at_utc": datetime.now(UTC).isoformat(),
+            "inputs": {
+                "evidence": evidence_snapshot,
+                "candidates": candidates_snapshot,
+            },
+        }
+    )
+    _assert_input_snapshots_unchanged(result.metadata["inputs"])
+    _write_immuno_context_bundle(
+        result,
+        args.output_dir,
+        input_paths=(args.evidence, args.candidates),
+    )
+    print(json.dumps(result.metadata, indent=2, sort_keys=True))
+    return 0
+
+
+def _file_sha256(path: str | Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _write_screen_report_bundle(
+    result: ScreenReportResult,
+    manifest: dict[str, object],
+    output_dir: str | Path,
+    *,
+    input_paths: tuple[str | Path, ...],
+) -> None:
+    output_dir = Path(output_dir)
+    output_names = (
+        "ranked_candidates.tsv",
+        "qc_summary.json",
+        "run_manifest.json",
+        "report.md",
+    )
+    resolved_inputs = {Path(path).resolve() for path in input_paths}
+    if any((output_dir / name).resolve() in resolved_inputs for name in output_names):
+        raise ValueError("screen-report outputs cannot overwrite an input file")
+    if output_dir.exists():
+        raise FileExistsError(f"screen-report output directory exists: {output_dir}")
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(
+        tempfile.mkdtemp(
+            prefix=f".{output_dir.name}.staging-",
+            dir=output_dir.parent,
+        )
+    )
+    try:
+        _write_frame(result.ranked_candidates, staging / "ranked_candidates.tsv")
+        (staging / "qc_summary.json").write_text(
+            json.dumps(result.qc_summary, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        (staging / "report.md").write_text(
+            result.report_markdown,
+            encoding="utf-8",
+        )
+        manifest["outputs"] = {
+            name: {
+                "filename": filename,
+                "sha256": _file_sha256(staging / filename),
+            }
+            for name, filename in (
+                ("ranked_candidates", "ranked_candidates.tsv"),
+                ("qc_summary", "qc_summary.json"),
+                ("report", "report.md"),
+            )
+        }
+        (staging / "run_manifest.json").write_text(
+            json.dumps(manifest, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        os.replace(staging, output_dir)
+    except Exception:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+
+
+def command_rank_screen(args: argparse.Namespace) -> int:
+    snapshots: dict[str, dict[str, str]] = {}
+    mageck = None
+    counts = None
+    samples = None
+    for role, path in (
+        ("mageck_summary", args.mageck_summary),
+        ("counts", args.counts),
+        ("samples", args.samples),
+    ):
+        if path is None:
+            continue
+        dtype = {
+            "mageck_summary": {
+                "id": "string",
+                "gene": "string",
+                "Gene": "string",
+                "gene_symbol": "string",
+            },
+            "counts": {
+                "sgrna_id": "string",
+                "gene_symbol": "string",
+            },
+            "samples": {
+                "sample_id": "string",
+                "screen_id": "string",
+                "contrast_id": "string",
+                "condition_role": "string",
+            },
+        }[role]
+        frame, snapshot = _read_table_snapshot(path, dtype=dtype)
+        snapshots[role] = snapshot
+        if role == "mageck_summary":
+            mageck = frame
+        elif role == "counts":
+            counts = frame
+        else:
+            samples = frame
+    screen_id = args.screen_id.strip() if args.screen_id is not None else None
+    contrast_id = args.contrast_id.strip() if args.contrast_id is not None else None
+    result = rank_screen(
+        mageck_summary=mageck,
+        counts=counts,
+        samples=samples,
+        screen_id=screen_id,
+        contrast_id=contrast_id,
+        positive_tail_means=args.positive_tail_means,
+        positive_lfc_means=args.positive_lfc_means,
+        pseudocount=args.pseudocount,
+        low_count_threshold=args.low_count_threshold,
+        normalization_method=args.normalization_method,
+        direction_deadband=args.direction_deadband,
+        fdr_threshold=args.fdr_threshold,
+    )
+    input_paths = tuple(
+        path
+        for path in (args.mageck_summary, args.counts, args.samples)
+        if path is not None
+    )
+    manifest: dict[str, object] = {
+        "report_type": "screen_signal_baseline",
+        "package_version": __version__,
+        "created_at_utc": datetime.now(UTC).isoformat(),
+        "inputs": snapshots,
+        "parameters": {
+            "screen_id": screen_id,
+            "contrast_id": contrast_id,
+            "resolved_screen_ids": result.qc_summary["screens"],
+            "resolved_contrast_ids": result.qc_summary["contrasts"],
+            "positive_tail_means": args.positive_tail_means,
+            "positive_lfc_means": args.positive_lfc_means,
+            "pseudocount": args.pseudocount,
+            "low_count_threshold": args.low_count_threshold,
+            "normalization_method": args.normalization_method,
+            "direction_deadband": args.direction_deadband,
+            "fdr_threshold": args.fdr_threshold,
+        },
+        "interpretation_boundary": (
+            "screen-signal rank; no validation probability and no therapeutic "
+            "recommendation"
+        ),
+    }
+    _assert_input_snapshots_unchanged(snapshots)
+    _write_screen_report_bundle(
+        result,
+        manifest,
+        args.output_dir,
+        input_paths=input_paths,
+    )
+    print(
+        json.dumps(
+            {
+                "output_dir": str(args.output_dir),
+                **result.qc_summary,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
     return 0
 
 
@@ -454,6 +784,77 @@ def build_parser() -> argparse.ArgumentParser:
         "--assessed-date", type=date.fromisoformat, required=True
     )
     review_completion.set_defaults(func=command_complete_curation_reviews)
+
+    rank = subparsers.add_parser(
+        "rank-screen",
+        help="create a self-contained screen-signal report for a new screen",
+    )
+    rank.add_argument("--mageck-summary")
+    rank.add_argument("--counts")
+    rank.add_argument("--samples")
+    rank.add_argument("--screen-id")
+    rank.add_argument("--contrast-id")
+    rank.add_argument(
+        "--positive-tail-means",
+        choices=["resistance", "sensitization"],
+    )
+    rank.add_argument(
+        "--positive-lfc-means",
+        choices=["resistance", "sensitization"],
+    )
+    rank.add_argument("--pseudocount", type=float, default=1.0)
+    rank.add_argument("--low-count-threshold", type=float, default=30.0)
+    rank.add_argument(
+        "--normalization-method",
+        choices=["median_ratio", "cpm"],
+        default="median_ratio",
+    )
+    rank.add_argument("--direction-deadband", type=float, default=0.1)
+    rank.add_argument("--fdr-threshold", type=float, default=0.05)
+    rank.add_argument("--output-dir", required=True)
+    rank.set_defaults(func=command_rank_screen)
+
+    immuno_context = subparsers.add_parser(
+        "summarize-immuno-context",
+        help="report source-family-aware immune context without changing ranking",
+    )
+    immuno_context.add_argument("--evidence", required=True)
+    immuno_context.add_argument("--candidates", required=True)
+    immuno_context.add_argument("--gene-column", default="gene_symbol")
+    immuno_context.add_argument(
+        "--cutoff-date",
+        type=date.fromisoformat,
+        required=True,
+    )
+    immuno_context.add_argument(
+        "--target-modality",
+        choices=[value.value for value in PerturbationModality],
+        required=True,
+    )
+    immuno_context.add_argument(
+        "--exclude-source-family",
+        action="append",
+        default=[],
+    )
+    immuno_context.add_argument(
+        "--exclude-raw-data-family",
+        action="append",
+        default=[],
+    )
+    immuno_context.add_argument("--recurrence-stratum-id")
+    immuno_context.add_argument("--dual-action-group-id")
+    immuno_context.add_argument("--dual-action-group-version")
+    immuno_context.add_argument("--max-source-fdr", type=float, default=0.05)
+    immuno_context.add_argument(
+        "--target-not-in-compendium",
+        action="store_true",
+        help=(
+            "attest that the target screen and sibling raw/source families are "
+            "absent from the evidence compendium"
+        ),
+    )
+    immuno_context.add_argument("--output-dir", required=True)
+    immuno_context.set_defaults(func=command_summarize_immuno_context)
 
     benchmark = subparsers.add_parser(
         "benchmark", help="run grouped out-of-fold baseline evaluation"

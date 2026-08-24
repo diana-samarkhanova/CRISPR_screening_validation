@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "crispr-evidencerank"
-version = "0.2.0.dev0"
+version = "0.3.0.dev0"
 description = "Experimental-design-aware prioritization of CRISPR drug-response screen hits for orthogonal validation"
 readme = "README.md"
 requires-python = ">=3.11"

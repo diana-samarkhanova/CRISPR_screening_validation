@@ -22,6 +22,12 @@ as study → screen → contrast → sample, and predictions are made for a
 
 ## Current model
 
+For a new unlabeled screen, v0.3 exposes a deterministic
+`screen_signal_baseline` through `rank-screen`. It preserves native MAGeCK rank
+or ranks absolute guide-level effects within the explicitly declared phenotype
+direction. This report is not produced by the validation-success model and is
+not a probability of reproduction.
+
 The repository implements a transparent two-stage baseline:
 
 1. logistic selection model for `tested` versus explicitly `not_tested`;
@@ -73,6 +79,13 @@ evaluation.
 - separate mechanistic, therapeutic, and novelty evidence components.
 - profile name, metadata completeness, and outside-training-support flags.
 
+The auxiliary immune-context command writes only `report_only_*` columns. It
+reports tumor/immune recurrence, conflicts, dual-action hypotheses, and
+verified-full-list RRA without changing any primary output. These columns are
+programmatically forbidden from the current success model. Candidate rows from
+`rank-screen` retain their screen, contrast, direction, tail, and signal rank;
+the immune axis neither filters nor reorders them.
+
 ## Known limitations
 
 - validation events are selectively reported;
@@ -93,6 +106,13 @@ evaluation.
   metric has fewer than the prespecified effective number of study draws.
 - BioGRID ORCS preserves heterogeneous author-defined screen scores and hit
   calls; these are not independent-validation outcomes.
+- ICRAFT recurrence and RRA are immune-screen context, not effect size,
+  orthogonal validation, therapeutic efficacy, or validation probability. No
+  frozen ICRAFT export is bundled in v0.3.
+- A dual-action class is a hypothesis-generating candidate category. CRISPRa
+  display inversion is accepted only as a registered numeric LFC sign-pair and
+  is not propagated, modality-mismatched evidence is not combined, versioned
+  dual-action groups require review, and ambiguous orthology is annotation-only.
 - missingness patterns can encode publication era, repository choice, or input
   mode and therefore require profile- and coverage-stratified analyses.
 
