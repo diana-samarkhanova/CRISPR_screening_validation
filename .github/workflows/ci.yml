@@ -76,7 +76,7 @@ jobs:
             --positive-tail-means resistance \
             --output-dir /tmp/screen-report
           uv run crispr-evidencerank summarize-immuno-context \
-            --evidence examples/immune_context/evidence.tsv \
+            --evidence examples/synthetic/immune_context/evidence.tsv \
             --candidates /tmp/screen-report/ranked_candidates.tsv \
             --cutoff-date 2025-04-08 \
             --target-modality CRISPR_KO \
