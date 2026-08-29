@@ -1558,6 +1558,22 @@ class _Response:
         return json.dumps(self.payload).encode("utf-8")
 
 
+def _freeze_translation_context_wall_clock(monkeypatch):
+    original_utc_datetime = translation_context_module._utc_datetime
+    frozen_instant = datetime(2026, 8, 28, 12, tzinfo=UTC)
+
+    def frozen_utc_datetime(value):
+        if value is None:
+            return frozen_instant
+        return original_utc_datetime(value)
+
+    monkeypatch.setattr(
+        translation_context_module,
+        "_utc_datetime",
+        frozen_utc_datetime,
+    )
+
+
 def _concept_snapshot_for_integrity_tests():
     def opener(request, timeout):
         if request.full_url.endswith("/version"):
@@ -1910,6 +1926,7 @@ def test_stock_live_transport_can_support_a_strict_registry_count(monkeypatch):
         return _Response({"studies": [_trial_set()[0]], "totalCount": 1})
 
     monkeypatch.setattr(translation_context_module, "urlopen", opener)
+    _freeze_translation_context_wall_clock(monkeypatch)
     snapshot = fetch_clinical_trials_concept_v2(
         "olaparib",
         "breast cancer",
@@ -1981,6 +1998,7 @@ def test_strict_registry_requires_verified_requested_subtype_parent(monkeypatch)
         return _Response({"studies": [_trial_set()[0]], "totalCount": 1})
 
     monkeypatch.setattr(translation_context_module, "urlopen", opener)
+    _freeze_translation_context_wall_clock(monkeypatch)
     snapshot = fetch_clinical_trials_concept_v2(
         "olaparib",
         "breast cancer",
@@ -2081,6 +2099,7 @@ def test_registry_strictness_abstains_on_unparsed_clinical_axes(
         return _Response({"studies": [_trial_set()[0]], "totalCount": 1})
 
     monkeypatch.setattr(translation_context_module, "urlopen", opener)
+    _freeze_translation_context_wall_clock(monkeypatch)
     snapshot = fetch_clinical_trials_concept_v2(
         "olaparib",
         "breast cancer",
@@ -2433,6 +2452,7 @@ def test_incomplete_live_and_serialized_replay_never_emit_strict_count(monkeypat
         )
 
     monkeypatch.setattr(translation_context_module, "urlopen", opener)
+    _freeze_translation_context_wall_clock(monkeypatch)
     live = fetch_clinical_trials_concept_v2(
         "olaparib",
         "breast cancer",
