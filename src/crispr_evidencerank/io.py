@@ -102,6 +102,15 @@ def validate_count_table(
             f"or annotation whitelist: {extra_columns[:10]}"
         )
 
+    boolean_count = counts[sample_ids].map(
+        lambda value: isinstance(value, (bool, np.bool_))
+    )
+    if boolean_count.any().any():
+        bad = np.argwhere(boolean_count.to_numpy())[0]
+        raise ValueError(
+            "raw counts cannot be boolean at "
+            f"row={int(bad[0]) + 2}, sample={sample_ids[int(bad[1])]}"
+        )
     numeric = counts[sample_ids].apply(pd.to_numeric, errors="coerce")
     if numeric.isna().any().any():
         bad = np.argwhere(numeric.isna().to_numpy())[0]

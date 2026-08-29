@@ -205,6 +205,97 @@ feature_groups:
       - report_only_immuno_direction_unresolved_fraction
       - report_only_immuno_directional_support_record_n
       - report_only_immuno_rra_verified_list_n
+  translation_context:
+    implementation_status: report_only_implemented
+    allowed_for_primary_model: false
+    reason: >-
+      Trial registries describe the treatment/disease landscape, not gene-level
+      validation. Curated patient and preclinical claims remain separate
+      post-ranking lanes until a frozen, temporally eligible, leakage-audited
+      training design is prespecified.
+    safeguards:
+      - trial_records_forbid_gene_ranking_use
+      - broad_api_retrieval_followed_by_local_structured_matching
+      - treatment_entity_aliases_separate_from_broader_class_terms
+      - cancer_entity_aliases_separate_from_broader_ancestor_terms
+      - subtype_entity_aliases_restricted_to_same_subtype
+      - declared_role_tagged_query_set_with_no_ontology_recall_claim
+      - live_snapshot_must_round_trip_through_frozen_replay_validation
+      - report_build_revalidates_snapshot_document_and_nested_studies
+      - clinical_trial_nct_ids_unique_within_each_query
+      - strict_registry_status_uses_only_registry_resolvable_structured_axes
+      - strict_registry_and_exact_curated_context_require_versioned_treatment_and_cancer_ids
+      - strict_registry_subtype_requires_parent_cancer_binding
+      - component_intervention_mentions_never_support_strict_registry_status
+      - requested_regimen_stage_and_line_force_registry_strict_abstention
+      - registry_biomarker_mention_never_establishes_typed_exact_match
+      - current_trial_snapshots_forbidden_as_historical_features
+      - biomarker_term_feature_state_specimen_timepoint_and_observation_all_or_none
+      - typed_biomarker_exactness_requires_informative_axes_attestation
+      - typed_biomarker_exactness_requires_observed_axis_status
+      - disease_subtype_exactness_requires_versioned_parent_binding
+      - regimen_exactness_requires_verified_active_exposure_ids_and_provenance
+      - controlled_curie_prefix_must_match_declared_versioned_identifier_source
+      - placeholder_identity_and_provenance_values_fail_closed
+      - scientific_attestations_require_literal_booleans
+      - signed_subtype_biomarker_state_and_specimen_preserved_during_matching
+      - patient_predictive_claim_requires_quantified_formal_interaction
+      - cohort_context_biomarker_is_distinct_from_candidate_gene_predictor
+      - predictor_gene_requires_versioned_identity_and_assay_compatibility
+      - predictor_identity_attestation_is_not_resolver_authentication
+      - patient_interactions_require_controlled_active_exposure_sets_and_relations
+      - patient_predictive_claim_requires_distinct_source_assignment_ids
+      - patient_interactions_require_versioned_inference_rule_and_estimability
+      - supported_null_inconclusive_and_unsupported_interactions_are_separate
+      - patient_exact_regimen_requires_verified_treatment_exposure
+      - prognostic_predictor_requires_pretreatment_measurement
+      - exact_patient_context_requires_ontology_subtype_typed_biomarker_regimen_stage_and_line_match
+      - omitted_exact_axes_are_never_wildcards
+      - longitudinal_claims_require_paired_baseline
+      - gene_specific_preclinical_claim_requires_versioned_curator_attested_gene_identity
+      - direct_preclinical_claim_requires_vehicle_and_interaction_controls
+      - exact_preclinical_context_requires_matching_perturbed_compartment_and_endpoint_category
+      - direction_concordance_requires_exact_context_and_matching_perturbation_modality
+      - direct_preclinical_direction_requires_verified_status_numeric_effect_and_sample_n
+      - compatible_nonexact_context_separate_from_conflicting_or_incompatible_context
+      - mixed_compatible_and_conflicting_evidence_has_explicit_status
+      - source_and_raw_family_deduplication
+      - explicit_temporal_cutoff
+      - target_family_exclusion_or_absence_attestation
+      - candidate_order_and_primary_axes_preserved
+      - rank_manifest_binding_requires_versioned_complete_bundle_and_rank_semantics
+      - rank_manifest_consumer_rechecks_native_numeric_domains_and_completeness
+      - frozen_or_injected_clinical_source_cannot_emit_strict_registry_count
+      - no_candidate_filtering_or_reranking
+      - no_validation_or_reproducibility_probability
+      - no_clinical_or_preclinical_mega_score
+      - success_model_denies_all_report_only_contract_fields
+    report_outputs_inventory: principal_non_exhaustive
+    report_outputs:
+      - report_only_preclinical_family_n
+      - report_only_preclinical_exact_context_family_n
+      - report_only_preclinical_compatible_nonexact_context_family_n
+      - report_only_preclinical_conflicting_context_family_n
+      - report_only_preclinical_direct_interaction_exact_context_family_n
+      - report_only_preclinical_in_vivo_exact_context_family_n
+      - report_only_preclinical_status
+      - report_only_patient_exact_context_family_n
+      - report_only_patient_compatible_nonexact_context_family_n
+      - report_only_patient_conflicting_context_family_n
+      - report_only_patient_predictive_exact_context_family_n
+      - report_only_patient_predictive_compatible_nonexact_context_family_n
+      - report_only_patient_predictive_conflicting_context_family_n
+      - report_only_patient_interaction_null_exact_context_family_n
+      - report_only_patient_interaction_null_compatible_nonexact_context_family_n
+      - report_only_patient_interaction_null_conflicting_context_family_n
+      - report_only_patient_interaction_inconclusive_exact_context_family_n
+      - report_only_patient_interaction_inconclusive_compatible_nonexact_context_family_n
+      - report_only_patient_interaction_inconclusive_conflicting_context_family_n
+      - report_only_patient_interaction_unsupported_exact_context_family_n
+      - report_only_patient_interaction_unsupported_compatible_nonexact_context_family_n
+      - report_only_patient_interaction_unsupported_conflicting_context_family_n
+      - report_only_patient_treated_association_exact_context_family_n
+      - report_only_patient_status
   author_selection:
     allowed_for_primary_model: false
     allowed_for_selection_model: true
@@ -272,3 +363,7 @@ forbidden_success_features:
   - causal_reversal_performed
   - author_validation_selection_flag
   - validation_figure_prominence
+  - clinical_trial_count
+  - patient_molecular_outcome
+  - preclinical_support
+  - translation_context

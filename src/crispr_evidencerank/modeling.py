@@ -12,7 +12,16 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GroupKFold, StratifiedGroupKFold
 from sklearn.pipeline import Pipeline
 
-from .contracts import CandidateRecord, validate_records
+from .contracts import (
+    CandidateRecord,
+    ClinicalTrialContextRecord,
+    EvidenceRecord,
+    ImmuneScreenEvidenceRecord,
+    PatientMolecularEvidenceRecord,
+    PreclinicalEvidenceRecord,
+    TreatmentDiseaseContextRecord,
+    validate_records,
+)
 from .evaluation import _composite_query_keys, grouped_ranking_metrics
 from .labels import model_target
 
@@ -120,6 +129,19 @@ FORBIDDEN_SUCCESS_FEATURES = {
     "validation_label",
 }
 
+REPORT_ONLY_CONTRACT_FEATURES = {
+    field_name
+    for contract in (
+        EvidenceRecord,
+        ImmuneScreenEvidenceRecord,
+        TreatmentDiseaseContextRecord,
+        ClinicalTrialContextRecord,
+        PreclinicalEvidenceRecord,
+        PatientMolecularEvidenceRecord,
+    )
+    for field_name in contract.model_fields
+}
+
 
 def validate_success_feature_columns(feature_columns: list[str]) -> None:
     forbidden_tokens = (
@@ -133,12 +155,21 @@ def validate_success_feature_columns(feature_columns: list[str]) -> None:
         "author_hit",
         "testing_status",
         "label_code",
+        "clinical_trial",
+        "patient_outcome",
+        "patient_molecular",
+        "preclinical",
+        "translation_context",
+        "organoid",
+        "pdx",
+        "in_vivo",
     )
     forbidden = sorted(
         {
             column
             for column in feature_columns
             if column in FORBIDDEN_SUCCESS_FEATURES
+            or column in REPORT_ONLY_CONTRACT_FEATURES
             or any(token in column.lower() for token in forbidden_tokens)
         }
     )

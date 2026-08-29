@@ -30,7 +30,11 @@ The registry preserves both `source_family_id` and `raw_data_family_id`. A
 source family links article/preprint versions, repository mirrors, and curated
 database records. A raw-data family links every result derived from the same
 experimental counts or author-supplied matrix. Alternative scoring methods do
-not create independent training data.
+not create independent training data. Translation-context evidence requires
+both identifiers. Publications or reanalyses that reuse a cohort, experiment,
+count matrix, or patient-level dataset must share a curator-assigned
+`raw_data_family_id`; source-local `cohort_id` values alone do not prove global
+identity. Family assignments therefore require an auditable curation decision.
 
 ## Repository policy
 
@@ -74,6 +78,104 @@ mapping, and an independent rights decision. The public crawler/parser
 software license must not be inherited by collected papers, counts, FASTQ,
 clinical cohorts, or portal database content. This repository currently ships
 the contract and report engine, not an ICRAFT export.
+
+ClinicalTrials.gov is a treatment/disease discovery and registry-context
+source, not a gene-validation registry. The v2 adapter records the exact query,
+all page URLs, canonical parsed-page checksums, API version, `dataTimestamp`,
+retrieval UTC, pagination completeness, and normalized unique-NCT output. It
+calls `/version` around every role-tagged declared query, aborts if the source
+snapshot changes, and deduplicates only identical NCT payloads. Same-entity
+treatment aliases are provenance-distinct from broader treatment-class terms;
+same-entity cancer aliases are likewise distinct from broader disease-ancestor
+terms, and canonical-subtype and same-subtype-alias lanes retain their own
+declared roles. Class and ancestor terms can expand discovery but never become
+exact entity matches. An `explicit_component` intervention match is likewise
+broader and never strict. Signed subtype identity is retained in compact and
+spaced labels, so `HER2+`, `HER2`, and `HER2 - breast cancer` remain distinct in
+declared-query binding and local matching. Signs are also preserved for typed
+biomarker state and specimen values such as `positive (+)`/`positive (-)` and
+`CD3+`/`CD3-`.
+Every live single-query and concept document is replayed through the frozen
+snapshot parser before it is returned and must reproduce the same canonical
+document. Duplicate NCT IDs within a query fail closed; identical records found
+through different lanes are unioned once, conflicting payloads abort, and the
+top-level study set must equal the recomputed declared-query NCT union. Report
+construction replays again and rejects nested mutation after initial validation.
+Typed concept snapshots require exactly one before/after version audit per
+declared query. A stock live retrieval receives a non-serializable capability
+bound to the final document digest and actual completion time. Frozen replay,
+an injected HTTP transport, or an injected timestamp remains
+source-provenance-unverified and cannot emit a strict registry count.
+Query-set completion is not an ontology-recall guarantee.
+Broad API search matches are adjudicated locally from structured active-
+intervention, condition, and keyword fields; search retrieval or a placebo
+mention alone is not an exact match.
+
+Strict registry status uses only requested axes that the adapter can resolve
+from structured intervention and condition fields. A biomarker term found in a
+registry record is an untyped discovery annotation: it does not resolve feature
+type, state, specimen, or measurement timepoint and cannot establish exact
+typed biomarker context. A subtype can be strict only when its signed identity
+and a separate exact structured parent-cancer condition are both present. An
+embedded or substring parent name is not accepted without a versioned,
+curator-attested parent-ID binding. Requested regimen, stage, or line of therapy remains unresolved
+and forces the strict registry count to zero until arm assignment and
+eligibility are parsed.
+
+The API exposes the current record rather than a documented historical/as-of
+version. Current trial status, planned outcomes, posted aggregate results, and
+linked publications are therefore report-only and forbidden as historical
+gene-model features. `hasResults` does not establish patient-level molecular
+data, and trial presence does not establish efficacy.
+
+Curated patient-molecular and preclinical records require row-level source
+locators, availability/retrieval dates, source/raw-data families, treatment,
+disease/subtype with versioned parent binding, the all-or-none biomarker
+term/feature/state/specimen/timepoint/observation-status tuple, an explicit
+`biomarker_axes_informative_verified` curator decision,
+endpoint, and claim type. Exact typed biomarker context requires a positive
+attestation and `observed` status in both the requested context and curated row;
+false or unobserved status remains unresolved. The tuple is cohort context, not
+the tested candidate-gene predictor, and one cannot fill the other. Patient
+rows separately bind matching gene/predictor symbols to a versioned gene ID,
+explicit feature/state/specimen, a compatible measurement
+type/platform/timepoint, and a curator identity attestation; this is not
+external resolver authentication. Preclinical gene-specific rows likewise
+require a versioned, curator-attested gene identity. Preclinical records additionally require
+`perturbed_compartment` and `endpoint_category`. Matching rows are filtered by
+the evidence cutoff and transitive target-family exclusion, then collapsed
+through source/raw-family links. Exact patient status additionally requires
+matching ontology identity/version, regimen, typed biomarker, stage, and line
+of therapy; a predictive interaction also requires versioned active-exposure
+sets/relations/provenance, distinct source-native arm IDs, evaluable counts,
+verified estimability and predictor variation, a controlled effect scale, and a
+versioned inference rule. Supported, formal-null, inconclusive, and unsupported
+interaction outcomes remain separate. Prognostic-only predictors require a
+pretreatment/baseline measurement, and unverified treatment exposure prevents
+exact patient regimen context. Exact
+preclinical status requires matching compartment and endpoint category. A
+non-unknown direct direction requires a versioned rule, numeric effect, sample
+size, and matching curator-verified inference status; resistance,
+sensitization, and discordant calls require nonzero effect. This status records
+direction adjudication and is not a calibrated statistical confidence.
+Resistance/sensitization/discordant use `direction_supported`, neutral uses
+`neutral_supported`, and unknown uses an explicit inconclusive, unsupported, or
+not-assessed state.
+
+Compatible non-exact context and explicit conflicts have distinct provenance
+and output partitions. Name-only or ontology-version-unresolved identity and
+missing or narrower axes remain compatible non-exact context, never wildcard
+exact. Explicit
+subtype, typed-biomarker, regimen, stage, line, compartment, or endpoint
+contradictions are conflicting context and do not contribute to compatible
+non-exact counts or statuses. When compatible and conflicting families coexist
+without a higher-priority exact or independence status, the mixed
+`compatible_and_conflicting_context_present` or
+`compatible_and_conflicting_patient_context_present` status is recorded instead
+of either `_only` status. An empty curated input or incomplete source search
+means no match in the queried material, never a biological negative. Same-study
+follow-up validation remains in `validation_event` and cannot be reused as
+prior evidence for its own outcome.
 
 [BioGRID ORCS](https://orcs.thebiogrid.org/) is used for screen discovery,
 structured metadata, and author-method gene scores. Record its release,
@@ -125,6 +227,27 @@ full rank list is accepted for RRA only after the complete row roster, exact
 verified against its gene count. CLI bundles are computed from exact byte
 snapshots, re-hash inputs before atomic publication, and refuse to overwrite an
 existing output directory.
+
+The v0.4 translation-context bundle applies the same immutable-input and atomic
+publication rules, including a second input re-hash immediately before atomic
+rename. It stores a canonical parsed ClinicalTrials.gov snapshot with per-page
+checksums and explicitly marks it `current_snapshot_only`; live runs cannot be
+backdated and wrapped snapshots cannot be restamped. Candidate-derived patient
+and preclinical columns use the `report_only_` prefix and preserve the incoming
+candidate order and screen axes. They cannot filter or rerank candidates, enter
+the success model, or be interpreted as a validation/reproducibility
+probability. The success-model field deny-list is derived from all report-only
+evidence contracts and supplemented by reserved leakage-token checks.
+Typed ClinicalTrials query roles and their complete cross-product are rebound
+to the requested context on replay. A mismatch aborts; legacy/raw snapshots
+without typed roles are marked query-context-unverified and cannot claim strict
+registry matches.
+A candidate TSV is bound only to a complete versioned `rank-screen` bundle when
+it contains both ranking fields. Validation covers manifest/method versions,
+mode and parameters, every output checksum, ordered columns and row count,
+identifiers, rank/tail/direction/percentile/neutral semantics, duplicate keys,
+and canonical order. It is an unsigned internal-consistency assertion, not
+producer authentication.
 
 ## ORCS intake and curation queue
 

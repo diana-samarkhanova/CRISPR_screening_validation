@@ -1,6 +1,108 @@
 version: 1
 
 sources:
+  clinicaltrials_gov:
+    name: ClinicalTrials.gov
+    status: live_and_frozen_report_only_adapter
+    api:
+      major_version: v2
+      endpoint: https://clinicaltrials.gov/api/v2/studies
+      version_endpoint: https://clinicaltrials.gov/api/v2/version
+      openapi: https://clinicaltrials.gov/api/oas/v2
+    retrieval_policy:
+      bounded_pagination_required: true
+      version_check_before_and_after_required: true
+      stable_data_timestamp_required: true
+      raw_snapshot_checksum_required: true
+      live_snapshot_frozen_replay_invariant_required: true
+      report_build_snapshot_revalidation_required: true
+      unique_nct_within_each_query_required: true
+      local_structured_field_matching_required: true
+      note: >-
+        query.intr and query.cond are candidate-retrieval searches, not exact
+        structured matches. Same-entity aliases are declared separately from
+        broader treatment-class and cancer-ancestor discovery terms; canonical
+        subtype and same-subtype aliases retain distinct query roles. Local
+        structured relations include exact/alias/component/declared-class and
+        subtype/cancer-only/declared-ancestor, but class and ancestor matches
+        are never exact entity matches. A structured biomarker mention remains
+        untyped discovery context and never establishes typed exactness. Signed
+        subtype state is preserved, and a subtype term must also bind the
+        requested parent cancer before it can be a strict registry candidate.
+        Component-only intervention mentions remain broader discovery matches
+        and never establish strict treatment identity.
+    permitted_project_roles:
+      - report_only_treatment_disease_landscape
+      - trial_design_and_status_context
+      - linked_publication_discovery
+    prohibited_project_roles:
+      - validation_label
+      - gene_ranking_feature
+      - patient_level_omics_inference
+      - efficacy_claim_from_trial_presence_or_status
+      - historical_feature_from_unversioned_current_record
+      - candidate_filtering_or_reranking
+      - validation_or_reproducibility_probability
+      - strict_biomarker_status_from_registry_term_mention
+    limitations:
+      - current_api_exposes_latest_record_not_historical_as_of_state
+      - has_results_means_registry_summary_results_not_patient_level_data
+      - planned_outcomes_are_not_observed_results
+      - trial_termination_is_not_an_automatic_negative_efficacy_result
+      - strict_registry_status_uses_only_registry_resolvable_structured_axes
+      - requested_regimen_stage_or_line_forces_strict_registry_abstention
+
+  curated_translation_evidence:
+    name: Curated patient-molecular and preclinical claims
+    status: versioned_contract_and_report_engine_only
+    permitted_project_roles:
+      - report_only_gene_specific_patient_context
+      - report_only_preclinical_context
+      - candidate_discovery_for_manual_curation
+    prohibited_project_roles:
+      - automatic_nlp_validation_label
+      - same_study_follow_up_as_prior_feature
+      - treated_cohort_association_as_predictive_evidence
+      - pharmacogenomic_correlation_as_crispr_ko_validation
+      - candidate_filtering_or_reranking
+      - validation_or_reproducibility_probability
+    import_policy:
+      row_level_source_locator_required: true
+      ontology_identity_and_version_required_when_ids_are_used: true
+      strict_and_exact_context_require_versioned_treatment_and_cancer_ids: true
+      controlled_curie_prefix_must_match_identifier_source: true
+      placeholder_identity_and_provenance_values_fail_closed: true
+      scientific_attestations_require_literal_booleans: true
+      biomarker_term_feature_state_specimen_timepoint_and_observation_all_or_none: true
+      typed_biomarker_exactness_requires_informative_axes_attestation: true
+      typed_biomarker_exactness_requires_observed_axis_status: true
+      signed_subtype_biomarker_state_and_specimen_preserved: true
+      subtype_parent_id_binding_and_version_required_for_exactness: true
+      active_exposure_ids_relations_and_identifier_provenance_required: true
+      cohort_context_biomarker_is_distinct_from_candidate_gene_predictor: true
+      predictor_gene_versioned_identity_and_assay_compatibility_required: true
+      predictor_identity_attestation_is_not_resolver_authentication: true
+      exact_patient_context_requires_ontology_subtype_typed_biomarker_regimen_stage_and_line_match: true
+      exact_preclinical_context_requires_perturbed_compartment_and_endpoint_category_match: true
+      omitted_exact_axes_are_never_wildcards: true
+      compatible_nonexact_evidence_separate_from_conflicting_or_incompatible: true
+      mixed_compatible_and_conflicting_evidence_has_explicit_status: true
+      predictive_claim_requires_quantified_treatment_interaction: true
+      predictive_claim_requires_distinct_named_treatment_and_comparator_regimens: true
+      predictive_claim_requires_distinct_source_assignment_ids: true
+      interaction_inference_status_rule_scale_and_estimability_required: true
+      gene_specific_preclinical_versioned_gene_identity_required: true
+      direct_preclinical_direction_status_numeric_effect_and_sample_n_required: true
+      supported_null_inconclusive_and_unsupported_interactions_separate: true
+      patient_exact_regimen_requires_verified_treatment_exposure: true
+      prognostic_predictor_requires_pretreatment_measurement: true
+      frozen_or_injected_registry_source_cannot_emit_strict_count: true
+      longitudinal_claim_requires_paired_baseline: true
+      source_and_raw_family_mapping_required: true
+      temporal_cutoff_required: true
+      target_family_exclusion_or_absence_attestation_required: true
+      used_for_label_must_be_false: true
+
   icraft:
     name: Immune-related CRISPR screen Analyzer of Functional Targets
     status: adapter_contract_and_report_engine_only

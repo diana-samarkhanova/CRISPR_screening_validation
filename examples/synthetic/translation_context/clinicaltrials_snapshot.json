@@ -1,0 +1,84 @@
+{
+  "api_version": "2.0.5-synthetic",
+  "complete": true,
+  "data_timestamp": "2025-04-08T00:00:00Z",
+  "pages": [
+    {
+      "studies": [
+        {
+          "hasResults": true,
+          "protocolSection": {
+            "armsInterventionsModule": {
+              "interventions": [
+                {
+                  "name": "SYNTHETIC-DRUG",
+                  "otherNames": [
+                    "SYN-001"
+                  ],
+                  "type": "DRUG"
+                }
+              ]
+            },
+            "conditionsModule": {
+              "conditions": [
+                "Synthetic Breast Cancer"
+              ],
+              "keywords": [
+                "Synthetic TNBC"
+              ]
+            },
+            "designModule": {
+              "enrollmentInfo": {
+                "count": 12,
+                "type": "ACTUAL"
+              },
+              "phases": [
+                "PHASE1"
+              ],
+              "studyType": "INTERVENTIONAL"
+            },
+            "identificationModule": {
+              "briefTitle": "Synthetic translation-context fixture",
+              "nctId": "NCT99999999",
+              "officialTitle": "Synthetic data only"
+            },
+            "outcomesModule": {
+              "primaryOutcomes": [
+                {
+                  "measure": "Synthetic response"
+                }
+              ]
+            },
+            "referencesModule": {
+              "references": []
+            },
+            "statusModule": {
+              "completionDateStruct": {
+                "date": "2025-01"
+              },
+              "lastUpdatePostDateStruct": {
+                "date": "2025-04-08"
+              },
+              "overallStatus": "COMPLETED",
+              "startDateStruct": {
+                "date": "2024-01"
+              },
+              "studyFirstPostDateStruct": {
+                "date": "2024-01-01"
+              }
+            }
+          }
+        }
+      ],
+      "totalCount": 1
+    }
+  ],
+  "request_urls": [
+    "https://clinicaltrials.gov/api/v2/studies?synthetic=true"
+  ],
+  "retrieved_at_utc": "2025-04-08T00:00:00+00:00",
+  "source": "ClinicalTrials.gov",
+  "source_api_major": "v2",
+  "total_count": 1,
+  "version_stable": false
+}

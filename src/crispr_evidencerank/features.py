@@ -86,6 +86,12 @@ def featurize_count_table(
         samples[column] = samples[column].astype(str).str.strip()
         if samples[column].eq("").any():
             raise ValueError(f"{column} cannot be empty")
+    if (
+        samples["replicate"]
+        .map(lambda value: isinstance(value, (bool, np.bool_)))
+        .any()
+    ):
+        raise ValueError("replicate cannot contain boolean values")
     replicate_numeric = pd.to_numeric(samples["replicate"], errors="coerce")
     if (
         replicate_numeric.isna().any()
@@ -103,7 +109,11 @@ def featurize_count_table(
         )
 
     numeric = counts[sample_ids].astype(float)
-    library_sizes = numeric.sum(axis=0)
+    with np.errstate(over="ignore"):
+        library_sizes = numeric.sum(axis=0)
+    if not np.isfinite(library_sizes).all():
+        bad = library_sizes.index[~np.isfinite(library_sizes)].tolist()
+        raise ValueError(f"samples with non-finite total library size: {bad}")
     if (library_sizes <= 0).any():
         bad = library_sizes.index[library_sizes <= 0].tolist()
         raise ValueError(f"samples with zero total library size: {bad}")

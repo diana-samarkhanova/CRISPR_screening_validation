@@ -1,0 +1,1069 @@
+{
+  "$defs": {
+    "BiomarkerAxisObservationStatus": {
+      "description": "Curator-visible availability state for a typed biomarker bundle.",
+      "enum": [
+        "observed",
+        "not_assessed",
+        "not_reported",
+        "insufficient_material",
+        "unknown"
+      ],
+      "title": "BiomarkerAxisObservationStatus",
+      "type": "string"
+    },
+    "BiomarkerFeatureType": {
+      "enum": [
+        "genomic_mutation",
+        "copy_number",
+        "fusion",
+        "rna_expression",
+        "protein_expression",
+        "epigenetic",
+        "genomic_signature",
+        "functional_status",
+        "other"
+      ],
+      "title": "BiomarkerFeatureType",
+      "type": "string"
+    },
+    "ComparatorExposureType": {
+      "description": "Whether a comparator arm contains an active therapeutic exposure.",
+      "enum": [
+        "active_therapeutic",
+        "placebo",
+        "vehicle",
+        "no_active_therapeutic",
+        "unresolved"
+      ],
+      "title": "ComparatorExposureType",
+      "type": "string"
+    },
+    "InteractionEffectScale": {
+      "description": "Controlled interaction-effect scales with a known statistical null.",
+      "enum": [
+        "additive_coefficient",
+        "difference_in_effect",
+        "hazard_ratio",
+        "odds_ratio",
+        "risk_ratio",
+        "ratio_of_ratios"
+      ],
+      "title": "InteractionEffectScale",
+      "type": "string"
+    },
+    "InteractionInferenceStatus": {
+      "description": "Curated conclusion of a formal treatment-by-predictor interaction test.",
+      "enum": [
+        "not_tested",
+        "supported",
+        "null",
+        "inconclusive",
+        "unsupported"
+      ],
+      "title": "InteractionInferenceStatus",
+      "type": "string"
+    },
+    "InteractionPValueRole": {
+      "description": "Inferential question answered by a reported interaction p-value.",
+      "enum": [
+        "departure_from_null",
+        "equivalence_to_null"
+      ],
+      "title": "InteractionPValueRole",
+      "type": "string"
+    },
+    "MolecularMeasurementTimepoint": {
+      "enum": [
+        "pretreatment",
+        "on_treatment",
+        "post_treatment",
+        "unknown"
+      ],
+      "title": "MolecularMeasurementTimepoint",
+      "type": "string"
+    },
+    "PatientAssociationInterpretation": {
+      "enum": [
+        "predictive_interaction",
+        "interaction_tested_null",
+        "interaction_tested_inconclusive",
+        "interaction_tested_unsupported",
+        "treated_cohort_association",
+        "prognostic_only",
+        "pharmacodynamic",
+        "acquired_resistance",
+        "on_treatment_association",
+        "post_progression_association",
+        "eligibility_only",
+        "descriptive_only",
+        "unresolved"
+      ],
+      "title": "PatientAssociationInterpretation",
+      "type": "string"
+    },
+    "RegimenComponentRelation": {
+      "description": "How listed canonical active components form a regimen.",
+      "enum": [
+        "fixed_all_of",
+        "alternative_one_of",
+        "none",
+        "unresolved"
+      ],
+      "title": "RegimenComponentRelation",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Aggregate gene/outcome claim from one treatment-matched patient cohort.",
+  "properties": {
+    "evidence_id": {
+      "minLength": 1,
+      "title": "Evidence Id",
+      "type": "string"
+    },
+    "source_study_id": {
+      "minLength": 1,
+      "title": "Source Study Id",
+      "type": "string"
+    },
+    "cohort_id": {
+      "minLength": 1,
+      "title": "Cohort Id",
+      "type": "string"
+    },
+    "source_family_id": {
+      "minLength": 1,
+      "title": "Source Family Id",
+      "type": "string"
+    },
+    "raw_data_family_id": {
+      "minLength": 1,
+      "title": "Raw Data Family Id",
+      "type": "string"
+    },
+    "gene_symbol": {
+      "minLength": 1,
+      "title": "Gene Symbol",
+      "type": "string"
+    },
+    "predictor_gene_symbol": {
+      "minLength": 1,
+      "title": "Predictor Gene Symbol",
+      "type": "string"
+    },
+    "gene_id": {
+      "minLength": 1,
+      "title": "Gene Id",
+      "type": "string"
+    },
+    "gene_identifier_source": {
+      "minLength": 1,
+      "title": "Gene Identifier Source",
+      "type": "string"
+    },
+    "gene_identifier_version": {
+      "minLength": 1,
+      "title": "Gene Identifier Version",
+      "type": "string"
+    },
+    "predictor_feature_type": {
+      "$ref": "#/$defs/BiomarkerFeatureType"
+    },
+    "predictor_state": {
+      "minLength": 1,
+      "title": "Predictor State",
+      "type": "string"
+    },
+    "predictor_specimen_type": {
+      "minLength": 1,
+      "title": "Predictor Specimen Type",
+      "type": "string"
+    },
+    "predictor_identity_curator_verified": {
+      "const": true,
+      "title": "Predictor Identity Curator Verified",
+      "type": "boolean"
+    },
+    "treatment_name": {
+      "minLength": 1,
+      "title": "Treatment Name",
+      "type": "string"
+    },
+    "treatment_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Treatment Id"
+    },
+    "treatment_ontology_name": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Treatment Ontology Name"
+    },
+    "treatment_ontology_version": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Treatment Ontology Version"
+    },
+    "regimen_name": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Regimen Name"
+    },
+    "comparator_regimen_name": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Comparator Regimen Name"
+    },
+    "treatment_assignment_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Treatment Assignment Id"
+    },
+    "comparator_assignment_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Comparator Assignment Id"
+    },
+    "treatment_active_exposure_ids_json": {
+      "anyOf": [
+        {
+          "minLength": 2,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Treatment Active Exposure Ids Json"
+    },
+    "comparator_active_exposure_ids_json": {
+      "anyOf": [
+        {
+          "minLength": 2,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Comparator Active Exposure Ids Json"
+    },
+    "treatment_regimen_component_relation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RegimenComponentRelation"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "comparator_regimen_component_relation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RegimenComponentRelation"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "comparator_exposure_type": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ComparatorExposureType"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "active_exposure_identifier_source": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Active Exposure Identifier Source"
+    },
+    "active_exposure_identifier_version": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Active Exposure Identifier Version"
+    },
+    "active_exposure_ids_curator_verified": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Active Exposure Ids Curator Verified"
+    },
+    "cancer_type": {
+      "minLength": 1,
+      "title": "Cancer Type",
+      "type": "string"
+    },
+    "cancer_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cancer Id"
+    },
+    "disease_subtype": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Disease Subtype"
+    },
+    "disease_subtype_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Disease Subtype Id"
+    },
+    "disease_subtype_parent_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Disease Subtype Parent Id"
+    },
+    "disease_subtype_parent_binding_verified": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Disease Subtype Parent Binding Verified"
+    },
+    "disease_ontology_name": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Disease Ontology Name"
+    },
+    "disease_ontology_version": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Disease Ontology Version"
+    },
+    "stage": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Stage"
+    },
+    "line_of_therapy": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Line Of Therapy"
+    },
+    "biomarker_context": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Biomarker Context"
+    },
+    "biomarker_feature_type": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BiomarkerFeatureType"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "biomarker_state": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Biomarker State"
+    },
+    "biomarker_specimen_type": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Biomarker Specimen Type"
+    },
+    "biomarker_measurement_timepoint": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MolecularMeasurementTimepoint"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "biomarker_axes_informative_verified": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Biomarker Axes Informative Verified"
+    },
+    "biomarker_axes_observation_status": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BiomarkerAxisObservationStatus"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "measurement_type": {
+      "minLength": 1,
+      "title": "Measurement Type",
+      "type": "string"
+    },
+    "measurement_platform": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Measurement Platform"
+    },
+    "measurement_timepoint": {
+      "$ref": "#/$defs/MolecularMeasurementTimepoint"
+    },
+    "clinical_outcome": {
+      "minLength": 1,
+      "title": "Clinical Outcome",
+      "type": "string"
+    },
+    "association_interpretation": {
+      "$ref": "#/$defs/PatientAssociationInterpretation"
+    },
+    "comparator_arm_present": {
+      "title": "Comparator Arm Present",
+      "type": "boolean"
+    },
+    "treatment_predictor_interaction_tested": {
+      "title": "Treatment Predictor Interaction Tested",
+      "type": "boolean"
+    },
+    "interaction_inference_status": {
+      "$ref": "#/$defs/InteractionInferenceStatus"
+    },
+    "interaction_effect_scale": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/InteractionEffectScale"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "interaction_inference_rule_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Interaction Inference Rule Id"
+    },
+    "interaction_inference_rule_version": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Interaction Inference Rule Version"
+    },
+    "interaction_significance_threshold": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0.0,
+          "maximum": 0.1,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Interaction Significance Threshold"
+    },
+    "interaction_p_value_role": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/InteractionPValueRole"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "interaction_equivalence_lower": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Interaction Equivalence Lower"
+    },
+    "interaction_equivalence_upper": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Interaction Equivalence Upper"
+    },
+    "interaction_inference_curator_verified": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Interaction Inference Curator Verified"
+    },
+    "treatment_exposure_verified": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Treatment Exposure Verified"
+    },
+    "treatment_comparator_exposures_distinct_verified": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Treatment Comparator Exposures Distinct Verified"
+    },
+    "paired_baseline_present": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Paired Baseline Present"
+    },
+    "longitudinal_change_tested": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Longitudinal Change Tested"
+    },
+    "progression_documented": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Progression Documented"
+    },
+    "analysis_model": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Analysis Model"
+    },
+    "patient_n": {
+      "minimum": 1,
+      "title": "Patient N",
+      "type": "integer"
+    },
+    "treatment_arm_patient_n": {
+      "anyOf": [
+        {
+          "minimum": 3,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Treatment Arm Patient N"
+    },
+    "comparator_arm_patient_n": {
+      "anyOf": [
+        {
+          "minimum": 3,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Comparator Arm Patient N"
+    },
+    "interaction_analysis_evaluable_patient_n": {
+      "anyOf": [
+        {
+          "minimum": 6,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Interaction Analysis Evaluable Patient N"
+    },
+    "interaction_model_parameter_n": {
+      "anyOf": [
+        {
+          "minimum": 4,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Interaction Model Parameter N"
+    },
+    "interaction_outcome_event_n": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Interaction Outcome Event N"
+    },
+    "interaction_model_estimable_verified": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Interaction Model Estimable Verified"
+    },
+    "biomarker_variation_in_each_arm_verified": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Biomarker Variation In Each Arm Verified"
+    },
+    "effect_numeric": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Effect Numeric"
+    },
+    "effect_type": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Effect Type"
+    },
+    "confidence_interval_lower": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Confidence Interval Lower"
+    },
+    "confidence_interval_upper": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Confidence Interval Upper"
+    },
+    "p_value": {
+      "anyOf": [
+        {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "P Value"
+    },
+    "outcome_text": {
+      "minLength": 1,
+      "title": "Outcome Text",
+      "type": "string"
+    },
+    "source_name": {
+      "minLength": 1,
+      "title": "Source Name",
+      "type": "string"
+    },
+    "source_version": {
+      "minLength": 1,
+      "title": "Source Version",
+      "type": "string"
+    },
+    "source_url": {
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Source Url",
+      "type": "string"
+    },
+    "source_locator": {
+      "minLength": 1,
+      "title": "Source Locator",
+      "type": "string"
+    },
+    "available_date": {
+      "format": "date",
+      "title": "Available Date",
+      "type": "string"
+    },
+    "retrieved_date": {
+      "format": "date",
+      "title": "Retrieved Date",
+      "type": "string"
+    },
+    "used_for_label": {
+      "const": false,
+      "default": false,
+      "title": "Used For Label",
+      "type": "boolean"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "evidence_id",
+    "source_study_id",
+    "cohort_id",
+    "source_family_id",
+    "raw_data_family_id",
+    "gene_symbol",
+    "predictor_gene_symbol",
+    "gene_id",
+    "gene_identifier_source",
+    "gene_identifier_version",
+    "predictor_feature_type",
+    "predictor_state",
+    "predictor_specimen_type",
+    "predictor_identity_curator_verified",
+    "treatment_name",
+    "cancer_type",
+    "measurement_type",
+    "measurement_timepoint",
+    "clinical_outcome",
+    "association_interpretation",
+    "comparator_arm_present",
+    "treatment_predictor_interaction_tested",
+    "interaction_inference_status",
+    "patient_n",
+    "outcome_text",
+    "source_name",
+    "source_version",
+    "source_url",
+    "source_locator",
+    "available_date",
+    "retrieved_date"
+  ],
+  "title": "PatientMolecularEvidenceRecord",
+  "type": "object",
+  "x-semantic-rules": [
+    "retrieved_date cannot precede available_date",
+    "source and raw-data family identifiers are required",
+    "ontology IDs require ontology name and version",
+    "subtypes require explicit parent verification; verified bindings require versioned subtype and cancer IDs with equal parent and cancer IDs",
+    "biomarker term, type, state, specimen, and timepoint are all-or-none",
+    "typed biomarker exactness requires observed status and attestation",
+    "cohort-context biomarker fields are distinct from the gene-level tested molecular predictor",
+    "gene_symbol is bound to a versioned predictor gene ID, feature type, state, specimen, measurement, and curator verification",
+    "predictor identity verification is a curator attestation, not external resolver authentication",
+    "scientific attestations require literal booleans",
+    "exact curated status requires versioned canonical treatment and cancer IDs",
+    "tested interactions require pretreatment measurement, verified canonical active-exposure sets and provenance, v1 canonical monotherapy versus placebo/no-active control, distinct source-native assignment IDs, evaluable per-arm/model counts, scale-appropriate event counts, predictor variation, a versioned inference rule, and a controlled effect scale",
+    "association interpretation, tested flag, and supported/null/inconclusive/unsupported/not-tested inference status must agree",
+    "controlled effect scale determines its null value, positivity constraints, and event-count requirements",
+    "supported and unsupported interaction p-values test departure from null; formal null requires prespecified equivalence bounds and an equivalence-role p-value when supplied",
+    "inconclusive interaction requires discordant p-value and confidence-interval support",
+    "untested interactions cannot carry formal interaction inference fields",
+    "pharmacodynamic and acquired-resistance claims require paired longitudinal testing",
+    "prognostic-only predictors require pretreatment measurement",
+    "unverified patient treatment exposure cannot establish exact treatment context",
+    "post-progression claims require documented progression",
+    "used_for_label must remain false"
+  ]
+}

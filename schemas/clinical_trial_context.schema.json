@@ -1,0 +1,320 @@
+{
+  "$defs": {
+    "TrialBiomarkerMatch": {
+      "enum": [
+        "explicit_structured_term",
+        "not_reported_in_structured_terms",
+        "not_requested"
+      ],
+      "title": "TrialBiomarkerMatch",
+      "type": "string"
+    },
+    "TrialDiseaseMatch": {
+      "enum": [
+        "explicit_subtype_term",
+        "explicit_subtype_alias",
+        "cancer_type_term_only",
+        "cancer_entity_alias",
+        "declared_ancestor_term",
+        "no_structured_match"
+      ],
+      "title": "TrialDiseaseMatch",
+      "type": "string"
+    },
+    "TrialInterventionMatch": {
+      "enum": [
+        "exact_canonical",
+        "explicit_alias",
+        "explicit_component",
+        "declared_class_term",
+        "no_structured_match"
+      ],
+      "title": "TrialInterventionMatch",
+      "type": "string"
+    },
+    "TrialRegimenRelation": {
+      "enum": [
+        "no_additional_active_agent_listed",
+        "additional_active_agent_listed",
+        "unresolved"
+      ],
+      "title": "TrialRegimenRelation",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Normalized current-snapshot ClinicalTrials.gov trial metadata.\n\nThe match fields describe structured-text retrieval only. A registry row\nis treatment-level context and can never become gene-level evidence.",
+  "properties": {
+    "context_id": {
+      "minLength": 1,
+      "title": "Context Id",
+      "type": "string"
+    },
+    "nct_id": {
+      "pattern": "^NCT[0-9]{8}$",
+      "title": "Nct Id",
+      "type": "string"
+    },
+    "brief_title": {
+      "minLength": 1,
+      "title": "Brief Title",
+      "type": "string"
+    },
+    "official_title": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Official Title"
+    },
+    "study_type": {
+      "minLength": 1,
+      "title": "Study Type",
+      "type": "string"
+    },
+    "overall_status": {
+      "minLength": 1,
+      "title": "Overall Status",
+      "type": "string"
+    },
+    "phases_json": {
+      "minLength": 2,
+      "title": "Phases Json",
+      "type": "string"
+    },
+    "conditions_json": {
+      "minLength": 2,
+      "title": "Conditions Json",
+      "type": "string"
+    },
+    "interventions_json": {
+      "minLength": 2,
+      "title": "Interventions Json",
+      "type": "string"
+    },
+    "intervention_types_json": {
+      "minLength": 2,
+      "title": "Intervention Types Json",
+      "type": "string"
+    },
+    "primary_outcomes_json": {
+      "minLength": 2,
+      "title": "Primary Outcomes Json",
+      "type": "string"
+    },
+    "linked_publications_json": {
+      "minLength": 2,
+      "title": "Linked Publications Json",
+      "type": "string"
+    },
+    "enrollment_count": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Enrollment Count"
+    },
+    "enrollment_type": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Enrollment Type"
+    },
+    "start_date": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Start Date"
+    },
+    "completion_date": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Completion Date"
+    },
+    "source_first_post_date": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source First Post Date"
+    },
+    "source_last_update_date": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Last Update Date"
+    },
+    "has_results": {
+      "title": "Has Results",
+      "type": "boolean"
+    },
+    "intervention_match": {
+      "$ref": "#/$defs/TrialInterventionMatch"
+    },
+    "disease_match": {
+      "$ref": "#/$defs/TrialDiseaseMatch"
+    },
+    "biomarker_match": {
+      "$ref": "#/$defs/TrialBiomarkerMatch"
+    },
+    "intervention_match_terms_json": {
+      "minLength": 2,
+      "title": "Intervention Match Terms Json",
+      "type": "string"
+    },
+    "disease_match_terms_json": {
+      "minLength": 2,
+      "title": "Disease Match Terms Json",
+      "type": "string"
+    },
+    "biomarker_match_terms_json": {
+      "minLength": 2,
+      "title": "Biomarker Match Terms Json",
+      "type": "string"
+    },
+    "regimen_relation": {
+      "$ref": "#/$defs/TrialRegimenRelation"
+    },
+    "source_name": {
+      "const": "ClinicalTrials.gov",
+      "default": "ClinicalTrials.gov",
+      "title": "Source Name",
+      "type": "string"
+    },
+    "source_api_major": {
+      "const": "v2",
+      "default": "v2",
+      "title": "Source Api Major",
+      "type": "string"
+    },
+    "source_api_version": {
+      "minLength": 1,
+      "title": "Source Api Version",
+      "type": "string"
+    },
+    "source_url": {
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Source Url",
+      "type": "string"
+    },
+    "retrieved_at_utc": {
+      "format": "date-time",
+      "title": "Retrieved At Utc",
+      "type": "string"
+    },
+    "registry_supports_patient_level_omics": {
+      "const": false,
+      "default": false,
+      "title": "Registry Supports Patient Level Omics",
+      "type": "boolean"
+    },
+    "temporal_version_status": {
+      "const": "current_snapshot_only",
+      "default": "current_snapshot_only",
+      "title": "Temporal Version Status",
+      "type": "string"
+    },
+    "used_for_gene_ranking": {
+      "const": false,
+      "default": false,
+      "title": "Used For Gene Ranking",
+      "type": "boolean"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "context_id",
+    "nct_id",
+    "brief_title",
+    "study_type",
+    "overall_status",
+    "phases_json",
+    "conditions_json",
+    "interventions_json",
+    "intervention_types_json",
+    "primary_outcomes_json",
+    "linked_publications_json",
+    "has_results",
+    "intervention_match",
+    "disease_match",
+    "biomarker_match",
+    "intervention_match_terms_json",
+    "disease_match_terms_json",
+    "biomarker_match_terms_json",
+    "regimen_relation",
+    "source_api_version",
+    "source_url",
+    "retrieved_at_utc"
+  ],
+  "title": "ClinicalTrialContextRecord",
+  "type": "object",
+  "x-semantic-rules": [
+    "retrieved_at_utc must use a zero UTC offset",
+    "all *_json fields must encode JSON lists",
+    "registry records are current-snapshot treatment context only",
+    "registry records cannot be used for gene ranking",
+    "source_url is the official ClinicalTrials.gov study URL bound to nct_id",
+    "source_api_version is API v2 or explicitly unverified",
+    "structured match statuses require non-empty meaningful string term lists; no-match statuses require empty lists",
+    "intervention alias, component, and class matches cannot establish strict canonical treatment identity",
+    "disease alias and ancestor matches cannot establish strict canonical disease identity",
+    "registry biomarker matches are untyped discovery context only",
+    "strict subtype status additionally requires verified requested parent binding and a separate exact parent-cancer condition",
+    "registry flags require literal booleans",
+    "strict status requires versioned canonical treatment and cancer IDs in the requested context"
+  ]
+}

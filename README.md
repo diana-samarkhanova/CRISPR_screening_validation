@@ -16,11 +16,11 @@ or a single database score as experimental validation.
 
 ## Status
 
-Version `0.3.0.dev0` is a reproducible development system, not a released
-pretrained model. It adds a one-command report for a new MAGeCK/count screen and
-an auxiliary ICRAFT-inspired immune-context method to the v0.2 normalized
-experimental-design, provenance, feature-profile, and leakage-control
-foundation. It includes:
+Version `0.4.0.dev0` is a reproducible development system, not a released
+pretrained model. It combines a one-command report for a new MAGeCK/count
+screen, an auxiliary ICRAFT-inspired immune-context method, and a report-only
+treatment/disease translation layer with the normalized experimental-design,
+provenance, feature-profile, and leakage-control foundation. It includes:
 
 - normalized records for studies, screens, contrasts, samples, gene scores,
   validation events, and external evidence;
@@ -33,6 +33,9 @@ foundation. It includes:
   human-readable report;
 - a report-only immune-screen evidence contract, tumor/immune dual-action
   classification, provenance-aware recurrence, and verified-full-list RRA;
+- a current-snapshot ClinicalTrials.gov v2 adapter plus strictly separate
+  curated patient-molecular and preclinical evidence contracts, with typed
+  biomarker and preclinical screen-context axes;
 - storage for raw and CNV-corrected scores without silently substituting a
   homemade correction;
 - a two-stage baseline that models both author selection for testing and
@@ -171,12 +174,15 @@ treatment, duration, or comparator fields remain missing.
    sources.
    The ICRAFT-inspired immune-context layer remains a separate report-only layer;
    it cannot enter the success model from a mutable current snapshot.
-5. `deduplication`: group publications, reanalyses, repositories, and ORCS
+5. `translation layer`: retrieve treatment/disease trial context and summarize
+   curated patient/preclinical claims without creating labels, reranking genes,
+   or estimating a validation probability.
+6. `deduplication`: group publications, reanalyses, repositories, and ORCS
    records derived from the same experimental material into a source/raw family.
-6. `selection model`: estimate which hits authors chose to test.
-7. `reproducibility model`: estimate relative success among genuinely tested
+7. `selection model`: estimate which hits authors chose to test.
+8. `reproducibility model`: estimate relative success among genuinely tested
    hits using grouped validation and selection-aware weights.
-8. `report`: return separate component scores, uncertainty, missingness, and
+9. `report`: return separate component scores, uncertainty, missingness, and
    source provenance.
 
 ## Quick start
@@ -263,6 +269,185 @@ reuse-rights review. The immune bundle contains `immune_context.tsv`,
 `immune_context_exclusions.tsv`, `immune_context_used_evidence.tsv`,
 `rank_list_audit.tsv`, and `summary.json`; primary screen axes are retained in
 the joined report. See `docs/IMMUNE_CONTEXT_METHOD.md`.
+
+## Report-only translation context
+
+The translation layer automatically retrieves the current ClinicalTrials.gov
+v2 landscape for a treatment and cancer, then keeps trial-level, curated
+patient-molecular, and curated preclinical evidence in separate lanes. API
+search terms are discovery queries. Same-entity treatment aliases are declared
+separately from broader treatment-class terms, and same-entity cancer aliases
+are declared separately from broader disease-ancestor terms. Subtype aliases
+are same-subtype discovery terms, not cancer ancestors. Alias hits are retained
+as alias-unverified context and cannot satisfy the strict canonical identity
+lane; class and ancestor terms are also non-exact discovery context. A
+treatment found only as an `explicit_component` remains non-exact and is never
+strict.
+
+```bash
+crispr-evidencerank summarize-translation-context \
+  --context-id mda_mb_468_olaparib_tnbc \
+  --screen-id mda_mb_468_olaparib \
+  --contrast-id olaparib_vs_vehicle \
+  --treatment olaparib \
+  --treatment-id NCIT:C71721 \
+  --treatment-ontology-name NCIt \
+  --treatment-ontology-version 26.07d \
+  --treatment-modality small_molecule \
+  --regimen-name "olaparib monotherapy" \
+  --regimen-active-exposure-id NCIT:C71721 \
+  --regimen-component-relation fixed_all_of \
+  --regimen-active-exposures-verified \
+  --regimen-active-exposure-identifier-source NCIt \
+  --regimen-active-exposure-identifier-version 26.07d \
+  --treatment-entity-alias Lynparza \
+  --treatment-entity-alias AZD2281 \
+  --treatment-class-term "PARP inhibitor" \
+  --cancer-type "breast cancer" \
+  --cancer-id NCIT:C4872 \
+  --cancer-entity-alias "mammary carcinoma" \
+  --cancer-ancestor-term "solid tumor" \
+  --disease-subtype "triple-negative breast cancer" \
+  --disease-subtype-id NCIT:C71732 \
+  --disease-subtype-parent-id NCIT:C4872 \
+  --disease-subtype-parent-binding-verified \
+  --disease-ontology-name NCIt \
+  --disease-ontology-version 26.07d \
+  --subtype-entity-alias TNBC \
+  --biomarker-context "BRCA1/2 alteration" \
+  --biomarker-feature-type genomic_mutation \
+  --biomarker-state pathogenic_or_loss \
+  --biomarker-specimen-type tumor \
+  --biomarker-measurement-timepoint pretreatment \
+  --biomarker-axes-informative-verified \
+  --biomarker-axes-observation-status observed \
+  --screen-perturbation-modality CRISPR_KO \
+  --perturbed-compartment tumor_cell \
+  --screen-endpoint-category drug_response_viability \
+  --context-date 2026-08-28 \
+  --evidence-cutoff-date 2026-08-28 \
+  --candidates results/olaparib_screen/ranked_candidates.tsv \
+  --candidate-manifest results/olaparib_screen/run_manifest.json \
+  --target-not-in-evidence-catalog \
+  --output-dir results/olaparib_screen/translation_context
+```
+
+Omit `--clinicaltrials-json` for a live, version-checked API crawl. Supply a
+previously frozen JSON snapshot for deterministic offline replay. Optional
+`--patient-evidence` and `--preclinical-evidence` tables must satisfy their
+strict contracts; the software does not auto-extract literature claims or
+convert search hits into evidence.
+
+Candidate rank provenance is structural and checksum-bound, not a digital
+signature. `ranking_type` and `screen_signal_rank` must be supplied together. A
+ranked TSV requires the complete versioned `rank-screen` bundle: manifest,
+canonical candidate filename, QC JSON, and report. The loader checks schema and
+method versions, input mode and parameters, every output checksum, ordered
+columns and row count, screen/contrast identities, tail/direction semantics,
+finite integral ranks, percentile formulas, neutral rows, duplicate keys, and
+canonical order. An unsigned user-authored bundle can attest only internal
+consistency; it does not prove producer identity.
+
+Live mode paginates the role-tagged treatment, cancer, and subtype query lanes,
+including declared entity aliases and broader class/ancestor discovery terms,
+deduplicates NCT records, and records the role of every query and all query
+URLs. Completeness applies only to that declared term set, not to unknown
+synonyms or unstructured eligibility text. Passing an ontology ancestor or
+drug-class term therefore expands discovery; it never turns that term into an
+exact entity alias. Every live per-query snapshot and the merged concept
+snapshot must round-trip identically through the frozen-snapshot validator
+before publication. NCT IDs must be unique within each query and in the merged
+top-level snapshot; the same NCT may be collapsed across query lanes only when
+its canonical payload is identical, and conflicting payloads fail closed. The
+report builder replays the snapshot again before normalization, so a nested
+mutation after initial validation also fails closed.
+
+On replay, the typed query cross-product must exactly match the requested
+canonical terms, entity aliases, class terms, subtype terms, and ancestors.
+A mismatched typed snapshot fails; a legacy/raw snapshot without typed query
+roles is explicitly `frozen_query_context_unverified` and cannot produce a
+strict registry-match count. A serialized replay cannot self-attest the live
+version check; an explicitly injected transport or clock is likewise
+source-provenance-unverified. Only the stock in-process live path receives the
+non-serializable, snapshot-digest-bound capability required for a strict count.
+Signed subtype identity is preserved during query
+binding and entity matching: terminal `+` and `-` markers are not discarded, so
+`HER2+`, `HER2-`, unsigned `HER2`, and spaced forms such as `HER2 + breast
+cancer` remain distinct. The same sign-preserving comparison applies to
+biomarker state and specimen values such as `positive (+)`/`positive (-)` and
+`CD3+`/`CD3-` cells.
+
+Trial phase, status, enrollment, and count describe one treatment/disease
+landscape for the entire screen and never reorder genes. A strict registry
+status is limited to axes resolvable from structured registry fields. A
+biomarker keyword mention cannot establish the required typed biomarker
+feature, state, specimen, and measurement timepoint and is never an exact
+biomarker match. When a subtype is requested, an exact structured subtype term
+supports strictness only alongside a separate exact structured parent-cancer
+condition. A parent name embedded in or inferred as a substring of the subtype
+label is not accepted without a versioned, curator-attested parent-ID binding.
+Requested regimen, stage, and line-of-therapy axes remain unresolved by the
+current study-level adapter and force the strict registry candidate count to
+zero until a verified arm-assignment and eligibility parser is implemented.
+
+The biomarker term, feature type, state, specimen type, measurement timepoint,
+and observation status are an all-or-none typed context and require an explicit
+`biomarker_axes_informative_verified` attestation. Exact typed matching requires
+`observation_status=observed` and `true` attestation on both the requested
+context and the curated evidence row;
+`false` preserves the declared bundle but leaves that axis unresolved rather
+than exact. The CLI records both fields with
+`--biomarker-axes-informative-verified` and
+`--biomarker-axes-observation-status observed`.
+
+The cohort-context biomarker tuple above is separate from the candidate gene
+whose association is tested. Every patient row binds `gene_symbol` to the same
+`predictor_gene_symbol`, a versioned `gene_id` plus identifier source/release,
+and an explicit predictor feature, state, specimen, measurement type/platform,
+and timepoint. Feature and assay must be compatible (for example RNA expression
+with an RNA/expression measurement). `predictor_identity_curator_verified=true`
+records a curator's audited identity assertion; it is not authentication by an
+external ontology or gene resolver.
+
+A patient association is called predictive only when pretreatment measurement,
+canonical active-exposure sets,
+component relations and identifier provenance, distinct source-native arm IDs,
+evaluable arm/model counts, scale-appropriate event counts, verified
+estimability and predictor variation,
+a versioned treatment-by-predictor inference rule, and consistently supportive
+departure-from-null metrics coexist. Formal null, inconclusive, and unsupported
+results remain separate report lanes. Direct preclinical interaction
+requires vehicle/baseline and genotype-by-treatment controls; exact preclinical
+context also requires matching `perturbed_compartment` and `endpoint_category`,
+and directional concordance additionally requires the target screen's
+perturbation modality. A non-unknown direct direction must also carry a numeric
+effect, reported sample size, curator-verified versioned inference rule, and a
+matching direction status. Neutral, inconclusive, unsupported, and unassessed
+states remain separate and cannot masquerade as directional support:
+resistance/sensitization/discordant require `direction_supported`, neutral
+requires `neutral_supported`, and unknown requires an explicit inconclusive,
+unsupported, or not-assessed status. Every
+gene-specific preclinical row also requires a versioned, curator-attested gene
+identity. Prognostic-only patient predictors must be pretreatment/baseline, and
+unverified patient treatment exposure cannot establish exact regimen context.
+
+Versioned treatment and cancer IDs are optional for a broad discovery report
+but mandatory for strict registry or exact curated-context status. A matching
+name without those IDs remains compatible non-exact.
+
+Compatible but non-exact evidence is counted separately from explicit context
+conflicts. Alias-only or ontology-version-unresolved identity can remain
+compatible non-exact evidence; explicit subtype, biomarker, regimen, stage, line,
+compartment, or endpoint contradictions are conflicting evidence. When both
+compatible-non-exact and conflicting families are present and no higher-priority
+exact-context or independence status applies, the statuses are
+`compatible_and_conflicting_context_present` for preclinical evidence and
+`compatible_and_conflicting_patient_context_present` for patient evidence,
+rather than incorrectly labeling either lane as `*_only`; the separate family
+counts retain both partitions regardless of status precedence. Every added
+candidate column is `report_only_*`: the layer does not filter or rerank the
+input candidates and does not emit a reproducibility or validation probability.
+See `docs/TRANSLATION_CONTEXT_METHOD.md`.
 
 For a release-pinned BioGRID ORCS archive:
 
@@ -370,6 +555,14 @@ section is not a negative.
 - keep exact screen-derived features separate from post-publication evidence;
 - use ORCS screen IDs as provenance/join keys and ORCS scores as screen evidence,
   not validation outcomes;
+- keep ClinicalTrials.gov trial records at treatment level; current mutable
+  snapshots are never historical gene-model features;
+- require exact treatment/disease/cohort linkage before calling patient data
+  treatment-associated, and a formal interaction before calling it predictive;
+- keep treatment-activity panels, natural biomarker associations, and direct
+  gene perturbation as different preclinical claim types;
+- derive the success-model field deny-list from every report-only evidence
+  contract, in addition to the reserved leakage-token guard;
 - never use the validation paper's prose or follow-up result as an input
   feature for that same label.
 

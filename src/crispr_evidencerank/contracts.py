@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import json
+import math
+import re
+import unicodedata
 from datetime import date, datetime
 from enum import StrEnum
 from typing import Any, ClassVar, Literal
 
+import numpy as np
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
@@ -45,6 +50,684 @@ class ExperimentalSetting(StrEnum):
     IN_VIVO = "in_vivo"
     EX_VIVO = "ex_vivo"
     UNKNOWN = "unknown"
+
+
+class InterventionModality(StrEnum):
+    SMALL_MOLECULE = "small_molecule"
+    ANTIBODY = "antibody"
+    CELL_THERAPY = "cell_therapy"
+    GENE_THERAPY = "gene_therapy"
+    RADIOTHERAPY = "radiotherapy"
+    COMBINATION = "combination"
+    OTHER = "other"
+    UNKNOWN = "unknown"
+
+
+class ScreenEndpointCategory(StrEnum):
+    DRUG_RESPONSE_VIABILITY = "drug_response_viability"
+    IMMUNE_KILLING = "immune_killing"
+    IMMUNE_CELL_FITNESS = "immune_cell_fitness"
+    MARKER_EXPRESSION = "marker_expression"
+    OTHER = "other"
+    UNKNOWN = "unknown"
+
+
+class PreclinicalEvidenceScope(StrEnum):
+    TREATMENT_CONTEXT = "treatment_context"
+    GENE_SPECIFIC = "gene_specific"
+
+
+class PreclinicalDirectionInferenceStatus(StrEnum):
+    DIRECTION_SUPPORTED = "direction_supported"
+    NEUTRAL_SUPPORTED = "neutral_supported"
+    INCONCLUSIVE = "inconclusive"
+    UNSUPPORTED = "unsupported"
+    NOT_ASSESSED = "not_assessed"
+
+
+class PreclinicalModelType(StrEnum):
+    CELL_LINE_2D = "cell_line_2d"
+    CELL_LINE_3D = "cell_line_3d"
+    IMMUNE_COCULTURE = "immune_coculture"
+    ORGANOID = "organoid"
+    PDX_DERIVED_ORGANOID = "pdx_derived_organoid"
+    EX_VIVO_TISSUE = "ex_vivo_tissue"
+    CELL_LINE_XENOGRAFT = "cell_line_xenograft"
+    PDX = "pdx"
+    SYNGENEIC = "syngeneic"
+    GENETICALLY_ENGINEERED_MODEL = "genetically_engineered_model"
+    HUMANIZED_MOUSE = "humanized_mouse"
+    OTHER_IN_VIVO = "other_in_vivo"
+    OTHER = "other"
+
+
+class PreclinicalClaimType(StrEnum):
+    DIRECT_PERTURBATIONAL_INTERACTION = "direct_perturbational_interaction"
+    NATURAL_BIOMARKER_ASSOCIATION = "natural_biomarker_association"
+    TREATMENT_ACTIVITY_ONLY = "treatment_activity_only"
+    MECHANISTIC_ONLY = "mechanistic_only"
+
+
+class MolecularMeasurementTimepoint(StrEnum):
+    PRETREATMENT = "pretreatment"
+    ON_TREATMENT = "on_treatment"
+    POST_TREATMENT = "post_treatment"
+    UNKNOWN = "unknown"
+
+
+class BiomarkerFeatureType(StrEnum):
+    GENOMIC_MUTATION = "genomic_mutation"
+    COPY_NUMBER = "copy_number"
+    FUSION = "fusion"
+    RNA_EXPRESSION = "rna_expression"
+    PROTEIN_EXPRESSION = "protein_expression"
+    EPIGENETIC = "epigenetic"
+    GENOMIC_SIGNATURE = "genomic_signature"
+    FUNCTIONAL_STATUS = "functional_status"
+    OTHER = "other"
+
+
+class BiomarkerAxisObservationStatus(StrEnum):
+    """Curator-visible availability state for a typed biomarker bundle."""
+
+    OBSERVED = "observed"
+    NOT_ASSESSED = "not_assessed"
+    NOT_REPORTED = "not_reported"
+    INSUFFICIENT_MATERIAL = "insufficient_material"
+    UNKNOWN = "unknown"
+
+
+class ComparatorExposureType(StrEnum):
+    """Whether a comparator arm contains an active therapeutic exposure."""
+
+    ACTIVE_THERAPEUTIC = "active_therapeutic"
+    PLACEBO = "placebo"
+    VEHICLE = "vehicle"
+    NO_ACTIVE_THERAPEUTIC = "no_active_therapeutic"
+    UNRESOLVED = "unresolved"
+
+
+class RegimenComponentRelation(StrEnum):
+    """How listed canonical active components form a regimen."""
+
+    FIXED_ALL_OF = "fixed_all_of"
+    ALTERNATIVE_ONE_OF = "alternative_one_of"
+    NONE = "none"
+    UNRESOLVED = "unresolved"
+
+
+class InteractionEffectScale(StrEnum):
+    """Controlled interaction-effect scales with a known statistical null."""
+
+    ADDITIVE_COEFFICIENT = "additive_coefficient"
+    DIFFERENCE_IN_EFFECT = "difference_in_effect"
+    HAZARD_RATIO = "hazard_ratio"
+    ODDS_RATIO = "odds_ratio"
+    RISK_RATIO = "risk_ratio"
+    RATIO_OF_RATIOS = "ratio_of_ratios"
+
+
+class InteractionInferenceStatus(StrEnum):
+    """Curated conclusion of a formal treatment-by-predictor interaction test."""
+
+    NOT_TESTED = "not_tested"
+    SUPPORTED = "supported"
+    NULL = "null"
+    INCONCLUSIVE = "inconclusive"
+    UNSUPPORTED = "unsupported"
+
+
+class InteractionPValueRole(StrEnum):
+    """Inferential question answered by a reported interaction p-value."""
+
+    DEPARTURE_FROM_NULL = "departure_from_null"
+    EQUIVALENCE_TO_NULL = "equivalence_to_null"
+
+
+_UNINFORMATIVE_BIOMARKER_TEXT = {
+    "missing",
+    "n a",
+    "na",
+    "none",
+    "not applicable",
+    "not assessed",
+    "not available",
+    "not collected",
+    "not done",
+    "not evaluable",
+    "not measured",
+    "not reported",
+    "not tested",
+    "null",
+    "no data",
+    "other",
+    "pending",
+    "quantity not sufficient",
+    "insufficient tissue",
+    "tbd",
+    "undetermined",
+    "unknown",
+    "unreported",
+    "unspecified",
+}
+
+_UNINFORMATIVE_CLAIM_PATTERN = re.compile(
+    r"\b(?:missing|none|null|undetermined|unknown|unreported|unspecified|"
+    r"unavailable|pending|tbd)\b|\bn\s+a\b|\bna\b|\bno\s+data\b|"
+    r"\binsufficient\s+(?:material|sample|tissue)\b|"
+    r"\bquantity\s+not\s+sufficient\b|\bnot\s+(?:applicable|assessed|"
+    r"available|collected|determined|done|evaluable|measured|reported|"
+    r"specified|tested)\b"
+)
+
+_ACTIVE_EXPOSURE_CURIE_PATTERN = re.compile(
+    r"^(?:CHEBI|DRON|DRUGBANK|NCIT|RXNORM|SYN):[A-Za-z0-9][A-Za-z0-9._-]*$",
+    flags=re.IGNORECASE,
+)
+_EXPOSURE_SOURCE_PREFIX = {
+    "chebi": "chebi",
+    "dron": "dron",
+    "drugbank": "drugbank",
+    "ncit": "ncit",
+    "rxnorm": "rxnorm",
+    "synthetic": "syn",
+}
+
+_STABLE_IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]*$")
+_ONTOLOGY_CURIE_PATTERN = re.compile(
+    r"^[A-Za-z][A-Za-z0-9._-]*:[A-Za-z0-9][A-Za-z0-9._-]*$"
+)
+_ONTOLOGY_SOURCE_PREFIX = {
+    **_EXPOSURE_SOURCE_PREFIX,
+    "diseaseontology": "doid",
+    "doid": "doid",
+    "efo": "efo",
+    "hgnc": "hgnc",
+    "mondo": "mondo",
+    "ncbigene": "ncbigene",
+    "nci thesaurus": "ncit",
+    "oncotree": "oncotree",
+    "syntheticgene": "syngene",
+}
+
+
+def _normalized_claim_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", value).casefold()
+    normalized = normalized.replace("_", " ")
+    normalized = re.sub(r"[^\w]+", " ", normalized, flags=re.UNICODE)
+    return " ".join(normalized.split())
+
+
+def _is_uninformative_claim_text(value: str, *, include_other: bool = False) -> bool:
+    normalized = _normalized_claim_text(value)
+    return (
+        not normalized
+        or bool(_UNINFORMATIVE_CLAIM_PATTERN.search(normalized))
+        or (include_other and bool(re.search(r"\bother\b", normalized)))
+    )
+
+
+def _canonical_exposure_id_set(
+    value: str,
+    *,
+    field_name: str,
+    allow_empty: bool = False,
+) -> set[str]:
+    try:
+        parsed = json.loads(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field_name} must encode a JSON array") from exc
+    if not isinstance(parsed, list) or (not parsed and not allow_empty):
+        qualifier = "a JSON array" if allow_empty else "a non-empty JSON array"
+        raise ValueError(f"{field_name} must encode {qualifier}")
+    if not all(isinstance(item, str) and item.strip() for item in parsed):
+        raise ValueError(f"{field_name} must contain non-empty string IDs")
+    if any(_is_uninformative_claim_text(item) for item in parsed):
+        raise ValueError(f"{field_name} cannot contain placeholder exposure IDs")
+    if any(
+        not _ACTIVE_EXPOSURE_CURIE_PATTERN.fullmatch(item.strip()) for item in parsed
+    ):
+        raise ValueError(
+            f"{field_name} must contain controlled CURIE identifiers from the "
+            "supported treatment ontologies"
+        )
+    normalized = {
+        " ".join(unicodedata.normalize("NFKC", item).casefold().split())
+        for item in parsed
+    }
+    if len(normalized) != len(parsed):
+        raise ValueError(f"{field_name} cannot contain duplicate exposure IDs")
+    return normalized
+
+
+def _validate_required_claim_texts(**values: str | None) -> None:
+    """Reject missingness placeholders in identity, provenance, and claim fields."""
+
+    for field_name, value in values.items():
+        if value is None or _is_uninformative_claim_text(value):
+            raise ValueError(f"{field_name} must be an informative observed value")
+
+
+def _validate_stable_identifier(value: str, *, field_name: str) -> None:
+    if _is_uninformative_claim_text(value) or not _STABLE_IDENTIFIER_PATTERN.fullmatch(
+        value.strip()
+    ):
+        raise ValueError(f"{field_name} must be a stable non-placeholder identifier")
+
+
+def _validate_versioned_ontology_identifier(
+    value: str,
+    *,
+    ontology_name: str,
+    ontology_version: str,
+    field_name: str,
+) -> None:
+    _validate_stable_identifier(value, field_name=field_name)
+    _validate_required_claim_texts(
+        **{
+            f"{field_name}_ontology_name": ontology_name,
+            f"{field_name}_ontology_version": ontology_version,
+        }
+    )
+    if not _ONTOLOGY_CURIE_PATTERN.fullmatch(value.strip()):
+        raise ValueError(f"{field_name} must be a controlled CURIE identifier")
+    observed_prefix = value.split(":", 1)[0].casefold()
+    source_key = _normalized_claim_text(ontology_name)
+    compact_source_key = source_key.replace(" ", "")
+    expected_prefix = _ONTOLOGY_SOURCE_PREFIX.get(
+        source_key,
+        _ONTOLOGY_SOURCE_PREFIX.get(compact_source_key, compact_source_key),
+    )
+    if observed_prefix != expected_prefix:
+        raise ValueError(
+            f"{field_name} CURIE prefix disagrees with its versioned ontology"
+        )
+
+
+def _reject_boolean_numeric_fields(
+    value: Any,
+    *,
+    field_names: set[str],
+) -> Any:
+    if isinstance(value, dict):
+        boolean_fields = sorted(
+            field_name
+            for field_name in field_names
+            if isinstance(value.get(field_name), (bool, np.bool_))
+        )
+        if boolean_fields:
+            raise ValueError(
+                "scientific numeric fields cannot be boolean: "
+                + ", ".join(boolean_fields)
+            )
+    return value
+
+
+def _require_boolean_fields(
+    value: Any,
+    *,
+    field_names: set[str],
+) -> Any:
+    """Reject Pydantic's permissive coercion for scientific attestations."""
+
+    if not isinstance(value, dict):
+        return value
+    normalized = dict(value)
+    invalid: list[str] = []
+    for field_name in sorted(field_names):
+        observed = value.get(field_name)
+        if observed is None:
+            continue
+        if type(observed) is bool:
+            continue
+        if isinstance(observed, np.bool_):
+            normalized[field_name] = bool(observed)
+            continue
+        invalid.append(field_name)
+    if invalid:
+        raise ValueError(
+            "scientific boolean fields require literal booleans: " + ", ".join(invalid)
+        )
+    return normalized
+
+
+def _validate_v1_monotherapy_regimen(
+    *,
+    treatment_name: str,
+    regimen_name: str,
+    component_relation: RegimenComponentRelation,
+    field_prefix: str,
+) -> None:
+    if component_relation != RegimenComponentRelation.FIXED_ALL_OF:
+        raise ValueError(
+            f"v1 verified {field_prefix} requires fixed_all_of component relation"
+        )
+    treatment_tokens = set(re.findall(r"\w+", _normalized_claim_text(treatment_name)))
+    regimen_tokens = set(re.findall(r"\w+", _normalized_claim_text(regimen_name)))
+    if not treatment_tokens or not (
+        treatment_tokens <= regimen_tokens
+        and regimen_tokens - treatment_tokens <= {"alone", "monotherapy"}
+    ):
+        raise ValueError(
+            f"v1 verified {field_prefix} label must be canonical monotherapy"
+        )
+
+
+def _predictor_measurement_is_compatible(
+    feature_type: BiomarkerFeatureType,
+    *,
+    measurement_type: str,
+    measurement_platform: str | None,
+) -> bool:
+    observed = _normalized_claim_text(
+        " ".join(value for value in (measurement_type, measurement_platform) if value)
+    )
+    required_terms = {
+        BiomarkerFeatureType.GENOMIC_MUTATION: {
+            "dna",
+            "genomic",
+            "mutation",
+            "variant",
+            "wes",
+            "wgs",
+        },
+        BiomarkerFeatureType.COPY_NUMBER: {"copy number", "cnv", "cna"},
+        BiomarkerFeatureType.FUSION: {"fusion", "rearrangement"},
+        BiomarkerFeatureType.RNA_EXPRESSION: {
+            "rna",
+            "rna seq",
+            "rnaseq",
+            "transcript",
+            "transcriptome",
+            "gene expression",
+        },
+        BiomarkerFeatureType.PROTEIN_EXPRESSION: {
+            "protein",
+            "ihc",
+            "immunohistochemistry",
+            "cytometry",
+        },
+        BiomarkerFeatureType.EPIGENETIC: {
+            "epigenetic",
+            "methylation",
+            "chromatin",
+        },
+        BiomarkerFeatureType.GENOMIC_SIGNATURE: {
+            "signature",
+            "hrd",
+            "genomic scar",
+        },
+        BiomarkerFeatureType.FUNCTIONAL_STATUS: {
+            "functional",
+            "activity",
+        },
+    }
+    terms = required_terms.get(feature_type)
+    if terms is None:
+        return False
+
+    def contains_term(term: str) -> bool:
+        pattern = r"(?<!\w)" + r"\s+".join(map(re.escape, term.split())) + r"(?!\w)"
+        return bool(re.search(pattern, observed))
+
+    if not any(contains_term(term) for term in terms):
+        return False
+    conflicting_terms = {
+        BiomarkerFeatureType.GENOMIC_MUTATION: {
+            "rna",
+            "rna seq",
+            "rnaseq",
+            "transcript",
+            "transcriptome",
+            "gene expression",
+            "protein",
+            "ihc",
+            "immunohistochemistry",
+            "cytometry",
+            "copy number",
+            "cnv",
+            "cna",
+            "fusion",
+            "rearrangement",
+        },
+        BiomarkerFeatureType.COPY_NUMBER: {
+            "rna",
+            "rna seq",
+            "rnaseq",
+            "transcript",
+            "transcriptome",
+            "gene expression",
+            "protein",
+            "ihc",
+            "immunohistochemistry",
+            "cytometry",
+            "mutation",
+            "variant",
+            "fusion",
+            "rearrangement",
+        },
+        BiomarkerFeatureType.FUSION: {
+            "copy number",
+            "cnv",
+            "cna",
+            "gene expression",
+            "protein",
+            "ihc",
+            "immunohistochemistry",
+            "cytometry",
+            "epigenetic",
+            "methylation",
+        },
+        BiomarkerFeatureType.RNA_EXPRESSION: {
+            "protein",
+            "ihc",
+            "immunohistochemistry",
+            "cytometry",
+            "dna",
+            "genomic mutation",
+            "copy number",
+            "cnv",
+            "cna",
+        },
+        BiomarkerFeatureType.PROTEIN_EXPRESSION: {
+            "rna",
+            "transcript",
+            "transcriptome",
+            "dna",
+            "genomic mutation",
+            "copy number",
+            "cnv",
+            "cna",
+        },
+    }
+    return not any(
+        contains_term(term) for term in conflicting_terms.get(feature_type, set())
+    )
+
+
+def _validate_exposure_ontology_binding(
+    exposures: set[str],
+    *,
+    source: str,
+    version: str,
+    field_name: str,
+) -> None:
+    _validate_required_claim_texts(
+        active_exposure_identifier_source=source,
+        active_exposure_identifier_version=version,
+    )
+    source_key = _normalized_claim_text(source).replace(" ", "")
+    expected_prefix = _EXPOSURE_SOURCE_PREFIX.get(source_key)
+    if expected_prefix is None:
+        raise ValueError(
+            f"{field_name} uses an unsupported active-exposure ontology source"
+        )
+    if any(value.split(":", 1)[0] != expected_prefix for value in exposures):
+        raise ValueError(
+            f"{field_name} CURIE prefixes disagree with the versioned ontology source"
+        )
+
+
+def _interaction_null_value(scale: InteractionEffectScale) -> float:
+    if scale in {
+        InteractionEffectScale.ADDITIVE_COEFFICIENT,
+        InteractionEffectScale.DIFFERENCE_IN_EFFECT,
+    }:
+        return 0.0
+    return 1.0
+
+
+def _normalize_biomarker_contract_text(
+    value: str,
+    *,
+    preserve_state_sign: bool,
+) -> str:
+    normalized = unicodedata.normalize("NFKC", value).casefold()
+    if preserve_state_sign:
+        for symbol, token in (
+            ("!=", " statenotequal "),
+            ("≥", " stategreaterorequal "),
+            ("≤", " statelessorequal "),
+            ("≠", " statenotequal "),
+            ("±", " stateplusminus "),
+            ("≈", " stateapproximatelyequal "),
+            ("~", " stateapproximately "),
+            (">", " stategreater "),
+            ("<", " stateless "),
+            ("=", " stateequal "),
+            ("↑", " stateup "),
+            ("↓", " statedown "),
+        ):
+            normalized = normalized.replace(symbol, token)
+        normalized = normalized.replace("+", " stateplus ")
+        normalized = re.sub(
+            r"(?<!\w)[\-\N{MINUS SIGN}\N{EN DASH}\N{EM DASH}]\s*(?=\d)"
+            r"|(?<!\w)[\-\N{MINUS SIGN}\N{EN DASH}\N{EM DASH}](?!\w)"
+            r"|(?<=\w)[\-\N{MINUS SIGN}\N{EN DASH}\N{EM DASH}](?=$|[^\w])",
+            " stateminus ",
+            normalized,
+        )
+    normalized = re.sub(r"[^\w]+", " ", normalized, flags=re.UNICODE)
+    return " ".join(normalized.split())
+
+
+def _validate_biomarker_bundle(
+    *,
+    biomarker_context: str | None,
+    feature_type: BiomarkerFeatureType | None,
+    state: str | None,
+    specimen_type: str | None,
+    measurement_timepoint: MolecularMeasurementTimepoint | None,
+    informative_verified: bool | None,
+    observation_status: BiomarkerAxisObservationStatus | None,
+) -> None:
+    """Require an explicit curator decision before typed axes can be exact."""
+
+    fields = (
+        biomarker_context,
+        feature_type,
+        state,
+        specimen_type,
+        measurement_timepoint,
+    )
+    any_present = any(value is not None for value in fields)
+    if any_present and not all(value is not None for value in fields):
+        raise ValueError(
+            "biomarker term, feature type, state, specimen, and measurement "
+            "timepoint must be supplied together"
+        )
+    if not any_present:
+        if informative_verified is not None or observation_status is not None:
+            raise ValueError(
+                "biomarker observation status/attestation requires a biomarker bundle"
+            )
+        return
+    if informative_verified is None or observation_status is None:
+        raise ValueError(
+            "a biomarker bundle requires explicit observation status and "
+            "biomarker_axes_informative_verified attestation"
+        )
+    if observation_status != BiomarkerAxisObservationStatus.OBSERVED:
+        if informative_verified is not False:
+            raise ValueError(
+                "a non-observed biomarker bundle cannot be marked informative"
+            )
+        return
+    if informative_verified is not True:
+        return
+    normalized_text = {
+        _normalize_biomarker_contract_text(
+            value,
+            preserve_state_sign=preserve_state_sign,
+        )
+        for value, preserve_state_sign in (
+            (biomarker_context, True),
+            (state, True),
+            (specimen_type, True),
+        )
+        if value is not None
+    }
+    if (
+        feature_type == BiomarkerFeatureType.OTHER
+        or measurement_timepoint == MolecularMeasurementTimepoint.UNKNOWN
+        or "" in normalized_text
+        or normalized_text & _UNINFORMATIVE_BIOMARKER_TEXT
+        or any(
+            bool(_UNINFORMATIVE_CLAIM_PATTERN.search(_normalized_claim_text(value)))
+            or bool(re.search(r"\bother\b", _normalized_claim_text(value)))
+            for value in (biomarker_context, state, specimen_type)
+            if value is not None
+        )
+    ):
+        raise ValueError(
+            "biomarker axes marked informative cannot contain unknown, other, or "
+            "unassessed values"
+        )
+
+
+class PatientAssociationInterpretation(StrEnum):
+    PREDICTIVE_INTERACTION = "predictive_interaction"
+    INTERACTION_TESTED_NULL = "interaction_tested_null"
+    INTERACTION_TESTED_INCONCLUSIVE = "interaction_tested_inconclusive"
+    INTERACTION_TESTED_UNSUPPORTED = "interaction_tested_unsupported"
+    TREATED_COHORT_ASSOCIATION = "treated_cohort_association"
+    PROGNOSTIC_ONLY = "prognostic_only"
+    PHARMACODYNAMIC = "pharmacodynamic"
+    ACQUIRED_RESISTANCE = "acquired_resistance"
+    ON_TREATMENT_ASSOCIATION = "on_treatment_association"
+    POST_PROGRESSION_ASSOCIATION = "post_progression_association"
+    ELIGIBILITY_ONLY = "eligibility_only"
+    DESCRIPTIVE_ONLY = "descriptive_only"
+    UNRESOLVED = "unresolved"
+
+
+class TrialInterventionMatch(StrEnum):
+    EXACT_CANONICAL = "exact_canonical"
+    EXPLICIT_ALIAS = "explicit_alias"
+    EXPLICIT_COMPONENT = "explicit_component"
+    DECLARED_CLASS_TERM = "declared_class_term"
+    NO_STRUCTURED_MATCH = "no_structured_match"
+
+
+class TrialDiseaseMatch(StrEnum):
+    EXPLICIT_SUBTYPE_TERM = "explicit_subtype_term"
+    EXPLICIT_SUBTYPE_ALIAS = "explicit_subtype_alias"
+    CANCER_TYPE_TERM_ONLY = "cancer_type_term_only"
+    CANCER_ENTITY_ALIAS = "cancer_entity_alias"
+    DECLARED_ANCESTOR_TERM = "declared_ancestor_term"
+    NO_STRUCTURED_MATCH = "no_structured_match"
+
+
+class TrialBiomarkerMatch(StrEnum):
+    EXPLICIT_STRUCTURED_TERM = "explicit_structured_term"
+    NOT_REPORTED_IN_STRUCTURED_TERMS = "not_reported_in_structured_terms"
+    NOT_REQUESTED = "not_requested"
+
+
+class TrialRegimenRelation(StrEnum):
+    NO_ADDITIONAL_ACTIVE_AGENT_LISTED = "no_additional_active_agent_listed"
+    ADDITIONAL_ACTIVE_AGENT_LISTED = "additional_active_agent_listed"
+    UNRESOLVED = "unresolved"
 
 
 class ImmuneScreenCategory(StrEnum):
@@ -2533,6 +3216,2168 @@ class ImmuneScreenEvidenceRecord(StrictRecord):
         return self
 
 
+class TreatmentDiseaseContextRecord(StrictRecord):
+    """One explicit treatment/disease question for a translation report."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "x-semantic-rules": [
+                "screen_id and contrast_id must be supplied together",
+                "treatment ID, ontology name, and ontology version are all-or-none",
+                "disease IDs require ontology name and ontology version",
+                "disease_subtype_id requires disease_subtype",
+                (
+                    "subtypes require explicit parent verification; verified "
+                    "bindings require versioned subtype and cancer IDs with equal "
+                    "parent and cancer IDs"
+                ),
+                (
+                    "regimen name, canonical active-exposure IDs, component "
+                    "relation, verification, identifier source, and identifier "
+                    "version are all-or-none"
+                ),
+                (
+                    "v1 verified regimens require a singleton exposure equal to "
+                    "treatment_id and provenance matching the treatment ontology "
+                    "release"
+                ),
+                "biomarker term, type, state, specimen, and timepoint are all-or-none",
+                "typed biomarker exactness requires observed status and attestation",
+                "scientific attestations require literal booleans",
+                (
+                    "strict registry and exact curated status require versioned "
+                    "canonical treatment and cancer IDs"
+                ),
+            ]
+        }
+    )
+    primary_key = ("context_id",)
+
+    context_id: str = Field(min_length=1)
+    screen_id: str | None = Field(default=None, min_length=1)
+    contrast_id: str | None = Field(default=None, min_length=1)
+    treatment_name: str = Field(min_length=1)
+    treatment_id: str | None = Field(default=None, min_length=1)
+    treatment_ontology_name: str | None = Field(default=None, min_length=1)
+    treatment_ontology_version: str | None = Field(default=None, min_length=1)
+    treatment_modality: InterventionModality
+    regimen_name: str | None = Field(default=None, min_length=1)
+    regimen_active_exposure_ids_json: str | None = Field(default=None, min_length=2)
+    regimen_component_relation: RegimenComponentRelation | None = None
+    regimen_active_exposures_verified: bool | None = None
+    regimen_active_exposure_identifier_source: str | None = Field(
+        default=None, min_length=1
+    )
+    regimen_active_exposure_identifier_version: str | None = Field(
+        default=None, min_length=1
+    )
+    cancer_type: str = Field(min_length=1)
+    cancer_id: str | None = Field(default=None, min_length=1)
+    disease_subtype: str | None = Field(default=None, min_length=1)
+    disease_subtype_id: str | None = Field(default=None, min_length=1)
+    disease_subtype_parent_id: str | None = Field(default=None, min_length=1)
+    disease_subtype_parent_binding_verified: bool | None = None
+    disease_ontology_name: str | None = Field(default=None, min_length=1)
+    disease_ontology_version: str | None = Field(default=None, min_length=1)
+    stage: str | None = Field(default=None, min_length=1)
+    biomarker_context: str | None = Field(default=None, min_length=1)
+    biomarker_feature_type: BiomarkerFeatureType | None = None
+    biomarker_state: str | None = Field(default=None, min_length=1)
+    biomarker_specimen_type: str | None = Field(default=None, min_length=1)
+    biomarker_measurement_timepoint: MolecularMeasurementTimepoint | None = None
+    biomarker_axes_informative_verified: bool | None = None
+    biomarker_axes_observation_status: BiomarkerAxisObservationStatus | None = None
+    line_of_therapy: str | None = Field(default=None, min_length=1)
+    screen_perturbation_modality: PerturbationModality
+    perturbed_compartment: PerturbedCompartment
+    screen_endpoint_category: ScreenEndpointCategory
+    context_date: date
+    notes: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def context_attestations_are_literal_booleans(cls, value: Any) -> Any:
+        return _require_boolean_fields(
+            value,
+            field_names={
+                "regimen_active_exposures_verified",
+                "disease_subtype_parent_binding_verified",
+                "biomarker_axes_informative_verified",
+            },
+        )
+
+    @model_validator(mode="after")
+    def context_identifiers_are_paired(self) -> TreatmentDiseaseContextRecord:
+        if (self.screen_id is None) != (self.contrast_id is None):
+            raise ValueError("screen_id and contrast_id must be supplied together")
+        if self.disease_subtype_id and not self.disease_subtype:
+            raise ValueError("disease_subtype_id requires disease_subtype")
+        if self.disease_subtype:
+            if self.disease_subtype_parent_binding_verified is None:
+                raise ValueError(
+                    "disease subtype requires explicit parent-binding verification"
+                )
+            if self.disease_subtype_parent_binding_verified is True:
+                if not (
+                    self.disease_subtype_id
+                    and self.cancer_id
+                    and self.disease_subtype_parent_id == self.cancer_id
+                ):
+                    raise ValueError(
+                        "verified disease subtype requires versioned IDs and a "
+                        "parent ID equal to cancer_id"
+                    )
+        elif (
+            self.disease_subtype_id is not None
+            or self.disease_subtype_parent_id is not None
+            or self.disease_subtype_parent_binding_verified is not None
+        ):
+            raise ValueError("disease subtype metadata requires disease_subtype")
+        treatment_ontology_fields = (
+            self.treatment_id,
+            self.treatment_ontology_name,
+            self.treatment_ontology_version,
+        )
+        if any(treatment_ontology_fields) and not all(treatment_ontology_fields):
+            raise ValueError(
+                "treatment ontology ID, name, and version must be supplied together"
+            )
+        disease_ids_present = bool(
+            self.cancer_id or self.disease_subtype_id or self.disease_subtype_parent_id
+        )
+        disease_ontology_fields = (
+            self.disease_ontology_name,
+            self.disease_ontology_version,
+        )
+        if disease_ids_present and not all(disease_ontology_fields):
+            raise ValueError(
+                "disease ontology name and version are required with disease IDs"
+            )
+        if not disease_ids_present and any(disease_ontology_fields):
+            raise ValueError("disease ontology metadata requires a disease ID")
+        if all(treatment_ontology_fields):
+            _validate_versioned_ontology_identifier(
+                self.treatment_id,
+                ontology_name=self.treatment_ontology_name,
+                ontology_version=self.treatment_ontology_version,
+                field_name="treatment_id",
+            )
+        if disease_ids_present:
+            for field_name in (
+                "cancer_id",
+                "disease_subtype_id",
+                "disease_subtype_parent_id",
+            ):
+                value = getattr(self, field_name)
+                if value is not None:
+                    _validate_versioned_ontology_identifier(
+                        value,
+                        ontology_name=self.disease_ontology_name,
+                        ontology_version=self.disease_ontology_version,
+                        field_name=field_name,
+                    )
+        if (
+            self.cancer_id
+            and self.disease_subtype_id
+            and (self.cancer_id.casefold() == self.disease_subtype_id.casefold())
+        ):
+            raise ValueError("disease subtype ID must differ from cancer ID")
+        _validate_required_claim_texts(
+            treatment_name=self.treatment_name,
+            cancer_type=self.cancer_type,
+        )
+        _validate_required_claim_texts(
+            **{
+                field_name: value
+                for field_name, value in (
+                    ("disease_subtype", self.disease_subtype),
+                    ("stage", self.stage),
+                    ("line_of_therapy", self.line_of_therapy),
+                )
+                if value is not None
+            }
+        )
+        regimen_fields = (
+            self.regimen_name,
+            self.regimen_active_exposure_ids_json,
+            self.regimen_component_relation,
+            self.regimen_active_exposures_verified,
+            self.regimen_active_exposure_identifier_source,
+            self.regimen_active_exposure_identifier_version,
+        )
+        if any(value is not None for value in regimen_fields) and not all(
+            value is not None for value in regimen_fields
+        ):
+            raise ValueError(
+                "regimen name, active-exposure IDs, and verification must be "
+                "supplied together"
+            )
+        if self.regimen_name is not None:
+            _validate_required_claim_texts(regimen_name=self.regimen_name)
+            exposures = _canonical_exposure_id_set(
+                self.regimen_active_exposure_ids_json,
+                field_name="regimen_active_exposure_ids_json",
+            )
+            _validate_exposure_ontology_binding(
+                exposures,
+                source=self.regimen_active_exposure_identifier_source,
+                version=self.regimen_active_exposure_identifier_version,
+                field_name="regimen_active_exposure_ids_json",
+            )
+            if self.treatment_id and self.treatment_id.casefold() not in exposures:
+                raise ValueError(
+                    "regimen_active_exposure_ids_json must contain treatment_id"
+                )
+            if self.regimen_active_exposures_verified is True:
+                if not self.treatment_id or exposures != {self.treatment_id.casefold()}:
+                    raise ValueError(
+                        "v1 verified regimens require exactly the canonical "
+                        "treatment_id"
+                    )
+                if (
+                    _normalized_claim_text(
+                        self.regimen_active_exposure_identifier_source
+                    )
+                    != _normalized_claim_text(self.treatment_ontology_name)
+                    or self.regimen_active_exposure_identifier_version
+                    != self.treatment_ontology_version
+                ):
+                    raise ValueError(
+                        "verified regimen exposure provenance must match the "
+                        "treatment ontology release"
+                    )
+                _validate_v1_monotherapy_regimen(
+                    treatment_name=self.treatment_name,
+                    regimen_name=self.regimen_name,
+                    component_relation=self.regimen_component_relation,
+                    field_prefix="context regimen",
+                )
+            if self.regimen_component_relation in {
+                RegimenComponentRelation.NONE,
+                RegimenComponentRelation.UNRESOLVED,
+            }:
+                raise ValueError(
+                    "a named regimen requires a resolved active-component relation"
+                )
+        _validate_biomarker_bundle(
+            biomarker_context=self.biomarker_context,
+            feature_type=self.biomarker_feature_type,
+            state=self.biomarker_state,
+            specimen_type=self.biomarker_specimen_type,
+            measurement_timepoint=self.biomarker_measurement_timepoint,
+            informative_verified=self.biomarker_axes_informative_verified,
+            observation_status=self.biomarker_axes_observation_status,
+        )
+        return self
+
+
+class ClinicalTrialContextRecord(StrictRecord):
+    """Normalized current-snapshot ClinicalTrials.gov trial metadata.
+
+    The match fields describe structured-text retrieval only. A registry row
+    is treatment-level context and can never become gene-level evidence.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "x-semantic-rules": [
+                "retrieved_at_utc must use a zero UTC offset",
+                "all *_json fields must encode JSON lists",
+                "registry records are current-snapshot treatment context only",
+                "registry records cannot be used for gene ranking",
+                (
+                    "source_url is the official ClinicalTrials.gov study URL "
+                    "bound to nct_id"
+                ),
+                "source_api_version is API v2 or explicitly unverified",
+                (
+                    "structured match statuses require non-empty meaningful "
+                    "string term lists; no-match statuses require empty lists"
+                ),
+                (
+                    "intervention alias, component, and class matches cannot "
+                    "establish strict canonical treatment identity"
+                ),
+                (
+                    "disease alias and ancestor matches cannot establish strict "
+                    "canonical disease identity"
+                ),
+                "registry biomarker matches are untyped discovery context only",
+                (
+                    "strict subtype status additionally requires verified requested "
+                    "parent binding and a separate exact parent-cancer condition"
+                ),
+                "registry flags require literal booleans",
+                (
+                    "strict status requires versioned canonical treatment and "
+                    "cancer IDs in the requested context"
+                ),
+            ]
+        }
+    )
+    primary_key = ("context_id", "nct_id")
+
+    context_id: str = Field(min_length=1)
+    nct_id: str = Field(pattern=r"^NCT[0-9]{8}$")
+    brief_title: str = Field(min_length=1)
+    official_title: str | None = None
+    study_type: str = Field(min_length=1)
+    overall_status: str = Field(min_length=1)
+    phases_json: str = Field(min_length=2)
+    conditions_json: str = Field(min_length=2)
+    interventions_json: str = Field(min_length=2)
+    intervention_types_json: str = Field(min_length=2)
+    primary_outcomes_json: str = Field(min_length=2)
+    linked_publications_json: str = Field(min_length=2)
+    enrollment_count: int | None = Field(default=None, ge=0)
+    enrollment_type: str | None = None
+    start_date: str | None = None
+    completion_date: str | None = None
+    source_first_post_date: str | None = None
+    source_last_update_date: str | None = None
+    has_results: bool
+    intervention_match: TrialInterventionMatch
+    disease_match: TrialDiseaseMatch
+    biomarker_match: TrialBiomarkerMatch
+    intervention_match_terms_json: str = Field(min_length=2)
+    disease_match_terms_json: str = Field(min_length=2)
+    biomarker_match_terms_json: str = Field(min_length=2)
+    regimen_relation: TrialRegimenRelation
+    source_name: Literal["ClinicalTrials.gov"] = "ClinicalTrials.gov"
+    source_api_major: Literal["v2"] = "v2"
+    source_api_version: str = Field(min_length=1)
+    source_url: HttpUrl
+    retrieved_at_utc: datetime
+    registry_supports_patient_level_omics: Literal[False] = False
+    temporal_version_status: Literal["current_snapshot_only"] = "current_snapshot_only"
+    used_for_gene_ranking: Literal[False] = False
+    notes: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def registry_flags_are_literal_booleans(cls, value: Any) -> Any:
+        value = _require_boolean_fields(
+            value,
+            field_names={
+                "has_results",
+                "registry_supports_patient_level_omics",
+                "used_for_gene_ranking",
+            },
+        )
+        return _reject_boolean_numeric_fields(value, field_names={"enrollment_count"})
+
+    @model_validator(mode="after")
+    def clinical_trial_context_is_fail_closed(self) -> ClinicalTrialContextRecord:
+        offset = self.retrieved_at_utc.utcoffset()
+        if offset is None or offset.total_seconds() != 0:
+            raise ValueError("retrieved_at_utc must include the UTC timezone")
+        source_url = self.source_url
+        if (
+            source_url.scheme != "https"
+            or source_url.host != "clinicaltrials.gov"
+            or source_url.username is not None
+            or source_url.password is not None
+            or source_url.path != f"/study/{self.nct_id}"
+            or source_url.query is not None
+            or source_url.fragment is not None
+        ):
+            raise ValueError(
+                "source_url must be the official ClinicalTrials.gov study URL "
+                "for nct_id"
+            )
+        if self.source_api_version != "unverified" and not re.match(
+            r"^2(?:\.|$)", self.source_api_version
+        ):
+            raise ValueError("source_api_version must identify API v2 or be unverified")
+        parsed_lists: dict[str, list[Any]] = {}
+        for field_name in (
+            "phases_json",
+            "conditions_json",
+            "interventions_json",
+            "intervention_types_json",
+            "primary_outcomes_json",
+            "linked_publications_json",
+            "intervention_match_terms_json",
+            "disease_match_terms_json",
+            "biomarker_match_terms_json",
+        ):
+            value = getattr(self, field_name)
+            try:
+                parsed = json.loads(value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"{field_name} must contain valid JSON") from exc
+            if not isinstance(parsed, list):
+                raise ValueError(f"{field_name} must encode a JSON list")
+            parsed_lists[field_name] = parsed
+        for field_name in (
+            "intervention_match_terms_json",
+            "disease_match_terms_json",
+            "biomarker_match_terms_json",
+        ):
+            if any(
+                not isinstance(term, str) or not term.strip()
+                for term in parsed_lists[field_name]
+            ):
+                raise ValueError(
+                    f"{field_name} must contain meaningful non-empty string terms"
+                )
+        match_term_rules = (
+            (
+                self.intervention_match != TrialInterventionMatch.NO_STRUCTURED_MATCH,
+                parsed_lists["intervention_match_terms_json"],
+                "intervention_match",
+            ),
+            (
+                self.disease_match != TrialDiseaseMatch.NO_STRUCTURED_MATCH,
+                parsed_lists["disease_match_terms_json"],
+                "disease_match",
+            ),
+            (
+                self.biomarker_match == TrialBiomarkerMatch.EXPLICIT_STRUCTURED_TERM,
+                parsed_lists["biomarker_match_terms_json"],
+                "biomarker_match",
+            ),
+        )
+        for match_present, match_terms, field_name in match_term_rules:
+            if match_present != bool(match_terms):
+                raise ValueError(
+                    f"{field_name} must agree with its structured match-term list"
+                )
+        return self
+
+
+class PreclinicalEvidenceRecord(StrictRecord):
+    """Curated preclinical claim; never an automatic validation label."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "x-semantic-rules": [
+                "retrieved_date cannot precede available_date",
+                "source and raw-data family identifiers are required",
+                "ontology IDs require ontology name and version",
+                (
+                    "subtypes require explicit parent verification; verified "
+                    "bindings require versioned subtype and cancer IDs with equal "
+                    "parent and cancer IDs"
+                ),
+                (
+                    "regimen name, canonical active-exposure IDs, component "
+                    "relation, verification, identifier source, and identifier "
+                    "version are all-or-none"
+                ),
+                (
+                    "v1 verified regimens require a singleton exposure equal to "
+                    "treatment_id and provenance matching the treatment ontology "
+                    "release"
+                ),
+                "biomarker term, type, state, specimen, and timepoint are all-or-none",
+                "typed biomarker exactness requires observed status and attestation",
+                (
+                    "gene-specific claims require a versioned gene ID bound to "
+                    "gene_symbol and a curator identity attestation"
+                ),
+                "scientific attestations require literal booleans",
+                (
+                    "exact curated status requires versioned canonical treatment "
+                    "and cancer IDs"
+                ),
+                "treatment_context cannot carry a gene perturbation claim",
+                "non-direct claims cannot carry perturbation modality or direction",
+                "direct claims require baseline and genotype-by-treatment controls",
+                "compartment and endpoint category are required matching axes",
+                "non-unknown direct directions require a versioned direction rule",
+                (
+                    "direct direction, neutral, inconclusive, and unsupported "
+                    "inference statuses remain separate and require curator "
+                    "adjudication"
+                ),
+                "neutral or discordant directions require a prespecified rule",
+                "used_for_label must remain false",
+            ]
+        }
+    )
+    primary_key = ("evidence_id",)
+
+    evidence_id: str = Field(min_length=1)
+    source_study_id: str = Field(min_length=1)
+    source_family_id: str = Field(min_length=1)
+    raw_data_family_id: str = Field(min_length=1)
+    evidence_scope: PreclinicalEvidenceScope
+    claim_type: PreclinicalClaimType
+    gene_symbol: str | None = Field(default=None, min_length=1)
+    gene_id: str | None = Field(default=None, min_length=1)
+    gene_identifier_source: str | None = Field(default=None, min_length=1)
+    gene_identifier_version: str | None = Field(default=None, min_length=1)
+    gene_identity_curator_verified: bool | None = None
+    perturbation_modality: PerturbationModality | None = None
+    perturbed_compartment: PerturbedCompartment
+    endpoint_category: ScreenEndpointCategory
+    phenotype_direction: PhenotypeDirection = PhenotypeDirection.UNKNOWN
+    treatment_name: str = Field(min_length=1)
+    treatment_id: str | None = Field(default=None, min_length=1)
+    treatment_ontology_name: str | None = Field(default=None, min_length=1)
+    treatment_ontology_version: str | None = Field(default=None, min_length=1)
+    regimen_name: str | None = Field(default=None, min_length=1)
+    regimen_active_exposure_ids_json: str | None = Field(default=None, min_length=2)
+    regimen_component_relation: RegimenComponentRelation | None = None
+    regimen_active_exposures_verified: bool | None = None
+    regimen_active_exposure_identifier_source: str | None = Field(
+        default=None, min_length=1
+    )
+    regimen_active_exposure_identifier_version: str | None = Field(
+        default=None, min_length=1
+    )
+    comparator: str = Field(min_length=1)
+    comparator_exposure_type: ComparatorExposureType | None = None
+    comparator_active_exposure_ids_json: str | None = Field(default=None, min_length=2)
+    comparator_regimen_component_relation: RegimenComponentRelation | None = None
+    cancer_type: str = Field(min_length=1)
+    cancer_id: str | None = Field(default=None, min_length=1)
+    disease_subtype: str | None = Field(default=None, min_length=1)
+    disease_subtype_id: str | None = Field(default=None, min_length=1)
+    disease_subtype_parent_id: str | None = Field(default=None, min_length=1)
+    disease_subtype_parent_binding_verified: bool | None = None
+    disease_ontology_name: str | None = Field(default=None, min_length=1)
+    disease_ontology_version: str | None = Field(default=None, min_length=1)
+    biomarker_context: str | None = Field(default=None, min_length=1)
+    biomarker_feature_type: BiomarkerFeatureType | None = None
+    biomarker_state: str | None = Field(default=None, min_length=1)
+    biomarker_specimen_type: str | None = Field(default=None, min_length=1)
+    biomarker_measurement_timepoint: MolecularMeasurementTimepoint | None = None
+    biomarker_axes_informative_verified: bool | None = None
+    biomarker_axes_observation_status: BiomarkerAxisObservationStatus | None = None
+    model_type: PreclinicalModelType
+    model_name: str = Field(min_length=1)
+    organism: str = Field(min_length=1)
+    endpoint: str = Field(min_length=1)
+    outcome_text: str = Field(min_length=1)
+    vehicle_or_baseline_control_present: bool | None = None
+    genotype_by_treatment_tested: bool | None = None
+    direction_rule_id: str | None = Field(default=None, min_length=1)
+    direction_rule_version: str | None = Field(default=None, min_length=1)
+    direction_inference_status: PreclinicalDirectionInferenceStatus | None = None
+    direction_inference_curator_verified: bool | None = None
+    neutrality_or_discordance_rule_prespecified: bool | None = None
+    native_effect: float | None = None
+    native_effect_type: str | None = Field(default=None, min_length=1)
+    native_reference_group: str | None = Field(default=None, min_length=1)
+    effect_numeric: float | None = None
+    effect_type: str | None = Field(default=None, min_length=1)
+    p_value: float | None = Field(default=None, ge=0.0, le=1.0)
+    sample_n: int | None = Field(default=None, ge=1)
+    source_name: str = Field(min_length=1)
+    source_version: str = Field(min_length=1)
+    source_url: HttpUrl
+    source_locator: str = Field(min_length=1)
+    available_date: date
+    retrieved_date: date
+    used_for_label: Literal[False] = False
+    notes: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def preclinical_numeric_fields_are_not_boolean(cls, value: Any) -> Any:
+        value = _require_boolean_fields(
+            value,
+            field_names={
+                "regimen_active_exposures_verified",
+                "gene_identity_curator_verified",
+                "disease_subtype_parent_binding_verified",
+                "biomarker_axes_informative_verified",
+                "vehicle_or_baseline_control_present",
+                "genotype_by_treatment_tested",
+                "direction_inference_curator_verified",
+                "neutrality_or_discordance_rule_prespecified",
+                "used_for_label",
+            },
+        )
+        return _reject_boolean_numeric_fields(
+            value,
+            field_names={"native_effect", "effect_numeric", "p_value", "sample_n"},
+        )
+
+    @model_validator(mode="after")
+    def preclinical_claim_is_internally_consistent(self) -> PreclinicalEvidenceRecord:
+        if self.retrieved_date < self.available_date:
+            raise ValueError("retrieved_date cannot precede available_date")
+        if (self.effect_numeric is None) != (self.effect_type is None):
+            raise ValueError("effect_numeric and effect_type must be supplied together")
+        for field_name in ("native_effect", "effect_numeric"):
+            value = getattr(self, field_name)
+            if value is not None and not math.isfinite(value):
+                raise ValueError(f"{field_name} must be finite")
+        native_fields = (
+            self.native_effect,
+            self.native_effect_type,
+            self.native_reference_group,
+        )
+        if any(value is not None for value in native_fields) and not all(
+            value is not None for value in native_fields
+        ):
+            raise ValueError(
+                "native_effect, native_effect_type, and native_reference_group "
+                "must be supplied together"
+            )
+        if self.effect_type is not None:
+            _validate_required_claim_texts(effect_type=self.effect_type)
+        if all(value is not None for value in native_fields):
+            _validate_required_claim_texts(
+                native_effect_type=self.native_effect_type,
+                native_reference_group=self.native_reference_group,
+            )
+        treatment_ontology_fields = (
+            self.treatment_id,
+            self.treatment_ontology_name,
+            self.treatment_ontology_version,
+        )
+        if any(treatment_ontology_fields) and not all(treatment_ontology_fields):
+            raise ValueError(
+                "treatment ontology ID, name, and version must be supplied together"
+            )
+        if self.disease_subtype_id and not self.disease_subtype:
+            raise ValueError("disease_subtype_id requires disease_subtype")
+        if self.disease_subtype:
+            if self.disease_subtype_parent_binding_verified is None:
+                raise ValueError(
+                    "disease subtype requires explicit parent-binding verification"
+                )
+            if self.disease_subtype_parent_binding_verified is True:
+                if not (
+                    self.disease_subtype_id
+                    and self.cancer_id
+                    and self.disease_subtype_parent_id == self.cancer_id
+                ):
+                    raise ValueError(
+                        "verified disease subtype requires versioned IDs and a "
+                        "parent ID equal to cancer_id"
+                    )
+        elif (
+            self.disease_subtype_id is not None
+            or self.disease_subtype_parent_id is not None
+            or self.disease_subtype_parent_binding_verified is not None
+        ):
+            raise ValueError("disease subtype metadata requires disease_subtype")
+        disease_ids_present = bool(
+            self.cancer_id or self.disease_subtype_id or self.disease_subtype_parent_id
+        )
+        disease_ontology_fields = (
+            self.disease_ontology_name,
+            self.disease_ontology_version,
+        )
+        if disease_ids_present and not all(disease_ontology_fields):
+            raise ValueError(
+                "disease ontology name and version are required with disease IDs"
+            )
+        if not disease_ids_present and any(disease_ontology_fields):
+            raise ValueError("disease ontology metadata requires a disease ID")
+        if all(treatment_ontology_fields):
+            _validate_versioned_ontology_identifier(
+                self.treatment_id,
+                ontology_name=self.treatment_ontology_name,
+                ontology_version=self.treatment_ontology_version,
+                field_name="treatment_id",
+            )
+        if disease_ids_present:
+            for field_name in (
+                "cancer_id",
+                "disease_subtype_id",
+                "disease_subtype_parent_id",
+            ):
+                value = getattr(self, field_name)
+                if value is not None:
+                    _validate_versioned_ontology_identifier(
+                        value,
+                        ontology_name=self.disease_ontology_name,
+                        ontology_version=self.disease_ontology_version,
+                        field_name=field_name,
+                    )
+        if (
+            self.cancer_id
+            and self.disease_subtype_id
+            and (self.cancer_id.casefold() == self.disease_subtype_id.casefold())
+        ):
+            raise ValueError("disease subtype ID must differ from cancer ID")
+        _validate_required_claim_texts(
+            treatment_name=self.treatment_name,
+            comparator=self.comparator,
+            cancer_type=self.cancer_type,
+            model_name=self.model_name,
+            organism=self.organism,
+            endpoint=self.endpoint,
+            outcome_text=self.outcome_text,
+            source_name=self.source_name,
+            source_version=self.source_version,
+            source_locator=self.source_locator,
+        )
+        if self.disease_subtype is not None:
+            _validate_required_claim_texts(disease_subtype=self.disease_subtype)
+        for field_name in ("source_study_id", "source_family_id"):
+            _validate_stable_identifier(
+                getattr(self, field_name), field_name=field_name
+            )
+        _validate_stable_identifier(
+            self.raw_data_family_id, field_name="raw_data_family_id"
+        )
+        regimen_fields = (
+            self.regimen_name,
+            self.regimen_active_exposure_ids_json,
+            self.regimen_component_relation,
+            self.regimen_active_exposures_verified,
+            self.regimen_active_exposure_identifier_source,
+            self.regimen_active_exposure_identifier_version,
+        )
+        if any(value is not None for value in regimen_fields) and not all(
+            value is not None for value in regimen_fields
+        ):
+            raise ValueError(
+                "regimen name, active-exposure IDs, and verification must be "
+                "supplied together"
+            )
+        if self.regimen_name is not None:
+            _validate_required_claim_texts(regimen_name=self.regimen_name)
+            exposures = _canonical_exposure_id_set(
+                self.regimen_active_exposure_ids_json,
+                field_name="regimen_active_exposure_ids_json",
+            )
+            _validate_exposure_ontology_binding(
+                exposures,
+                source=self.regimen_active_exposure_identifier_source,
+                version=self.regimen_active_exposure_identifier_version,
+                field_name="regimen_active_exposure_ids_json",
+            )
+            if self.treatment_id and self.treatment_id.casefold() not in exposures:
+                raise ValueError(
+                    "regimen_active_exposure_ids_json must contain treatment_id"
+                )
+            if self.regimen_active_exposures_verified is True:
+                if not self.treatment_id or exposures != {self.treatment_id.casefold()}:
+                    raise ValueError(
+                        "v1 verified regimens require exactly the canonical "
+                        "treatment_id"
+                    )
+                if (
+                    _normalized_claim_text(
+                        self.regimen_active_exposure_identifier_source
+                    )
+                    != _normalized_claim_text(self.treatment_ontology_name)
+                    or self.regimen_active_exposure_identifier_version
+                    != self.treatment_ontology_version
+                ):
+                    raise ValueError(
+                        "verified regimen exposure provenance must match the "
+                        "treatment ontology release"
+                    )
+                _validate_v1_monotherapy_regimen(
+                    treatment_name=self.treatment_name,
+                    regimen_name=self.regimen_name,
+                    component_relation=self.regimen_component_relation,
+                    field_prefix="preclinical regimen",
+                )
+            if self.regimen_component_relation in {
+                RegimenComponentRelation.NONE,
+                RegimenComponentRelation.UNRESOLVED,
+            }:
+                raise ValueError(
+                    "a named regimen requires a resolved active-component relation"
+                )
+        _validate_biomarker_bundle(
+            biomarker_context=self.biomarker_context,
+            feature_type=self.biomarker_feature_type,
+            state=self.biomarker_state,
+            specimen_type=self.biomarker_specimen_type,
+            measurement_timepoint=self.biomarker_measurement_timepoint,
+            informative_verified=self.biomarker_axes_informative_verified,
+            observation_status=self.biomarker_axes_observation_status,
+        )
+        if self.evidence_scope == PreclinicalEvidenceScope.GENE_SPECIFIC:
+            if not self.gene_symbol:
+                raise ValueError("gene_specific evidence requires gene_symbol")
+            _validate_required_claim_texts(gene_symbol=self.gene_symbol)
+            if not (
+                self.gene_id
+                and self.gene_identifier_source
+                and self.gene_identifier_version
+                and self.gene_identity_curator_verified is True
+            ):
+                raise ValueError(
+                    "gene_specific evidence requires a curator-attested versioned "
+                    "gene identity"
+                )
+            _validate_versioned_ontology_identifier(
+                self.gene_id,
+                ontology_name=self.gene_identifier_source,
+                ontology_version=self.gene_identifier_version,
+                field_name="gene_id",
+            )
+            if self.claim_type == PreclinicalClaimType.TREATMENT_ACTIVITY_ONLY:
+                raise ValueError(
+                    "treatment_activity_only must use treatment_context scope"
+                )
+        else:
+            if any(
+                value is not None
+                for value in (
+                    self.gene_symbol,
+                    self.gene_id,
+                    self.gene_identifier_source,
+                    self.gene_identifier_version,
+                    self.gene_identity_curator_verified,
+                    self.perturbation_modality,
+                )
+            ):
+                raise ValueError(
+                    "treatment_context evidence cannot claim a gene perturbation"
+                )
+            if self.phenotype_direction != PhenotypeDirection.UNKNOWN:
+                raise ValueError(
+                    "treatment_context evidence cannot assign a gene phenotype"
+                )
+            if self.claim_type not in {
+                PreclinicalClaimType.TREATMENT_ACTIVITY_ONLY,
+                PreclinicalClaimType.MECHANISTIC_ONLY,
+            }:
+                raise ValueError(
+                    "treatment_context evidence cannot make a gene-specific claim"
+                )
+        if self.claim_type == PreclinicalClaimType.DIRECT_PERTURBATIONAL_INTERACTION:
+            if self.evidence_scope != PreclinicalEvidenceScope.GENE_SPECIFIC:
+                raise ValueError("direct perturbational evidence must be gene_specific")
+            if self.perturbation_modality is None:
+                raise ValueError(
+                    "direct perturbational evidence requires perturbation_modality"
+                )
+            if self.vehicle_or_baseline_control_present is not True:
+                raise ValueError(
+                    "direct perturbational evidence requires a vehicle or "
+                    "baseline-growth control"
+                )
+            if self.genotype_by_treatment_tested is not True:
+                raise ValueError(
+                    "direct perturbational evidence requires a "
+                    "genotype-by-treatment test"
+                )
+            comparator_bundle = (
+                self.comparator_exposure_type,
+                self.comparator_active_exposure_ids_json,
+                self.comparator_regimen_component_relation,
+            )
+            if any(value is None for value in comparator_bundle):
+                raise ValueError(
+                    "direct perturbational evidence requires a structured comparator"
+                )
+            comparator_exposures = _canonical_exposure_id_set(
+                self.comparator_active_exposure_ids_json,
+                field_name="comparator_active_exposure_ids_json",
+                allow_empty=True,
+            )
+            if (
+                self.comparator_exposure_type
+                not in {
+                    ComparatorExposureType.PLACEBO,
+                    ComparatorExposureType.VEHICLE,
+                    ComparatorExposureType.NO_ACTIVE_THERAPEUTIC,
+                }
+                or comparator_exposures
+                or self.comparator_regimen_component_relation
+                != RegimenComponentRelation.NONE
+            ):
+                raise ValueError(
+                    "v1 direct perturbational evidence requires a resolved no-active "
+                    "comparator with an empty active-exposure set"
+                )
+            comparator_label = _normalized_claim_text(self.comparator)
+            allowed_comparator_labels = {
+                ComparatorExposureType.PLACEBO: {"placebo", "placebo control"},
+                ComparatorExposureType.VEHICLE: {"vehicle", "vehicle control"},
+                ComparatorExposureType.NO_ACTIVE_THERAPEUTIC: {
+                    "no active therapy",
+                    "untreated control",
+                },
+            }
+            if (
+                comparator_label
+                not in allowed_comparator_labels[self.comparator_exposure_type]
+            ):
+                raise ValueError(
+                    "preclinical comparator label conflicts with its controlled type"
+                )
+            if self.phenotype_direction != PhenotypeDirection.UNKNOWN and not (
+                self.direction_rule_id and self.direction_rule_version
+            ):
+                raise ValueError(
+                    "a non-unknown perturbational phenotype requires a versioned "
+                    "direction rule"
+                )
+            if self.phenotype_direction != PhenotypeDirection.UNKNOWN:
+                _validate_stable_identifier(
+                    self.direction_rule_id,
+                    field_name="direction_rule_id",
+                )
+                _validate_stable_identifier(
+                    self.direction_rule_version,
+                    field_name="direction_rule_version",
+                )
+                if self.native_effect is None and self.effect_numeric is None:
+                    raise ValueError(
+                        "directional perturbational evidence requires a numerical "
+                        "native or harmonized effect"
+                    )
+                if self.phenotype_direction in {
+                    PhenotypeDirection.RESISTANCE,
+                    PhenotypeDirection.SENSITIZATION,
+                } and all(
+                    value is None or value == 0
+                    for value in (self.native_effect, self.effect_numeric)
+                ):
+                    raise ValueError(
+                        "resistance or sensitization evidence requires a non-zero "
+                        "effect under its versioned direction rule"
+                    )
+                if self.sample_n is None:
+                    raise ValueError(
+                        "directional perturbational evidence requires sample_n"
+                    )
+                expected_status = (
+                    PreclinicalDirectionInferenceStatus.NEUTRAL_SUPPORTED
+                    if self.phenotype_direction == PhenotypeDirection.NEUTRAL
+                    else PreclinicalDirectionInferenceStatus.DIRECTION_SUPPORTED
+                )
+                if (
+                    self.direction_inference_status != expected_status
+                    or self.direction_inference_curator_verified is not True
+                ):
+                    raise ValueError(
+                        "non-unknown perturbational direction requires the matching "
+                        "curator-verified inference status"
+                    )
+                if self.phenotype_direction in {
+                    PhenotypeDirection.RESISTANCE,
+                    PhenotypeDirection.SENSITIZATION,
+                    PhenotypeDirection.DISCORDANT,
+                }:
+                    supplied_effects = [
+                        value
+                        for value in (self.native_effect, self.effect_numeric)
+                        if value is not None
+                    ]
+                    if not supplied_effects or all(
+                        math.isclose(value, 0.0, abs_tol=1e-15)
+                        for value in supplied_effects
+                    ):
+                        raise ValueError(
+                            "direction-supported perturbational evidence requires a "
+                            "non-zero effect"
+                        )
+            else:
+                if self.direction_inference_status not in {
+                    PreclinicalDirectionInferenceStatus.INCONCLUSIVE,
+                    PreclinicalDirectionInferenceStatus.UNSUPPORTED,
+                    PreclinicalDirectionInferenceStatus.NOT_ASSESSED,
+                }:
+                    raise ValueError(
+                        "unknown perturbational direction requires an inconclusive, "
+                        "unsupported, or not-assessed inference status"
+                    )
+                if self.direction_inference_curator_verified is None:
+                    raise ValueError(
+                        "direct perturbational inference status requires an explicit "
+                        "curator verification decision"
+                    )
+            if (
+                self.phenotype_direction
+                in {
+                    PhenotypeDirection.NEUTRAL,
+                    PhenotypeDirection.DISCORDANT,
+                }
+                and self.neutrality_or_discordance_rule_prespecified is not True
+            ):
+                raise ValueError(
+                    "neutral or discordant perturbational evidence requires a "
+                    "prespecified decision rule"
+                )
+        else:
+            if self.perturbation_modality is not None:
+                raise ValueError("non-direct claims cannot carry perturbation_modality")
+            if (
+                self.direction_rule_id is not None
+                or self.direction_rule_version is not None
+                or self.direction_inference_status is not None
+                or self.direction_inference_curator_verified is not None
+                or self.neutrality_or_discordance_rule_prespecified is not None
+            ):
+                raise ValueError(
+                    "non-direct claims cannot carry perturbation direction rules"
+                )
+            if self.phenotype_direction != PhenotypeDirection.UNKNOWN:
+                raise ValueError(
+                    "non-perturbational claims cannot be translated into a KO "
+                    "phenotype direction"
+                )
+            if any(
+                value is not None
+                for value in (
+                    self.comparator_exposure_type,
+                    self.comparator_active_exposure_ids_json,
+                    self.comparator_regimen_component_relation,
+                )
+            ):
+                raise ValueError(
+                    "non-direct claims cannot carry structured perturbational "
+                    "comparator fields"
+                )
+        return self
+
+
+class PatientMolecularEvidenceRecord(StrictRecord):
+    """Aggregate gene/outcome claim from one treatment-matched patient cohort."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "x-semantic-rules": [
+                "retrieved_date cannot precede available_date",
+                "source and raw-data family identifiers are required",
+                "ontology IDs require ontology name and version",
+                (
+                    "subtypes require explicit parent verification; verified "
+                    "bindings require versioned subtype and cancer IDs with equal "
+                    "parent and cancer IDs"
+                ),
+                "biomarker term, type, state, specimen, and timepoint are all-or-none",
+                "typed biomarker exactness requires observed status and attestation",
+                (
+                    "cohort-context biomarker fields are distinct from the "
+                    "gene-level tested molecular predictor"
+                ),
+                (
+                    "gene_symbol is bound to a versioned predictor gene ID, "
+                    "feature type, state, specimen, measurement, and curator "
+                    "verification"
+                ),
+                (
+                    "predictor identity verification is a curator attestation, "
+                    "not external resolver authentication"
+                ),
+                "scientific attestations require literal booleans",
+                (
+                    "exact curated status requires versioned canonical treatment "
+                    "and cancer IDs"
+                ),
+                (
+                    "tested interactions require pretreatment measurement, verified "
+                    "canonical active-exposure sets and provenance, v1 canonical "
+                    "monotherapy versus placebo/no-active control, distinct "
+                    "source-native assignment IDs, evaluable per-arm/model counts, "
+                    "scale-appropriate event counts, predictor variation, a "
+                    "versioned inference rule, and a controlled effect scale"
+                ),
+                (
+                    "association interpretation, tested flag, and supported/null/"
+                    "inconclusive/unsupported/not-tested inference status must agree"
+                ),
+                (
+                    "controlled effect scale determines its null value, positivity "
+                    "constraints, and event-count requirements"
+                ),
+                (
+                    "supported and unsupported interaction p-values test departure "
+                    "from null; formal null requires prespecified equivalence bounds "
+                    "and an equivalence-role p-value when supplied"
+                ),
+                (
+                    "inconclusive interaction requires discordant p-value and "
+                    "confidence-interval support"
+                ),
+                (
+                    "untested interactions cannot carry formal interaction "
+                    "inference fields"
+                ),
+                (
+                    "pharmacodynamic and acquired-resistance claims require paired "
+                    "longitudinal testing"
+                ),
+                "prognostic-only predictors require pretreatment measurement",
+                (
+                    "unverified patient treatment exposure cannot establish exact "
+                    "treatment context"
+                ),
+                "post-progression claims require documented progression",
+                "used_for_label must remain false",
+            ]
+        }
+    )
+    primary_key = ("evidence_id",)
+
+    evidence_id: str = Field(min_length=1)
+    source_study_id: str = Field(min_length=1)
+    cohort_id: str = Field(min_length=1)
+    source_family_id: str = Field(min_length=1)
+    raw_data_family_id: str = Field(min_length=1)
+    gene_symbol: str = Field(min_length=1)
+    predictor_gene_symbol: str = Field(min_length=1)
+    gene_id: str = Field(min_length=1)
+    gene_identifier_source: str = Field(min_length=1)
+    gene_identifier_version: str = Field(min_length=1)
+    predictor_feature_type: BiomarkerFeatureType
+    predictor_state: str = Field(min_length=1)
+    predictor_specimen_type: str = Field(min_length=1)
+    predictor_identity_curator_verified: Literal[True]
+    treatment_name: str = Field(min_length=1)
+    treatment_id: str | None = Field(default=None, min_length=1)
+    treatment_ontology_name: str | None = Field(default=None, min_length=1)
+    treatment_ontology_version: str | None = Field(default=None, min_length=1)
+    regimen_name: str | None = Field(default=None, min_length=1)
+    comparator_regimen_name: str | None = Field(default=None, min_length=1)
+    treatment_assignment_id: str | None = Field(default=None, min_length=1)
+    comparator_assignment_id: str | None = Field(default=None, min_length=1)
+    treatment_active_exposure_ids_json: str | None = Field(default=None, min_length=2)
+    comparator_active_exposure_ids_json: str | None = Field(default=None, min_length=2)
+    treatment_regimen_component_relation: RegimenComponentRelation | None = None
+    comparator_regimen_component_relation: RegimenComponentRelation | None = None
+    comparator_exposure_type: ComparatorExposureType | None = None
+    active_exposure_identifier_source: str | None = Field(default=None, min_length=1)
+    active_exposure_identifier_version: str | None = Field(default=None, min_length=1)
+    active_exposure_ids_curator_verified: bool | None = None
+    cancer_type: str = Field(min_length=1)
+    cancer_id: str | None = Field(default=None, min_length=1)
+    disease_subtype: str | None = Field(default=None, min_length=1)
+    disease_subtype_id: str | None = Field(default=None, min_length=1)
+    disease_subtype_parent_id: str | None = Field(default=None, min_length=1)
+    disease_subtype_parent_binding_verified: bool | None = None
+    disease_ontology_name: str | None = Field(default=None, min_length=1)
+    disease_ontology_version: str | None = Field(default=None, min_length=1)
+    stage: str | None = Field(default=None, min_length=1)
+    line_of_therapy: str | None = Field(default=None, min_length=1)
+    biomarker_context: str | None = Field(default=None, min_length=1)
+    biomarker_feature_type: BiomarkerFeatureType | None = None
+    biomarker_state: str | None = Field(default=None, min_length=1)
+    biomarker_specimen_type: str | None = Field(default=None, min_length=1)
+    biomarker_measurement_timepoint: MolecularMeasurementTimepoint | None = None
+    biomarker_axes_informative_verified: bool | None = None
+    biomarker_axes_observation_status: BiomarkerAxisObservationStatus | None = None
+    measurement_type: str = Field(min_length=1)
+    measurement_platform: str | None = Field(default=None, min_length=1)
+    measurement_timepoint: MolecularMeasurementTimepoint
+    clinical_outcome: str = Field(min_length=1)
+    association_interpretation: PatientAssociationInterpretation
+    comparator_arm_present: bool
+    treatment_predictor_interaction_tested: bool
+    interaction_inference_status: InteractionInferenceStatus
+    interaction_effect_scale: InteractionEffectScale | None = None
+    interaction_inference_rule_id: str | None = Field(default=None, min_length=1)
+    interaction_inference_rule_version: str | None = Field(default=None, min_length=1)
+    interaction_significance_threshold: float | None = Field(
+        default=None, gt=0.0, le=0.10
+    )
+    interaction_p_value_role: InteractionPValueRole | None = None
+    interaction_equivalence_lower: float | None = None
+    interaction_equivalence_upper: float | None = None
+    interaction_inference_curator_verified: bool | None = None
+    treatment_exposure_verified: bool | None = None
+    treatment_comparator_exposures_distinct_verified: bool | None = None
+    paired_baseline_present: bool | None = None
+    longitudinal_change_tested: bool | None = None
+    progression_documented: bool | None = None
+    analysis_model: str | None = Field(default=None, min_length=1)
+    patient_n: int = Field(ge=1)
+    treatment_arm_patient_n: int | None = Field(default=None, ge=3)
+    comparator_arm_patient_n: int | None = Field(default=None, ge=3)
+    interaction_analysis_evaluable_patient_n: int | None = Field(default=None, ge=6)
+    interaction_model_parameter_n: int | None = Field(default=None, ge=4)
+    interaction_outcome_event_n: int | None = Field(default=None, ge=1)
+    interaction_model_estimable_verified: bool | None = None
+    biomarker_variation_in_each_arm_verified: bool | None = None
+    effect_numeric: float | None = None
+    effect_type: str | None = Field(default=None, min_length=1)
+    confidence_interval_lower: float | None = None
+    confidence_interval_upper: float | None = None
+    p_value: float | None = Field(default=None, ge=0.0, le=1.0)
+    outcome_text: str = Field(min_length=1)
+    source_name: str = Field(min_length=1)
+    source_version: str = Field(min_length=1)
+    source_url: HttpUrl
+    source_locator: str = Field(min_length=1)
+    available_date: date
+    retrieved_date: date
+    used_for_label: Literal[False] = False
+    notes: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def patient_numeric_fields_are_not_boolean(cls, value: Any) -> Any:
+        value = _require_boolean_fields(
+            value,
+            field_names={
+                "predictor_identity_curator_verified",
+                "active_exposure_ids_curator_verified",
+                "disease_subtype_parent_binding_verified",
+                "biomarker_axes_informative_verified",
+                "comparator_arm_present",
+                "treatment_predictor_interaction_tested",
+                "interaction_inference_curator_verified",
+                "treatment_exposure_verified",
+                "treatment_comparator_exposures_distinct_verified",
+                "paired_baseline_present",
+                "longitudinal_change_tested",
+                "progression_documented",
+                "interaction_model_estimable_verified",
+                "biomarker_variation_in_each_arm_verified",
+                "used_for_label",
+            },
+        )
+        return _reject_boolean_numeric_fields(
+            value,
+            field_names={
+                "interaction_significance_threshold",
+                "interaction_equivalence_lower",
+                "interaction_equivalence_upper",
+                "patient_n",
+                "treatment_arm_patient_n",
+                "comparator_arm_patient_n",
+                "interaction_analysis_evaluable_patient_n",
+                "interaction_model_parameter_n",
+                "interaction_outcome_event_n",
+                "effect_numeric",
+                "confidence_interval_lower",
+                "confidence_interval_upper",
+                "p_value",
+            },
+        )
+
+    @model_validator(mode="after")
+    def patient_claim_is_not_overstated(self) -> PatientMolecularEvidenceRecord:
+        if self.retrieved_date < self.available_date:
+            raise ValueError("retrieved_date cannot precede available_date")
+        if (self.effect_numeric is None) != (self.effect_type is None):
+            raise ValueError("effect_numeric and effect_type must be supplied together")
+        if (self.confidence_interval_lower is None) != (
+            self.confidence_interval_upper is None
+        ):
+            raise ValueError("both confidence-interval bounds are required together")
+        if (
+            self.confidence_interval_lower is not None
+            and self.confidence_interval_upper is not None
+            and self.confidence_interval_lower > self.confidence_interval_upper
+        ):
+            raise ValueError("confidence-interval lower bound exceeds upper bound")
+        treatment_ontology_fields = (
+            self.treatment_id,
+            self.treatment_ontology_name,
+            self.treatment_ontology_version,
+        )
+        if any(treatment_ontology_fields) and not all(treatment_ontology_fields):
+            raise ValueError(
+                "treatment ontology ID, name, and version must be supplied together"
+            )
+        if self.disease_subtype_id and not self.disease_subtype:
+            raise ValueError("disease_subtype_id requires disease_subtype")
+        if self.disease_subtype:
+            if self.disease_subtype_parent_binding_verified is None:
+                raise ValueError(
+                    "disease subtype requires explicit parent-binding verification"
+                )
+            if self.disease_subtype_parent_binding_verified is True:
+                if not (
+                    self.disease_subtype_id
+                    and self.cancer_id
+                    and self.disease_subtype_parent_id == self.cancer_id
+                ):
+                    raise ValueError(
+                        "verified disease subtype requires versioned IDs and a "
+                        "parent ID equal to cancer_id"
+                    )
+        elif (
+            self.disease_subtype_id is not None
+            or self.disease_subtype_parent_id is not None
+            or self.disease_subtype_parent_binding_verified is not None
+        ):
+            raise ValueError("disease subtype metadata requires disease_subtype")
+        disease_ids_present = bool(
+            self.cancer_id or self.disease_subtype_id or self.disease_subtype_parent_id
+        )
+        disease_ontology_fields = (
+            self.disease_ontology_name,
+            self.disease_ontology_version,
+        )
+        if disease_ids_present and not all(disease_ontology_fields):
+            raise ValueError(
+                "disease ontology name and version are required with disease IDs"
+            )
+        if not disease_ids_present and any(disease_ontology_fields):
+            raise ValueError("disease ontology metadata requires a disease ID")
+        if all(treatment_ontology_fields):
+            _validate_versioned_ontology_identifier(
+                self.treatment_id,
+                ontology_name=self.treatment_ontology_name,
+                ontology_version=self.treatment_ontology_version,
+                field_name="treatment_id",
+            )
+        if disease_ids_present:
+            for field_name in (
+                "cancer_id",
+                "disease_subtype_id",
+                "disease_subtype_parent_id",
+            ):
+                value = getattr(self, field_name)
+                if value is not None:
+                    _validate_versioned_ontology_identifier(
+                        value,
+                        ontology_name=self.disease_ontology_name,
+                        ontology_version=self.disease_ontology_version,
+                        field_name=field_name,
+                    )
+        if (
+            self.cancer_id
+            and self.disease_subtype_id
+            and (self.cancer_id.casefold() == self.disease_subtype_id.casefold())
+        ):
+            raise ValueError("disease subtype ID must differ from cancer ID")
+        _validate_required_claim_texts(
+            gene_symbol=self.gene_symbol,
+            predictor_gene_symbol=self.predictor_gene_symbol,
+            predictor_state=self.predictor_state,
+            predictor_specimen_type=self.predictor_specimen_type,
+            treatment_name=self.treatment_name,
+            cancer_type=self.cancer_type,
+            measurement_type=self.measurement_type,
+            clinical_outcome=self.clinical_outcome,
+            outcome_text=self.outcome_text,
+            source_name=self.source_name,
+            source_version=self.source_version,
+            source_locator=self.source_locator,
+        )
+        if _normalized_claim_text(self.gene_symbol) != _normalized_claim_text(
+            self.predictor_gene_symbol
+        ):
+            raise ValueError("predictor_gene_symbol must equal gene_symbol")
+        _validate_versioned_ontology_identifier(
+            self.gene_id,
+            ontology_name=self.gene_identifier_source,
+            ontology_version=self.gene_identifier_version,
+            field_name="gene_id",
+        )
+        if self.predictor_feature_type == BiomarkerFeatureType.OTHER:
+            raise ValueError("gene-level predictor feature type cannot be other")
+        if not _predictor_measurement_is_compatible(
+            self.predictor_feature_type,
+            measurement_type=self.measurement_type,
+            measurement_platform=self.measurement_platform,
+        ):
+            raise ValueError(
+                "predictor feature type conflicts with measurement type/platform"
+            )
+        _validate_required_claim_texts(
+            **{
+                field_name: value
+                for field_name, value in (
+                    ("disease_subtype", self.disease_subtype),
+                    ("stage", self.stage),
+                    ("line_of_therapy", self.line_of_therapy),
+                )
+                if value is not None
+            }
+        )
+        for field_name in (
+            "source_study_id",
+            "cohort_id",
+            "source_family_id",
+        ):
+            _validate_stable_identifier(
+                getattr(self, field_name), field_name=field_name
+            )
+        _validate_stable_identifier(
+            self.raw_data_family_id, field_name="raw_data_family_id"
+        )
+        _validate_biomarker_bundle(
+            biomarker_context=self.biomarker_context,
+            feature_type=self.biomarker_feature_type,
+            state=self.biomarker_state,
+            specimen_type=self.biomarker_specimen_type,
+            measurement_timepoint=self.biomarker_measurement_timepoint,
+            informative_verified=self.biomarker_axes_informative_verified,
+            observation_status=self.biomarker_axes_observation_status,
+        )
+        treatment_bundle = (
+            self.regimen_name,
+            self.treatment_active_exposure_ids_json,
+            self.treatment_regimen_component_relation,
+            self.active_exposure_identifier_source,
+            self.active_exposure_identifier_version,
+            self.active_exposure_ids_curator_verified,
+        )
+        if any(value is not None for value in treatment_bundle) and not all(
+            value is not None for value in treatment_bundle
+        ):
+            raise ValueError(
+                "patient treatment regimen, active IDs, relation, provenance, and "
+                "verification must be supplied together"
+            )
+        comparator_bundle = (
+            self.comparator_regimen_name,
+            self.comparator_active_exposure_ids_json,
+            self.comparator_regimen_component_relation,
+            self.comparator_exposure_type,
+        )
+        if any(value is not None for value in comparator_bundle) and not all(
+            value is not None for value in comparator_bundle
+        ):
+            raise ValueError(
+                "patient comparator name, active IDs, relation, and type must be "
+                "supplied together"
+            )
+        comparator_presence_fields = (*comparator_bundle, self.comparator_assignment_id)
+        if self.comparator_arm_present:
+            if not all(value is not None for value in comparator_presence_fields):
+                raise ValueError(
+                    "comparator_arm_present requires a complete comparator bundle "
+                    "and assignment ID"
+                )
+        elif any(value is not None for value in comparator_presence_fields):
+            raise ValueError(
+                "comparator metadata cannot be supplied when comparator_arm_present "
+                "is false"
+            )
+        if all(value is not None for value in treatment_bundle):
+            bundled_treatment_exposures = _canonical_exposure_id_set(
+                self.treatment_active_exposure_ids_json,
+                field_name="treatment_active_exposure_ids_json",
+            )
+            _validate_exposure_ontology_binding(
+                bundled_treatment_exposures,
+                source=self.active_exposure_identifier_source,
+                version=self.active_exposure_identifier_version,
+                field_name="treatment_active_exposure_ids_json",
+            )
+            if (
+                self.treatment_regimen_component_relation
+                == RegimenComponentRelation.NONE
+            ):
+                raise ValueError(
+                    "a non-empty treatment active-exposure set cannot use relation none"
+                )
+            if self.treatment_id is None or self.treatment_id.casefold() not in (
+                bundled_treatment_exposures
+            ):
+                raise ValueError(
+                    "verified treatment active-exposure IDs must contain treatment_id"
+                )
+            if (
+                _normalized_claim_text(self.active_exposure_identifier_source)
+                != _normalized_claim_text(self.treatment_ontology_name)
+                or self.active_exposure_identifier_version
+                != self.treatment_ontology_version
+            ):
+                raise ValueError(
+                    "active-exposure identifier provenance must match the canonical "
+                    "treatment ontology release"
+                )
+            if self.active_exposure_ids_curator_verified is True:
+                if bundled_treatment_exposures != {self.treatment_id.casefold()}:
+                    raise ValueError(
+                        "v1 verified patient regimens require exactly treatment_id"
+                    )
+                _validate_v1_monotherapy_regimen(
+                    treatment_name=self.treatment_name,
+                    regimen_name=self.regimen_name,
+                    component_relation=self.treatment_regimen_component_relation,
+                    field_prefix="patient regimen",
+                )
+        if all(value is not None for value in comparator_bundle):
+            bundled_comparator_exposures = _canonical_exposure_id_set(
+                self.comparator_active_exposure_ids_json,
+                field_name="comparator_active_exposure_ids_json",
+                allow_empty=True,
+            )
+            no_active_comparator_types = {
+                ComparatorExposureType.PLACEBO,
+                ComparatorExposureType.NO_ACTIVE_THERAPEUTIC,
+                ComparatorExposureType.VEHICLE,
+            }
+            if self.comparator_exposure_type in no_active_comparator_types:
+                if bundled_comparator_exposures:
+                    raise ValueError(
+                        "a placebo/vehicle/no-active comparator must have no active "
+                        "exposure IDs"
+                    )
+                if (
+                    self.comparator_regimen_component_relation
+                    != RegimenComponentRelation.NONE
+                ):
+                    raise ValueError(
+                        "an empty placebo/vehicle/no-active comparator must use "
+                        "relation none"
+                    )
+            if (
+                self.comparator_exposure_type
+                == ComparatorExposureType.ACTIVE_THERAPEUTIC
+                and not bundled_comparator_exposures
+            ):
+                raise ValueError("an active comparator requires active exposure IDs")
+            if bundled_comparator_exposures:
+                if (
+                    self.comparator_regimen_component_relation
+                    == RegimenComponentRelation.NONE
+                ):
+                    raise ValueError(
+                        "a non-empty comparator active-exposure set cannot use "
+                        "relation none"
+                    )
+                if (
+                    self.active_exposure_identifier_source is None
+                    or self.active_exposure_identifier_version is None
+                ):
+                    raise ValueError(
+                        "active comparator IDs require identifier provenance"
+                    )
+                _validate_exposure_ontology_binding(
+                    bundled_comparator_exposures,
+                    source=self.active_exposure_identifier_source,
+                    version=self.active_exposure_identifier_version,
+                    field_name="comparator_active_exposure_ids_json",
+                )
+        tested_interpretation_status = {
+            PatientAssociationInterpretation.PREDICTIVE_INTERACTION: (
+                InteractionInferenceStatus.SUPPORTED
+            ),
+            PatientAssociationInterpretation.INTERACTION_TESTED_NULL: (
+                InteractionInferenceStatus.NULL
+            ),
+            PatientAssociationInterpretation.INTERACTION_TESTED_INCONCLUSIVE: (
+                InteractionInferenceStatus.INCONCLUSIVE
+            ),
+            PatientAssociationInterpretation.INTERACTION_TESTED_UNSUPPORTED: (
+                InteractionInferenceStatus.UNSUPPORTED
+            ),
+        }
+        expected_inference_status = tested_interpretation_status.get(
+            self.association_interpretation
+        )
+        if expected_inference_status is not None:
+            if not self.treatment_predictor_interaction_tested:
+                raise ValueError(
+                    "an interaction interpretation requires a formal "
+                    "treatment-by-predictor interaction test"
+                )
+            if self.interaction_inference_status != expected_inference_status:
+                raise ValueError(
+                    "association_interpretation conflicts with "
+                    "interaction_inference_status"
+                )
+            if self.measurement_timepoint != MolecularMeasurementTimepoint.PRETREATMENT:
+                raise ValueError(
+                    "tested interactions require a pretreatment measurement"
+                )
+            if not self.comparator_arm_present:
+                raise ValueError("tested interactions require a comparator arm")
+            if not self.comparator_regimen_name:
+                raise ValueError("tested interactions require comparator_regimen_name")
+            if not self.regimen_name:
+                raise ValueError("tested interactions require regimen_name")
+            if not self.treatment_assignment_id or not self.comparator_assignment_id:
+                raise ValueError(
+                    "tested interactions require treatment and comparator "
+                    "assignment IDs"
+                )
+            if self.treatment_active_exposure_ids_json is None or (
+                self.comparator_active_exposure_ids_json is None
+            ):
+                raise ValueError(
+                    "tested interactions require canonical treatment and "
+                    "comparator active-exposure ID arrays"
+                )
+            treatment_exposures = _canonical_exposure_id_set(
+                self.treatment_active_exposure_ids_json,
+                field_name="treatment_active_exposure_ids_json",
+            )
+            comparator_exposures = _canonical_exposure_id_set(
+                self.comparator_active_exposure_ids_json,
+                field_name="comparator_active_exposure_ids_json",
+                allow_empty=True,
+            )
+            if self.comparator_exposure_type is None:
+                raise ValueError("tested interactions require comparator_exposure_type")
+            if (
+                self.comparator_exposure_type
+                in {
+                    ComparatorExposureType.PLACEBO,
+                    ComparatorExposureType.NO_ACTIVE_THERAPEUTIC,
+                }
+                and comparator_exposures
+            ):
+                raise ValueError(
+                    "a placebo/no-active comparator must use an empty "
+                    "active-exposure array"
+                )
+            if (
+                self.comparator_exposure_type
+                == ComparatorExposureType.ACTIVE_THERAPEUTIC
+                and not comparator_exposures
+            ):
+                raise ValueError(
+                    "an active comparator requires a non-empty active-exposure array"
+                )
+            if self.comparator_exposure_type in {
+                ComparatorExposureType.ACTIVE_THERAPEUTIC,
+                ComparatorExposureType.UNRESOLVED,
+            }:
+                raise ValueError(
+                    "active or unresolved comparators require a versioned concept "
+                    "registry and are unsupported for formal interaction claims in v1"
+                )
+            if (
+                self.treatment_regimen_component_relation
+                != RegimenComponentRelation.FIXED_ALL_OF
+                or self.comparator_regimen_component_relation
+                != RegimenComponentRelation.NONE
+            ):
+                raise ValueError(
+                    "v1 tested interactions require fixed treatment components and "
+                    "a no-active comparator relation"
+                )
+            if treatment_exposures == comparator_exposures:
+                raise ValueError(
+                    "tested interactions require distinct canonical active "
+                    "therapeutic exposure sets"
+                )
+            canonical_treatment_id = (
+                unicodedata.normalize("NFKC", self.treatment_id).casefold()
+                if self.treatment_id
+                else None
+            )
+            if canonical_treatment_id is None:
+                raise ValueError(
+                    "tested interactions require a versioned canonical treatment_id"
+                )
+            if canonical_treatment_id and canonical_treatment_id not in (
+                treatment_exposures
+            ):
+                raise ValueError(
+                    "treatment_active_exposure_ids_json must contain treatment_id"
+                )
+            if treatment_exposures != {canonical_treatment_id}:
+                raise ValueError(
+                    "v1 formal interaction claims require the treatment arm active "
+                    "set to equal the requested canonical treatment_id"
+                )
+            if (
+                canonical_treatment_id
+                and canonical_treatment_id in comparator_exposures
+            ):
+                raise ValueError(
+                    "the requested treatment cannot be active in the comparator arm"
+                )
+            if self.active_exposure_ids_curator_verified is not True:
+                raise ValueError(
+                    "tested interactions require curator-verified active-exposure IDs"
+                )
+            _validate_required_claim_texts(
+                regimen_name=self.regimen_name,
+                comparator_regimen_name=self.comparator_regimen_name,
+                active_exposure_identifier_source=(
+                    self.active_exposure_identifier_source
+                ),
+                active_exposure_identifier_version=(
+                    self.active_exposure_identifier_version
+                ),
+                analysis_model=self.analysis_model,
+                effect_type=self.effect_type,
+            )
+            _validate_exposure_ontology_binding(
+                treatment_exposures,
+                source=self.active_exposure_identifier_source,
+                version=self.active_exposure_identifier_version,
+                field_name="treatment_active_exposure_ids_json",
+            )
+            if (
+                _normalized_claim_text(self.active_exposure_identifier_source)
+                != _normalized_claim_text(self.treatment_ontology_name)
+                or self.active_exposure_identifier_version
+                != self.treatment_ontology_version
+            ):
+                raise ValueError(
+                    "active-exposure identifier provenance must match the canonical "
+                    "treatment ontology release"
+                )
+            _validate_stable_identifier(
+                self.treatment_assignment_id,
+                field_name="treatment_assignment_id",
+            )
+            _validate_stable_identifier(
+                self.comparator_assignment_id,
+                field_name="comparator_assignment_id",
+            )
+            normalized_regimen = "".join(
+                character
+                for character in self.regimen_name.casefold()
+                if character.isalnum()
+            )
+            normalized_comparator = "".join(
+                character
+                for character in self.comparator_regimen_name.casefold()
+                if character.isalnum()
+            )
+            if not normalized_regimen or not normalized_comparator:
+                raise ValueError(
+                    "predictive_interaction regimen names must contain letters or "
+                    "numbers"
+                )
+            if normalized_regimen == normalized_comparator:
+                raise ValueError(
+                    "tested interactions require distinct treatment and "
+                    "comparator regimens"
+                )
+            treatment_label_tokens = set(
+                re.findall(r"\w+", _normalized_claim_text(self.treatment_name))
+            )
+            regimen_label_tokens = set(
+                re.findall(r"\w+", _normalized_claim_text(self.regimen_name))
+            )
+            if not treatment_label_tokens or not (
+                treatment_label_tokens <= regimen_label_tokens
+                and regimen_label_tokens - treatment_label_tokens
+                <= {"alone", "monotherapy"}
+            ):
+                raise ValueError(
+                    "v1 formal interaction treatment label must be canonical "
+                    "monotherapy"
+                )
+            comparator_label = _normalized_claim_text(self.comparator_regimen_name)
+            allowed_comparator_labels = {
+                ComparatorExposureType.PLACEBO: {"placebo", "placebo control"},
+                ComparatorExposureType.NO_ACTIVE_THERAPEUTIC: {
+                    "no active therapy",
+                    "no treatment",
+                    "observation",
+                },
+            }
+            if comparator_label not in allowed_comparator_labels.get(
+                self.comparator_exposure_type, set()
+            ):
+                raise ValueError(
+                    "v1 placebo/no-active comparator label conflicts with its "
+                    "controlled exposure type"
+                )
+            normalized_assignment = re.sub(
+                r"[^\w]+", "", self.treatment_assignment_id.casefold()
+            )
+            normalized_comparator_assignment = re.sub(
+                r"[^\w]+", "", self.comparator_assignment_id.casefold()
+            )
+            if normalized_assignment == normalized_comparator_assignment:
+                raise ValueError(
+                    "tested interactions require distinct non-empty source "
+                    "assignment IDs"
+                )
+            if self.treatment_comparator_exposures_distinct_verified is not True:
+                raise ValueError(
+                    "tested interactions require curator verification that treatment "
+                    "and comparator exposures are distinct"
+                )
+            if (
+                self.treatment_arm_patient_n is None
+                or self.comparator_arm_patient_n is None
+                or self.interaction_analysis_evaluable_patient_n is None
+                or self.interaction_model_parameter_n is None
+            ):
+                raise ValueError(
+                    "tested interactions require evaluable per-arm and model counts"
+                )
+            if (
+                self.treatment_arm_patient_n + self.comparator_arm_patient_n
+                != self.interaction_analysis_evaluable_patient_n
+                or self.interaction_analysis_evaluable_patient_n > self.patient_n
+            ):
+                raise ValueError(
+                    "per-arm counts must sum to the analysis-evaluable cohort and "
+                    "cannot exceed patient_n"
+                )
+            if self.interaction_analysis_evaluable_patient_n <= (
+                self.interaction_model_parameter_n
+            ):
+                raise ValueError(
+                    "interaction analysis requires more evaluable patients than "
+                    "model parameters"
+                )
+            if self.interaction_model_estimable_verified is not True:
+                raise ValueError(
+                    "tested interactions require verified model estimability"
+                )
+            if self.biomarker_variation_in_each_arm_verified is not True:
+                raise ValueError(
+                    "tested interactions require verified predictor variation in "
+                    "each arm"
+                )
+            if self.effect_numeric is None or self.effect_type is None:
+                raise ValueError(
+                    "tested interactions require a numerical interaction effect"
+                )
+            numeric_values = (
+                self.effect_numeric,
+                self.confidence_interval_lower,
+                self.confidence_interval_upper,
+            )
+            if any(
+                value is not None and not math.isfinite(value)
+                for value in numeric_values
+            ):
+                raise ValueError("interaction effect and interval must be finite")
+            if self.confidence_interval_lower is not None and not (
+                self.confidence_interval_lower
+                <= self.effect_numeric
+                <= self.confidence_interval_upper
+            ):
+                raise ValueError(
+                    "interaction confidence interval must contain the point estimate"
+                )
+            if self.p_value is None and self.confidence_interval_lower is None:
+                raise ValueError(
+                    "tested interactions require an interaction p-value or "
+                    "confidence interval"
+                )
+            if self.interaction_effect_scale is None:
+                raise ValueError("tested interactions require interaction_effect_scale")
+            if _normalized_claim_text(self.effect_type) != _normalized_claim_text(
+                self.interaction_effect_scale.value
+            ):
+                raise ValueError(
+                    "effect_type must equal the controlled interaction_effect_scale"
+                )
+            if self.interaction_effect_scale not in {
+                InteractionEffectScale.ADDITIVE_COEFFICIENT,
+                InteractionEffectScale.DIFFERENCE_IN_EFFECT,
+            } and (
+                self.effect_numeric <= 0
+                or (
+                    self.confidence_interval_lower is not None
+                    and self.confidence_interval_lower <= 0
+                )
+            ):
+                raise ValueError("ratio-scale interaction values must be positive")
+            if self.interaction_effect_scale in {
+                InteractionEffectScale.HAZARD_RATIO,
+                InteractionEffectScale.ODDS_RATIO,
+                InteractionEffectScale.RISK_RATIO,
+            }:
+                if (
+                    self.interaction_outcome_event_n is None
+                    or self.interaction_outcome_event_n
+                    <= self.interaction_model_parameter_n
+                    or self.interaction_outcome_event_n
+                    > self.interaction_analysis_evaluable_patient_n
+                ):
+                    raise ValueError(
+                        "event-based interaction scales require an estimable event "
+                        "count greater than model parameters"
+                    )
+            elif (
+                self.interaction_outcome_event_n is not None
+                and self.interaction_outcome_event_n
+                > self.interaction_analysis_evaluable_patient_n
+            ):
+                raise ValueError(
+                    "interaction outcome event count cannot exceed the evaluable cohort"
+                )
+            if self.interaction_effect_scale in {
+                InteractionEffectScale.ODDS_RATIO,
+                InteractionEffectScale.RISK_RATIO,
+            } and (
+                self.interaction_analysis_evaluable_patient_n
+                - self.interaction_outcome_event_n
+                <= self.interaction_model_parameter_n
+            ):
+                raise ValueError(
+                    "binary interaction scales require estimable event and non-event "
+                    "counts"
+                )
+            if (
+                not self.interaction_inference_rule_id
+                or not self.interaction_inference_rule_version
+                or self.interaction_inference_curator_verified is not True
+            ):
+                raise ValueError(
+                    "tested interactions require a curator-verified versioned "
+                    "inference rule"
+                )
+            _validate_stable_identifier(
+                self.interaction_inference_rule_id,
+                field_name="interaction_inference_rule_id",
+            )
+            _validate_stable_identifier(
+                self.interaction_inference_rule_version,
+                field_name="interaction_inference_rule_version",
+            )
+            if (self.p_value is None) != (
+                self.interaction_significance_threshold is None
+            ) or (self.p_value is None) != (self.interaction_p_value_role is None):
+                raise ValueError(
+                    "p_value, its role, and interaction_significance_threshold must "
+                    "be supplied together"
+                )
+            null_value = _interaction_null_value(self.interaction_effect_scale)
+            p_meets_rule = (
+                self.p_value <= self.interaction_significance_threshold
+                if self.p_value is not None
+                else None
+            )
+            ci_excludes_null = (
+                self.confidence_interval_upper < null_value
+                or self.confidence_interval_lower > null_value
+                if self.confidence_interval_lower is not None
+                else None
+            )
+            if (
+                self.interaction_inference_status != InteractionInferenceStatus.NULL
+                and (
+                    self.interaction_equivalence_lower is not None
+                    or self.interaction_equivalence_upper is not None
+                )
+            ):
+                raise ValueError(
+                    "equivalence bounds are reserved for formal null interactions"
+                )
+            if (
+                self.interaction_inference_status
+                == InteractionInferenceStatus.SUPPORTED
+            ):
+                if self.interaction_p_value_role not in {
+                    None,
+                    InteractionPValueRole.DEPARTURE_FROM_NULL,
+                }:
+                    raise ValueError(
+                        "supported interaction p-values must test departure from null"
+                    )
+                supplied_support = [
+                    value
+                    for value in (p_meets_rule, ci_excludes_null)
+                    if value is not None
+                ]
+                if self.effect_numeric == null_value or not all(supplied_support):
+                    raise ValueError(
+                        "supported interaction metrics must exclude the controlled null"
+                    )
+            elif self.interaction_inference_status == InteractionInferenceStatus.NULL:
+                if (
+                    self.interaction_equivalence_lower is None
+                    or self.interaction_equivalence_upper is None
+                    or self.confidence_interval_lower is None
+                ):
+                    raise ValueError(
+                        "formal null interaction requires prespecified equivalence "
+                        "bounds and a confidence interval"
+                    )
+                if not (
+                    self.interaction_equivalence_lower
+                    < null_value
+                    < self.interaction_equivalence_upper
+                    and self.interaction_equivalence_lower
+                    <= self.confidence_interval_lower
+                    <= self.confidence_interval_upper
+                    <= self.interaction_equivalence_upper
+                ):
+                    raise ValueError(
+                        "formal null confidence interval must lie within the "
+                        "prespecified equivalence bounds"
+                    )
+                if (
+                    self.interaction_effect_scale
+                    not in {
+                        InteractionEffectScale.ADDITIVE_COEFFICIENT,
+                        InteractionEffectScale.DIFFERENCE_IN_EFFECT,
+                    }
+                    and self.interaction_equivalence_lower <= 0
+                ):
+                    raise ValueError(
+                        "ratio-scale equivalence bounds must be strictly positive"
+                    )
+                if self.p_value is not None and (
+                    self.interaction_p_value_role
+                    != InteractionPValueRole.EQUIVALENCE_TO_NULL
+                    or p_meets_rule is not True
+                ):
+                    raise ValueError(
+                        "formal null p-value must support the prespecified "
+                        "equivalence test"
+                    )
+            elif (
+                self.interaction_inference_status
+                == InteractionInferenceStatus.INCONCLUSIVE
+            ):
+                if (
+                    self.p_value is not None
+                    and self.interaction_p_value_role
+                    != InteractionPValueRole.DEPARTURE_FROM_NULL
+                ):
+                    raise ValueError(
+                        "inconclusive interaction p-values must test departure "
+                        "from null"
+                    )
+                if (
+                    p_meets_rule is None
+                    or ci_excludes_null is None
+                    or p_meets_rule == ci_excludes_null
+                ):
+                    raise ValueError(
+                        "inconclusive interaction requires discordant p-value and "
+                        "confidence-interval support"
+                    )
+            elif (
+                self.interaction_inference_status
+                == InteractionInferenceStatus.UNSUPPORTED
+            ):
+                if (
+                    self.p_value is not None
+                    and self.interaction_p_value_role
+                    != InteractionPValueRole.DEPARTURE_FROM_NULL
+                ):
+                    raise ValueError(
+                        "unsupported interaction p-values must test departure from null"
+                    )
+                supplied_support = [
+                    value
+                    for value in (p_meets_rule, ci_excludes_null)
+                    if value is not None
+                ]
+                if any(supplied_support):
+                    raise ValueError(
+                        "unsupported interaction metrics cannot satisfy the "
+                        "departure-from-null rule"
+                    )
+        else:
+            if self.treatment_predictor_interaction_tested:
+                raise ValueError(
+                    "a tested treatment-by-predictor interaction must use an "
+                    "interaction-specific interpretation"
+                )
+            if (
+                self.interaction_inference_status
+                != InteractionInferenceStatus.NOT_TESTED
+            ):
+                raise ValueError(
+                    "an untested interaction requires inference status not_tested"
+                )
+            unused_interaction_fields = (
+                self.interaction_effect_scale,
+                self.interaction_inference_rule_id,
+                self.interaction_inference_rule_version,
+                self.interaction_significance_threshold,
+                self.interaction_p_value_role,
+                self.interaction_equivalence_lower,
+                self.interaction_equivalence_upper,
+                self.interaction_inference_curator_verified,
+                self.treatment_arm_patient_n,
+                self.comparator_arm_patient_n,
+                self.interaction_analysis_evaluable_patient_n,
+                self.interaction_model_parameter_n,
+                self.interaction_outcome_event_n,
+                self.interaction_model_estimable_verified,
+                self.biomarker_variation_in_each_arm_verified,
+            )
+            if any(value is not None for value in unused_interaction_fields):
+                raise ValueError(
+                    "untested interactions cannot carry interaction inference fields"
+                )
+        if (
+            self.association_interpretation
+            == (PatientAssociationInterpretation.TREATED_COHORT_ASSOCIATION)
+            and self.measurement_timepoint != MolecularMeasurementTimepoint.PRETREATMENT
+        ):
+            raise ValueError(
+                "treated_cohort_association requires a pretreatment measurement"
+            )
+        if (
+            self.association_interpretation
+            == PatientAssociationInterpretation.PROGNOSTIC_ONLY
+            and self.measurement_timepoint != MolecularMeasurementTimepoint.PRETREATMENT
+        ):
+            raise ValueError(
+                "prognostic_only requires a pretreatment or baseline predictor"
+            )
+        treatment_exposure_claims = {
+            PatientAssociationInterpretation.PREDICTIVE_INTERACTION,
+            PatientAssociationInterpretation.INTERACTION_TESTED_NULL,
+            PatientAssociationInterpretation.INTERACTION_TESTED_INCONCLUSIVE,
+            PatientAssociationInterpretation.INTERACTION_TESTED_UNSUPPORTED,
+            PatientAssociationInterpretation.TREATED_COHORT_ASSOCIATION,
+            PatientAssociationInterpretation.PHARMACODYNAMIC,
+            PatientAssociationInterpretation.ACQUIRED_RESISTANCE,
+            PatientAssociationInterpretation.ON_TREATMENT_ASSOCIATION,
+            PatientAssociationInterpretation.POST_PROGRESSION_ASSOCIATION,
+        }
+        if (
+            self.association_interpretation in treatment_exposure_claims
+            and self.treatment_exposure_verified is not True
+        ):
+            raise ValueError(
+                "treatment-linked patient evidence requires verified exposure"
+            )
+        if self.association_interpretation == (
+            PatientAssociationInterpretation.PHARMACODYNAMIC
+        ) and self.measurement_timepoint not in {
+            MolecularMeasurementTimepoint.ON_TREATMENT,
+            MolecularMeasurementTimepoint.POST_TREATMENT,
+        }:
+            raise ValueError(
+                "pharmacodynamic evidence requires on-treatment or post-treatment "
+                "measurement"
+            )
+        if self.association_interpretation == (
+            PatientAssociationInterpretation.PHARMACODYNAMIC
+        ) and not (
+            self.paired_baseline_present is True
+            and self.longitudinal_change_tested is True
+        ):
+            raise ValueError(
+                "pharmacodynamic evidence requires paired baseline and a "
+                "longitudinal change test"
+            )
+        if self.association_interpretation == (
+            PatientAssociationInterpretation.ACQUIRED_RESISTANCE
+        ) and self.measurement_timepoint != (
+            MolecularMeasurementTimepoint.POST_TREATMENT
+        ):
+            raise ValueError(
+                "acquired_resistance evidence requires a post-treatment measurement"
+            )
+        if self.association_interpretation == (
+            PatientAssociationInterpretation.ACQUIRED_RESISTANCE
+        ) and not (
+            self.paired_baseline_present is True
+            and self.longitudinal_change_tested is True
+        ):
+            raise ValueError(
+                "acquired_resistance evidence requires paired baseline and a "
+                "longitudinal change test"
+            )
+        if (
+            self.association_interpretation
+            == (PatientAssociationInterpretation.ACQUIRED_RESISTANCE)
+            and self.progression_documented is not True
+        ):
+            raise ValueError("acquired_resistance requires documented progression")
+        if (
+            self.association_interpretation
+            == (PatientAssociationInterpretation.ON_TREATMENT_ASSOCIATION)
+            and self.measurement_timepoint != MolecularMeasurementTimepoint.ON_TREATMENT
+        ):
+            raise ValueError(
+                "on_treatment_association requires an on-treatment measurement"
+            )
+        if self.association_interpretation == (
+            PatientAssociationInterpretation.POST_PROGRESSION_ASSOCIATION
+        ):
+            if (
+                self.measurement_timepoint
+                != MolecularMeasurementTimepoint.POST_TREATMENT
+            ):
+                raise ValueError(
+                    "post_progression_association requires a post-treatment measurement"
+                )
+            if self.progression_documented is not True:
+                raise ValueError(
+                    "post_progression_association requires documented progression"
+                )
+        return self
+
+
 class DataAssetRecord(StrictRecord):
     """Versioned pointer to raw or derived data without redistributing it."""
 
@@ -2675,6 +5520,10 @@ CONTRACTS: dict[str, type[StrictRecord]] = {
     "candidate": CandidateRecord,
     "evidence": EvidenceRecord,
     "immune_screen_evidence": ImmuneScreenEvidenceRecord,
+    "treatment_disease_context": TreatmentDiseaseContextRecord,
+    "clinical_trial_context": ClinicalTrialContextRecord,
+    "preclinical_evidence": PreclinicalEvidenceRecord,
+    "patient_molecular_evidence": PatientMolecularEvidenceRecord,
     "external_screen_map": ExternalScreenMapRecord,
     "screen_intake": ScreenIntakeRecord,
     "curation_queue": CurationQueueRecord,

@@ -289,6 +289,141 @@ under olaparib denotes candidate loss-induced resistance; favorable immune
 evidence does not turn that gene into an inhibitor target. Report the result as
 a PARPi–immune trade-off when the two axes disagree.
 
+## Translation-context analysis
+
+Run translation-context analysis after screen-signal ranking and keep it
+outside the reproducibility model. The clinical-trial unit is one unique NCT
+record for the treatment/disease question; it has no gene-level outcome. Trial
+phase, status, enrollment, planned endpoints, posted aggregate results, and
+linked publications remain treatment-level context. Translation-context output
+is report-only: it preserves candidate membership and order, does not rerank,
+and does not estimate a validation or reproducibility probability.
+
+Treat ClinicalTrials.gov `query.intr` and `query.cond` as discovery searches.
+Paginate the role-tagged declared query set and deduplicate NCT IDs. Declare
+same-entity treatment aliases separately from broader treatment-class terms,
+and same-entity cancer aliases separately from broader disease-ancestor terms.
+Subtype aliases must denote the same subtype rather than a disease ancestor.
+Alias, class, and ancestor matches expand discovery but can never become strict
+canonical entity matches. Never interpret completion of that finite term set as exhaustive
+ontology-level recall. Preserve signed subtype identity during query binding and
+local matching: `HER2+`, `HER2`, `HER2-`, and spaced signed labels remain
+different terms. Preserve `+`/`-` in typed biomarker state and specimen values
+as well; for example, `CD3+` and `CD3-` cells cannot be exact matches.
+
+Validate every live document by replaying it through the frozen-input
+parser and requiring byte-independent canonical-document equality. Reject
+duplicate NCT IDs inside any query, conflicting payloads for one NCT across
+queries, and any top-level study set that differs from the NCT union recomputed
+from declared queries. Deduplicate only identical cross-query payloads. Replay
+again when building the report so nested post-validation mutation fails closed.
+Require one before/after version audit per typed query. Only the stock live
+transport with its actual completion time receives a digest-bound in-process
+capability; serialized replay, injected transports, and injected clocks cannot
+emit a strict registry count.
+
+Adjudicate structured intervention, disease/subtype, biomarker, and regimen
+relations separately. Exact molecule, molecule as one listed component, drug
+class, and unrelated retrieval candidates are not interchangeable. Generic
+breast cancer is broader than TNBC, while BRCA mutation and HRD are biomarker
+contexts rather than synonyms for TNBC. `explicit_component` remains broader
+registry context and can never satisfy strict treatment matching.
+
+Compute strict registry status only over requested axes that the adapter can
+resolve from structured intervention and condition fields. A registry
+biomarker mention is untyped discovery context: it cannot establish exact
+agreement on biomarker feature, state, specimen, and measurement timepoint. A
+biomarker-constrained context therefore cannot receive strict typed registry
+status merely because a keyword appears. A requested subtype is strict only
+when both its signed identity and a separate exact structured parent-cancer
+condition are present. Do not infer the parent from an embedded name or
+substring without a versioned, curator-attested parent-ID binding. Requested
+regimen, stage, and line of therapy remain unresolved and force the strict
+registry count to zero until arm assignment and eligibility are parsed;
+study-level intervention lists do not resolve them.
+
+A gene-specific patient claim requires actual treatment, compatible disease,
+gene measurement, specimen timing, outcome, cohort provenance, and an atomic
+effect estimate or qualitative claim in the same cohort. The biomarker term,
+feature type, state, specimen type, measurement timepoint, and observation
+status are an all-or-none tuple with an explicit
+`biomarker_axes_informative_verified` curator decision. An exact typed match
+requires `observed` status and positive attestation in both the requested
+context and curated row; an
+uninformative tuple is unresolved-compatible, not exact. This tuple describes
+cohort context and is distinct from the candidate gene predictor; one cannot
+fill the other. Bind the predictor to matching `gene_symbol` and
+`predictor_gene_symbol`, a versioned gene ID, explicit
+feature/state/specimen, a compatible measurement type/platform/timepoint, and
+a curator identity attestation. The attestation records curation and is not
+external resolver authentication. Reserve
+`predictive_interaction` for a pretreatment measurement with versioned canonical
+active-exposure sets and relations, distinct source-native arm IDs, evaluable
+arm/model counts, scale-appropriate event counts, verified estimability and predictor variation, a
+controlled effect scale, and a versioned inference rule with consistent
+departure-from-null support. Keep formal null, inconclusive, and unsupported
+interaction tests as distinct interpretations and counts.
+Require exact ontology, subtype, typed cohort biomarker, regimen, stage, and
+line agreement for exact-context status. Missing axes on either side are not
+wildcards and remain compatible non-exact. Keep treated-only, prognostic,
+pharmacodynamic, acquired-resistance, on-treatment, post-progression,
+eligibility-only, and descriptive claims distinct. Longitudinal
+interpretations require paired baseline testing and do not create validation
+labels. Require prognostic-only predictors to be pretreatment/baseline, and do
+not assign exact patient regimen context when treatment exposure is unverified.
+
+Curate preclinical evidence as one
+`gene × perturbation × perturbed compartment × model × regimen × comparator ×
+endpoint category × endpoint × direction` claim. Every direct-perturbation
+claim requires vehicle/baseline-growth control and genotype-by-treatment
+testing. Gene-specific evidence requires a versioned, curator-attested gene
+identity. A non-unknown direction additionally needs a versioned sign rule,
+numeric effect, sample size, and matching curator-verified inference status;
+resistance, sensitization, and discordant calls require nonzero effect. Unknown
+directions must be explicitly inconclusive, unsupported, or not assessed.
+Map resistance/sensitization/discordant to `direction_supported` and neutral to
+`neutral_supported`.
+Exact preclinical context requires `perturbed_compartment` and
+`endpoint_category` to match the target screen. Direction concordance is
+evaluated only for exact screen context and the same perturbation modality as
+the target screen. This concordance is curator-rule direction mapping, not a
+new statistical support test. Treatment activity, natural biomarker association, and
+mechanistic evidence do not become CRISPR-KO validation. Cell line,
+organoid/ex-vivo, and in-vivo lanes remain separate rather than being combined
+into a model-quality score.
+
+Partition non-exact curated evidence into compatible non-exact and conflicting
+context. Alias-only or ontology-version-unresolved identity may remain
+compatible non-exact evidence. An omitted requested axis is not a wildcard;
+narrower evidence remains non-exact. Explicit subtype,
+biomarker, regimen, stage, line-of-therapy, perturbed-compartment, or
+endpoint-category contradictions are conflicting evidence. Report those
+family counts and statuses separately; neither partition may be promoted to an
+exact-context claim. If both partitions exist for a gene and no higher-priority
+exact or independence status applies, report
+`compatible_and_conflicting_context_present` or
+`compatible_and_conflicting_patient_context_present`, never an `_only` status.
+
+Bind only the complete versioned `rank-screen` bundle to a candidate TSV that
+contains both ranking fields. Verify manifest and method schemas, input mode and
+parameters, all output checksums, ordered columns/row count, identifiers,
+tail/direction/rank/percentile/neutral semantics, duplicate keys, and canonical
+order. This unsigned consistency binding does not authenticate a producer and
+does not make translation-context
+columns ranking features. Derive the success-model field deny-list from all
+report-only evidence contracts and retain the reserved leakage-token guard.
+
+Apply an evidence-availability cutoff and collapse transitive source/raw-data
+families. Same-study follow-up belongs in the label registry and is excluded as
+prior support. If target-family exclusion is not demonstrated, report
+`independence_unverified`. If a source search is incomplete or unavailable, do
+not convert the failure into evidence absence.
+
+The current V1 model is applicable only to small-molecule, tumor-cell,
+CRISPR-KO drug-response/viability screens. A clinical report may still be
+produced for CAR-T or immune-killing contexts, but the core model must return
+`not_applicable`.
+
 ## Prospective experiment
 
 After model freeze, select genes from:
