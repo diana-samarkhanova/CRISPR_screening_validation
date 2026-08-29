@@ -130,6 +130,51 @@ def test_count_report_ranks_positive_and_negative_lfc_separately() -> None:
     )
 
 
+def test_screen_numeric_inputs_reject_booleans_before_coercion() -> None:
+    counts, samples = _counts_and_samples()
+    counts["c1"] = counts["c1"].astype(object)
+    counts.loc[0, "c1"] = True
+    with pytest.raises(ValueError, match="counts cannot be boolean"):
+        rank_screen(
+            counts=counts,
+            samples=samples,
+            positive_lfc_means="resistance",
+        )
+
+    counts, samples = _counts_and_samples()
+    samples["replicate"] = samples["replicate"].astype(object)
+    samples.loc[0, "replicate"] = True
+    with pytest.raises(ValueError, match="replicate cannot contain boolean"):
+        rank_screen(
+            counts=counts,
+            samples=samples,
+            positive_lfc_means="resistance",
+        )
+
+    mageck = _mageck_summary()
+    mageck["pos|score"] = True
+    with pytest.raises(ValueError, match="MAGeCK pos\\|score cannot contain boolean"):
+        rank_screen(
+            mageck_summary=mageck,
+            screen_id="S1",
+            contrast_id="olaparib_vs_vehicle",
+            positive_tail_means="resistance",
+        )
+
+
+def test_count_report_rejects_library_size_overflow() -> None:
+    counts, samples = _counts_and_samples()
+    for column in ("c1", "c2", "t1", "t2"):
+        counts[column] = 1e308
+    with pytest.raises(ValueError, match="non-finite total library size"):
+        rank_screen(
+            counts=counts,
+            samples=samples,
+            positive_lfc_means="resistance",
+            normalization_method="cpm",
+        )
+
+
 def test_count_mode_rejects_conflicting_declared_and_sample_sheet_ids() -> None:
     counts, samples = _counts_and_samples()
     with pytest.raises(ValueError, match="does not match sample sheet"):
@@ -255,6 +300,57 @@ def test_combined_report_keeps_mageck_rank_and_adds_guide_qc() -> None:
     assert ranked["screen_signal_rank_source"].eq("mageck_native_rank").all()
 
 
+def test_combined_report_reranks_guide_metrics_on_shared_gene_roster() -> None:
+    mageck = _mageck_summary().iloc[:2].copy()
+    mageck["id"] = ["A", "B"]
+    counts = pd.DataFrame(
+        {
+            "sgrna_id": ["a1", "b1", "x1"],
+            "gene_symbol": ["A", "B", "EXTRA"],
+            "c1": [100, 100, 100],
+            "t1": [500, 10, 800],
+        }
+    )
+    samples = pd.DataFrame(
+        {
+            "sample_id": ["c1", "t1"],
+            "screen_id": ["S1", "S1"],
+            "contrast_id": ["C1", "C1"],
+            "condition_role": ["control", "treatment"],
+            "replicate": [1, 1],
+        }
+    )
+
+    result = rank_screen(
+        mageck_summary=mageck,
+        counts=counts,
+        samples=samples,
+        screen_id="S1",
+        contrast_id="C1",
+        positive_tail_means="resistance",
+        positive_lfc_means="resistance",
+        normalization_method="cpm",
+    )
+    guide = (
+        result.ranked_candidates[
+            [
+                "gene_symbol",
+                "within_screen_effect_percentile",
+                "guide_screen_signal_rank",
+                "guide_screen_signal_percentile",
+            ]
+        ]
+        .drop_duplicates("gene_symbol")
+        .set_index("gene_symbol")
+    )
+
+    assert set(guide.index) == {"A", "B"}
+    assert guide.loc["A", "within_screen_effect_percentile"] == pytest.approx(0.5)
+    assert guide.loc["B", "within_screen_effect_percentile"] == pytest.approx(1.0)
+    assert guide.loc["A", "guide_screen_signal_rank"] == 1
+    assert guide.loc["A", "guide_screen_signal_percentile"] == pytest.approx(1.0)
+
+
 def test_combined_report_marks_missing_guide_qc_as_unavailable() -> None:
     counts, samples = _counts_and_samples()
     counts = counts.loc[counts["gene_symbol"].eq("GENE1")].copy()
@@ -359,6 +455,7 @@ def test_mageck_nonfinite_values_are_rejected() -> None:
     [
         ("pos|rank", 0, "positive integers"),
         ("pos|rank", 1.5, "positive integers"),
+        ("pos|rank", 1.0000000001, "positive integers"),
         ("pos|p-value", -0.1, "p-values"),
         ("pos|p-value", 1.1, "p-values"),
         ("pos|score", -0.1, "RRA scores"),
@@ -382,6 +479,46 @@ def test_mageck_rank_and_pvalue_bounds_are_enforced(
             screen_id="S1",
             contrast_id="C1",
             positive_tail_means="resistance",
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("pseudocount", float("nan")),
+        ("low_count_threshold", float("inf")),
+        ("direction_deadband", float("nan")),
+        ("fdr_threshold", float("inf")),
+    ],
+)
+def test_rank_screen_rejects_nonfinite_parameters_even_when_mode_unused(field, value):
+    kwargs = {
+        "mageck_summary": _mageck_summary(),
+        "screen_id": "S1",
+        "contrast_id": "C1",
+        "positive_tail_means": "resistance",
+        field: value,
+    }
+    with pytest.raises(ValueError, match="finite"):
+        rank_screen(**kwargs)
+
+
+def test_rank_screen_rejects_direction_flags_irrelevant_to_input_mode():
+    with pytest.raises(ValueError, match="only valid with count"):
+        rank_screen(
+            mageck_summary=_mageck_summary(),
+            screen_id="S1",
+            contrast_id="C1",
+            positive_tail_means="resistance",
+            positive_lfc_means="resistance",
+        )
+    counts, samples = _counts_and_samples()
+    with pytest.raises(ValueError, match="only valid with MAGeCK"):
+        rank_screen(
+            counts=counts,
+            samples=samples,
+            positive_tail_means="resistance",
+            positive_lfc_means="resistance",
         )
 
 
@@ -494,6 +631,44 @@ def test_input_mutation_aborts_before_bundle_publish(tmp_path, monkeypatch) -> N
     with pytest.raises(ValueError, match="changed during the run"):
         args.func(args)
     assert not output_dir.exists()
+
+
+def test_input_mutation_during_staging_aborts_bundle_publish(
+    tmp_path, monkeypatch
+) -> None:
+    mageck_path = tmp_path / "mageck.tsv"
+    output_dir = tmp_path / "report"
+    _mageck_summary().to_csv(mageck_path, sep="\t", index=False)
+    original_write_frame = cli_module._write_frame
+    mutated = False
+
+    def mutate_during_staging(frame, path):
+        nonlocal mutated
+        original_write_frame(frame, path)
+        if not mutated:
+            mageck_path.write_bytes(mageck_path.read_bytes() + b"\n")
+            mutated = True
+
+    monkeypatch.setattr(cli_module, "_write_frame", mutate_during_staging)
+    args = build_parser().parse_args(
+        [
+            "rank-screen",
+            "--mageck-summary",
+            str(mageck_path),
+            "--screen-id",
+            "S1",
+            "--contrast-id",
+            "C1",
+            "--positive-tail-means",
+            "resistance",
+            "--output-dir",
+            str(output_dir),
+        ]
+    )
+    with pytest.raises(ValueError, match="changed during the run"):
+        args.func(args)
+    assert not output_dir.exists()
+    assert not list(tmp_path.glob(".report.staging-*"))
 
 
 def test_cli_preserves_leading_zero_sample_identifiers(tmp_path) -> None:

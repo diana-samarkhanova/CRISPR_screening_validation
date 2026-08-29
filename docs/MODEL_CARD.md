@@ -22,7 +22,7 @@ as study → screen → contrast → sample, and predictions are made for a
 
 ## Current model
 
-For a new unlabeled screen, v0.3 exposes a deterministic
+For a new unlabeled screen, v0.4 exposes a deterministic
 `screen_signal_baseline` through `rank-screen`. It preserves native MAGeCK rank
 or ranks absolute guide-level effects within the explicitly declared phenotype
 direction. This report is not produced by the validation-success model and is
@@ -86,6 +86,21 @@ programmatically forbidden from the current success model. Candidate rows from
 `rank-screen` retain their screen, contrast, direction, tail, and signal rank;
 the immune axis neither filters nor reorders them.
 
+The translation-context command is also outside the success model. Trial
+records are treatment/disease-level and structurally lack a gene-ranking role.
+Curated patient and preclinical summaries add only `report_only_*` candidate
+columns and preserve input row order, screen rank, contrast, and direction.
+Trial counts, phases, status, enrollment, posted aggregate results, treated
+cohort associations, and model-system tier never become a composite score or
+probability. The command neither filters nor reranks candidates.
+
+Translation-context matching is typed. Biomarker term, feature type, state,
+specimen type, and measurement timepoint are required together. Preclinical
+exact context additionally requires the perturbation compartment and endpoint
+category to match the target screen. Compatible non-exact evidence and explicit
+context conflicts have separate family counts and statuses; they are not pooled
+into one “broader” bucket.
+
 ## Known limitations
 
 - validation events are selectively reported;
@@ -113,6 +128,86 @@ the immune axis neither filters nor reorders them.
   display inversion is accepted only as a registered numeric LFC sign-pair and
   is not propagated, modality-mismatched evidence is not combined, versioned
   dual-action groups require review, and ambiguous orthology is annotation-only.
+- ClinicalTrials.gov search is broad candidate retrieval and the current API
+  record is mutable. Even a complete role-tagged declared query set is not
+  exhaustive ontology-level recall. Local structured matches do not establish
+  efficacy, patient-level RNA-seq, gene-specific response, or a historical
+  feature. Every live snapshot must reproduce exactly through the frozen-input
+  parser; duplicate NCT IDs within a query, conflicting cross-query payloads,
+  or disagreement with the recomputed top-level NCT union fail closed. Report
+  construction replays once more and rejects nested post-validation mutation.
+  Serialized replay, injected transports, and injected clocks cannot
+  self-attest live provenance and therefore emit a strict registry count of
+  zero. The stock live path uses a non-serializable capability bound to the
+  final snapshot digest and actual completion time.
+- Same-entity treatment aliases are distinct from broader treatment-class
+  discovery terms, and same-entity cancer aliases are distinct from disease
+  ancestors. Alias, class, ancestor, and `explicit_component` matches remain
+  non-exact; none can become strict canonical entity evidence. Signed subtype state is preserved in
+  compact and spaced labels, so `HER2+`, `HER2`, and `HER2 - breast cancer` are
+  not interchangeable. Signs are also preserved in biomarker state and
+  specimen values such as `positive (+)`/`positive (-)` and `CD3+`/`CD3-`.
+  A strict subtype match also requires a separate exact
+  structured parent-cancer condition. An embedded or substring parent name is
+  not accepted without a versioned, curator-attested parent-ID binding. Strict registry
+  status uses only requested axes resolvable from structured registry fields. A
+  biomarker keyword does not resolve the typed feature/state/specimen/timepoint
+  tuple, and requested regimen, stage, or line of therapy remains unresolved
+  until arm assignment and eligibility are parsed; each condition forces the
+  strict count to zero.
+- `treated_cohort_association` is not predictive evidence without a comparator
+  and quantified formal treatment-by-predictor interaction. The cohort-context
+  biomarker tuple is distinct from the candidate gene predictor and cannot be
+  filled by it. Each patient row binds the predictor gene to a versioned ID,
+  feature/state/specimen, compatible measurement type/platform/timepoint, and
+  curator identity attestation; the attestation is not external resolver
+  authentication. A predictive claim requires versioned active-exposure sets
+  and relations, distinct source-native arm IDs, evaluable arm/model counts,
+  scale-appropriate event counts, verified estimability and predictor
+  variation, a controlled effect scale, and a versioned inference rule with
+  consistent departure-from-null evidence. Formal null, inconclusive, and
+  unsupported results remain separate. Exact patient context additionally requires
+  ontology, regimen, signed subtype, the full typed biomarker tuple, stage, and
+  line-of-therapy agreement. Typed biomarker exactness requires an explicit
+  `biomarker_axes_observation_status=observed` and positive
+  `biomarker_axes_informative_verified` attestation in both context and curated
+  row; unobserved or uninformative axes remain unresolved.
+  Unverified treatment exposure cannot establish exact patient regimen context,
+  and a prognostic-only predictor must be measured pretreatment/baseline.
+  Pharmacodynamic and acquired-resistance claims require paired longitudinal
+  evidence and are not baseline predictors.
+- Preclinical model types answer different questions and are not treated as a
+  quality ladder. Treatment activity, natural biomarker association, and
+  direct perturbational interaction remain distinct claims; CRISPRa,
+  overexpression, RNAi, inhibitor, and CRISPR-KO directions are not treated as
+  interchangeable. Gene-specific rows additionally require a versioned,
+  curator-attested gene identity. Exact-context and directional-concordance
+  counts require matching `perturbed_compartment` and `endpoint_category`. A
+  non-unknown direct direction additionally requires a versioned rule, numeric
+  effect, sample size, and matching curator-verified inference status;
+  resistance, sensitization, and discordant calls require nonzero effect.
+  Resistance/sensitization/discordant map to `direction_supported`, neutral to
+  `neutral_supported`, and unknown to an explicit inconclusive, unsupported, or
+  not-assessed state.
+  Concordance is a structured direction adjudication, not a statistical
+  confidence claim.
+- Alias-only or ontology-version-unresolved compatible context is counted
+  separately from explicit subtype, biomarker, regimen, stage, line,
+  compartment, or endpoint conflicts. Neither category is exact evidence, and
+  no translation-context count is a calibrated probability. When compatible
+  and conflicting families both occur without a higher-priority exact or
+  independence status,
+  `compatible_and_conflicting_context_present` or
+  `compatible_and_conflicting_patient_context_present` replaces either
+  misleading `_only` status.
+- A complete versioned `rank-screen` bundle binds only a candidate TSV that
+  carries both ranking fields. It verifies mode, schema/method versions,
+  parameters, all output hashes, ordered columns/row count, identifiers, rank
+  semantics, and canonical order. This is unsigned internal consistency, not
+  producer authentication, and it does not admit report-only
+  translation columns into the model. The success-model field deny-list is
+  derived from every report-only evidence contract, with a reserved token guard
+  as a second layer.
 - missingness patterns can encode publication era, repository choice, or input
   mode and therefore require profile- and coverage-stratified analyses.
 

@@ -4,6 +4,105 @@ All notable project changes are recorded here. The project follows semantic
 versioning once public releases begin; development checkpoints use a `.devN`
 suffix and are not claims of a trained biological model.
 
+## 0.4.0.dev0 — translation-context engine
+
+- Added `summarize-translation-context`, with live ClinicalTrials.gov v2
+  retrieval or deterministic replay from a frozen JSON snapshot.
+- Added before/after API-version and `dataTimestamp` checks, bounded audited
+  pagination, canonical page checksums, role-tagged treatment, cancer, subtype,
+  entity-alias, class, and ancestor discovery queries, exact NCT deduplication,
+  SHA-256 input/output manifests, and atomic publication with a final
+  input-mutation check. Every live query and merged concept snapshot must replay
+  identically through the frozen validator; duplicate NCTs within a lane or the
+  merged output and conflicting same-NCT payloads across lanes fail closed. The
+  report builder replays again before normalization and detects nested mutation
+  after initial validation.
+- Bound verified live provenance to a non-serializable in-process capability and
+  the final snapshot digest. Serialized replay, injected transports, and
+  injected clocks remain reportable but cannot emit a strict registry count;
+  typed query sets require one before/after version audit per query.
+- Bound typed ClinicalTrials query cross-products to the requested replay
+  context; typed mismatches fail and legacy/raw snapshots cannot emit strict
+  registry-match counts. Query binding and entity matching preserve terminal
+  or spaced subtype `+`/`-` markers, and typed matching preserves signs in
+  biomarker state and specimen values.
+- Treated API text search as candidate retrieval and assigned intervention,
+  disease/subtype, biomarker, and listed-regimen relations separately from
+  structured fields.
+- Separated same-entity treatment aliases from broader treatment-class terms
+  and same-entity cancer aliases from broader disease-ancestor terms; class and
+  ancestor discovery matches cannot become exact entity matches. An
+  `explicit_component` intervention match remains broader and never strict.
+- Replaced the ambiguous translation CLI alias options with
+  `--treatment-entity-alias`, `--cancer-entity-alias`, and
+  `--subtype-entity-alias`.
+- Added strict treatment/disease, clinical-trial, curated preclinical, and
+  patient-molecular contracts plus deterministic JSON Schemas.
+- Required biomarker term, feature type, state, specimen type, and measurement
+  timepoint and observation status together plus an explicit
+  `biomarker_axes_informative_verified` attestation. Exact typed matching
+  requires `observed` status and true attestation on both the requested context
+  and curated row. A registry biomarker mention remains untyped discovery
+  context and cannot establish an exact typed biomarker match or strict
+  biomarker-constrained registry status.
+- Required versioned canonical active-exposure sets, relations and provenance,
+  distinct source-native arm IDs, evaluable arm/model counts, scale-appropriate
+  event counts, verified estimability and predictor variation, a controlled effect scale, and a
+  versioned inference rule before a patient claim can be called predictive.
+  Supported, formal-null, inconclusive, and unsupported interactions are
+  separate lanes; longitudinal and post-progression claims remain guarded.
+- Separated the cohort-context biomarker tuple from the candidate-gene
+  predictor. Patient rows bind matching gene/predictor symbols to a versioned
+  gene ID, feature/state/specimen, compatible assay and measurement timepoint,
+  and explicit curator identity attestation. Ambiguous or conflicting assay
+  text fails closed; the attestation is not resolver authentication.
+- Required ontology-aware exact-context matching across treatment, disease,
+  subtype, typed biomarker, regimen, stage, and line of therapy, plus matching
+  perturbed compartment and endpoint category for preclinical claims.
+- Required a requested registry subtype to have a separate exact structured
+  parent-cancer condition before it can satisfy strict disease matching. A
+  parent name embedded in or inferred as a substring of the subtype label is
+  not accepted without a versioned, curator-attested parent-ID binding. Requested
+  regimen, stage, or line of therapy forces the strict registry count to zero
+  until verified arm-assignment and eligibility parsing is implemented.
+- Split compatible non-exact evidence from explicit context conflicts in both
+  patient and preclinical counts and statuses. Name-only or ontology-version
+  uncertainty remains compatible non-exact context; explicit subtype, biomarker,
+  regimen, stage, line, compartment, or endpoint contradictions are reported
+  as conflicting context. When no higher-priority exact-context or independence
+  status applies, mixed lanes emit
+  `compatible_and_conflicting_context_present` or
+  `compatible_and_conflicting_patient_context_present` rather than an
+  inaccurate `*_only` status; separate family counts still retain both
+  partitions.
+- Required vehicle/baseline and genotype-by-treatment controls for every direct
+  perturbational claim, versioned direction rules, and modality-matched
+  direction concordance. Gene-specific preclinical rows now require a
+  versioned, curator-attested gene identity; non-unknown directions require a
+  numeric effect, sample size, and matching curator-verified inference status.
+- Required literal booleans for scientific attestations and rejected boolean
+  coercion in MAGeCK metrics, raw counts, replicate numbers, and bound bundle
+  numeric fields. The manifest consumer now rechecks native MAGeCK/count
+  scientific domains rather than trusting self-consistent checksums alone.
+- Required versioned treatment/cancer IDs for strict registry and exact curated
+  context, baseline timing for prognostic-only predictors, and verified patient
+  treatment exposure for exact regimen context.
+- Added source/raw-family collapse, temporal cutoff, target-family exclusion,
+  model-applicability/OOD reporting, and explicit missingness.
+- Preserved candidate order and primary screen axes, emitted only
+  `report_only_*` gene-context columns, and expanded the success-model leakage
+  guard with a deny-list derived from every report-only evidence contract. The
+  layer neither filters nor reranks candidates and emits no validation or
+  reproducibility probability.
+- Required candidate TSVs to supply both ranking fields and bind the complete
+  versioned `rank-screen` bundle. Validation now covers mode, schema/method
+  versions, parameters, all output hashes, ordered columns/row count,
+  identifiers, tail/direction/rank/percentile/neutral semantics, duplicate keys,
+  and canonical order. The unsigned binding attests consistency, not producer
+  identity.
+- Kept trial counts, phases, statuses, posted aggregate results, patient
+  associations, and model tiers out of the validation score and labels.
+
 ## 0.3.0.dev0 — screen report and immune-context engine
 
 - Added `rank-screen`, a one-command bundle for MAGeCK gene summaries, raw

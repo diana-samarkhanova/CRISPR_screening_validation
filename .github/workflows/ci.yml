@@ -67,15 +67,33 @@ jobs:
       - name: Run smoke test
         run: uv run python scripts/smoke_test.py
 
-      - name: Run installed CLI reports end to end
+      - name: Build distribution
+        run: uv build
+
+      - name: Install wheel in clean environment
         run: |
-          uv run crispr-evidencerank rank-screen \
+          uv venv \
+            --python "${{ matrix.python-version }}" \
+            /tmp/crispr-evidencerank-wheel
+          uv pip install \
+            --python /tmp/crispr-evidencerank-wheel/bin/python \
+            dist/*.whl
+          /tmp/crispr-evidencerank-wheel/bin/crispr-evidencerank --help
+
+      - name: Run wheel-installed CLI reports end to end
+        run: |
+          /tmp/crispr-evidencerank-wheel/bin/crispr-evidencerank rank-screen \
             --mageck-summary examples/synthetic/mageck_gene_summary.tsv \
             --screen-id synthetic_olaparib \
             --contrast-id olaparib_vs_vehicle \
             --positive-tail-means resistance \
             --output-dir /tmp/screen-report
-          uv run crispr-evidencerank summarize-immuno-context \
+          /tmp/crispr-evidencerank-wheel/bin/crispr-evidencerank rank-screen \
+            --counts examples/synthetic/guide_counts_screen_01.csv \
+            --samples examples/synthetic/sample_sheet_screen_01.csv \
+            --positive-lfc-means resistance \
+            --output-dir /tmp/count-screen-report
+          /tmp/crispr-evidencerank-wheel/bin/crispr-evidencerank summarize-immuno-context \
             --evidence examples/synthetic/immune_context/evidence.tsv \
             --candidates /tmp/screen-report/ranked_candidates.tsv \
             --cutoff-date 2025-04-08 \
@@ -83,11 +101,52 @@ jobs:
             --dual-action-group-id ko_antitumor_function \
             --dual-action-group-version synthetic-v1 \
             --output-dir /tmp/immune-context
+          /tmp/crispr-evidencerank-wheel/bin/crispr-evidencerank summarize-translation-context \
+            --context-id synthetic-treatment-context \
+            --screen-id synthetic_olaparib \
+            --contrast-id olaparib_vs_vehicle \
+            --treatment SYNTHETIC-DRUG \
+            --treatment-id SYN:001 \
+            --treatment-ontology-name synthetic \
+            --treatment-ontology-version v1 \
+            --treatment-modality small_molecule \
+            --regimen-name "SYNTHETIC-DRUG monotherapy" \
+            --regimen-active-exposure-id SYN:001 \
+            --regimen-component-relation fixed_all_of \
+            --regimen-active-exposures-verified \
+            --regimen-active-exposure-identifier-source synthetic \
+            --regimen-active-exposure-identifier-version v1 \
+            --treatment-entity-alias SYN-001 \
+            --cancer-type "synthetic breast cancer" \
+            --cancer-id SYN:CANCER001 \
+            --disease-subtype "synthetic TNBC" \
+            --disease-subtype-id SYN:TNBC001 \
+            --disease-subtype-parent-id SYN:CANCER001 \
+            --disease-subtype-parent-binding-verified \
+            --disease-ontology-name synthetic \
+            --disease-ontology-version v1 \
+            --screen-perturbation-modality CRISPR_KO \
+            --perturbed-compartment tumor_cell \
+            --screen-endpoint-category drug_response_viability \
+            --context-date 2025-04-08 \
+            --evidence-cutoff-date 2025-04-08 \
+            --clinicaltrials-json \
+              examples/synthetic/translation_context/clinicaltrials_snapshot.json \
+            --preclinical-evidence \
+              examples/synthetic/translation_context/preclinical_evidence.tsv \
+            --patient-evidence \
+              examples/synthetic/translation_context/patient_evidence.tsv \
+            --candidates /tmp/screen-report/ranked_candidates.tsv \
+            --candidate-manifest /tmp/screen-report/run_manifest.json \
+            --target-not-in-evidence-catalog \
+            --output-dir /tmp/translation-context
           test -s /tmp/screen-report/ranked_candidates.tsv
           test -s /tmp/screen-report/run_manifest.json
+          test -s /tmp/count-screen-report/ranked_candidates.tsv
+          test -s /tmp/count-screen-report/run_manifest.json
           test -s /tmp/immune-context/immune_context.tsv
           test -s /tmp/immune-context/immune_context_used_evidence.tsv
           test -s /tmp/immune-context/summary.json
-
-      - name: Build distribution
-        run: uv build
+          test -s /tmp/translation-context/clinical_trials.tsv
+          test -s /tmp/translation-context/candidate_translation_context.tsv
+          test -s /tmp/translation-context/summary.json

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -9,6 +10,15 @@ import pandas as pd
 
 from .features import featurize_count_table
 from .io import normalize_count_inputs, normalize_mageck_gene_summary
+
+RANK_SCREEN_MANIFEST_SCHEMA = "crispr_evidencerank.rank_screen_manifest"
+RANK_SCREEN_MANIFEST_SCHEMA_VERSION = "1.0.0"
+RANK_SCREEN_METHOD_VERSION = "1.0.0"
+RANK_SCREEN_CANDIDATE_SCHEMA = "crispr_evidencerank.ranked_candidates"
+RANK_SCREEN_CANDIDATE_SCHEMA_VERSION = "1.0.0"
+RANK_SCREEN_INTERPRETATION_BOUNDARY = (
+    "screen-signal rank; no validation probability and no therapeutic recommendation"
+)
 
 
 @dataclass(frozen=True)
@@ -32,6 +42,8 @@ def _require_finite_numeric(frame: pd.DataFrame, columns: list[str]) -> None:
     for column in columns:
         if column not in frame:
             continue
+        if frame[column].map(lambda value: isinstance(value, (bool, np.bool_))).any():
+            raise ValueError(f"{column} cannot contain boolean numeric values")
         values = pd.to_numeric(frame[column], errors="coerce")
         invalid = frame[column].notna() & (~np.isfinite(values))
         if invalid.any():
@@ -58,6 +70,36 @@ def _rank_mageck(
     raw_genes = mageck_summary[gene_column]
     if raw_genes.isna().any() or raw_genes.astype(str).str.strip().eq("").any():
         raise ValueError("MAGeCK gene identifiers cannot be missing or empty")
+    numeric_suffixes = (
+        "score",
+        "lfc",
+        "p-value",
+        "pvalue",
+        "p_value",
+        "fdr",
+        "rank",
+        "goodsgrna",
+        "good_sgrna",
+    )
+    raw_numeric_columns = {"num"} & set(mageck_summary)
+    for direction in ("pos", "neg"):
+        for suffix in numeric_suffixes:
+            raw_numeric_columns.update(
+                column
+                for column in (
+                    f"{direction}|{suffix}",
+                    f"{direction}_{suffix}",
+                    f"{direction}.{suffix}",
+                )
+                if column in mageck_summary
+            )
+    for column in sorted(raw_numeric_columns):
+        if (
+            mageck_summary[column]
+            .map(lambda value: isinstance(value, (bool, np.bool_)))
+            .any()
+        ):
+            raise ValueError(f"MAGeCK {column} cannot contain boolean values")
     normalized = normalize_mageck_gene_summary(
         mageck_summary,
         screen_id=screen_id,
@@ -88,23 +130,17 @@ def _rank_mageck(
                 raise ValueError(f"MAGeCK {label} must lie in [0, 1]")
     if "rank" in normalized:
         observed_rank = pd.to_numeric(normalized["rank"], errors="coerce").dropna()
-        if (observed_rank < 1).any() or not np.allclose(
-            observed_rank,
-            np.rint(observed_rank),
-            rtol=0,
-            atol=1e-9,
-        ):
+        if (observed_rank < 1).any() or not np.equal(
+            observed_rank, np.floor(observed_rank)
+        ).all():
             raise ValueError("MAGeCK ranks must be positive integers")
     for column in ("input_sgrna_n", "good_sgrna_n"):
         if column not in normalized:
             continue
         observed = pd.to_numeric(normalized[column], errors="coerce").dropna()
-        if (observed < 0).any() or not np.allclose(
-            observed,
-            np.rint(observed),
-            rtol=0,
-            atol=1e-9,
-        ):
+        if (observed < 0).any() or not observed.map(
+            lambda value: float(value).is_integer()
+        ).all():
             raise ValueError(f"MAGeCK {column} must contain non-negative integers")
     if {"input_sgrna_n", "good_sgrna_n"} <= set(normalized):
         input_n = pd.to_numeric(normalized["input_sgrna_n"], errors="coerce")
@@ -221,6 +257,37 @@ def _rank_count_features(
         normalization_method=normalization_method,
         direction_deadband=direction_deadband,
     )
+    _require_finite_numeric(
+        features,
+        [
+            "guide_n",
+            "median_guide_lfc",
+            "mean_guide_lfc",
+            "mean_control_count",
+            "low_count_fraction",
+            "zero_fraction_control",
+            "zero_fraction_treatment",
+            "positive_guide_fraction",
+            "negative_guide_fraction",
+            "neutral_guide_fraction",
+            "guide_lfc_mad",
+            "guide_lfc_iqr",
+            "top2_abs_lfc_mean",
+            "leave_one_guide_out_median_sd",
+            "strongest_guide_dominance",
+            "guide_direction_agreement",
+            "absolute_median_guide_lfc",
+            "absolute_mean_guide_lfc",
+            "is_sensitization_signal",
+            "is_neutral_signal",
+            "within_screen_effect_percentile",
+            "replicate_correlation",
+            "control_replicate_correlation",
+            "treatment_replicate_correlation",
+            "replicate_effect_sd",
+            "median_library_size",
+        ],
+    )
     sample_counts = (
         samples.groupby(
             ["screen_id", "contrast_id", "condition_role"],
@@ -323,6 +390,32 @@ def _merge_mageck_and_counts(
     )
     if relevant.empty:
         raise ValueError("MAGeCK and count inputs have no shared screen contrast")
+    # Count ranks and percentiles are initially computed over the complete count
+    # roster. Combined output retains the MAGeCK roster, so recompute every
+    # roster-relative guide statistic after the inner filter and before each gene
+    # is duplicated across the two MAGeCK tails.
+    relevant["within_screen_effect_percentile"] = relevant.groupby(
+        ["screen_id", "contrast_id"], sort=False
+    )["median_guide_lfc"].transform(
+        lambda values: values.abs().rank(method="average", pct=True)
+    )
+    relevant["screen_signal_rank"] = np.nan
+    relevant["screen_signal_percentile"] = np.nan
+    directional = relevant["phenotype_direction"].isin(["resistance", "sensitization"])
+    for _, indices in (
+        relevant.loc[directional]
+        .groupby(
+            ["screen_id", "contrast_id", "phenotype_direction"],
+            sort=False,
+        )
+        .groups.items()
+    ):
+        effect = relevant.loc[indices, "median_guide_lfc"].abs()
+        rank = effect.rank(method="min", ascending=False)
+        relevant.loc[indices, "screen_signal_rank"] = rank
+        relevant.loc[indices, "screen_signal_percentile"] = 1.0 - (rank - 1.0) / max(
+            len(rank) - 1, 1
+        )
     count_columns = [column for column in relevant.columns if column not in keys]
     count_columns = [
         column if column not in mageck.columns else f"guide_{column}"
@@ -352,7 +445,7 @@ def _merge_mageck_and_counts(
     return merged
 
 
-def _qc_summary(
+def summarize_screen_qc(
     ranked: pd.DataFrame,
     *,
     mode: str,
@@ -505,7 +598,7 @@ def _markdown_top_table(ranked: pd.DataFrame, *, top_n: int = 10) -> str:
     return "\n".join(lines)
 
 
-def _markdown_report(qc: dict[str, object], ranked: pd.DataFrame) -> str:
+def render_screen_report_markdown(qc: dict[str, object], ranked: pd.DataFrame) -> str:
     warnings = qc["warnings"]
     warning_lines = (
         "\n".join(f"- {warning}" for warning in warnings)
@@ -567,6 +660,26 @@ def rank_screen(
 ) -> ScreenReportResult:
     """Create a screen-signal report from MAGeCK, counts, or both."""
 
+    for field_name, value, minimum, maximum, minimum_inclusive in (
+        ("pseudocount", pseudocount, 0.0, None, False),
+        ("low_count_threshold", low_count_threshold, 0.0, None, True),
+        ("direction_deadband", direction_deadband, 0.0, None, True),
+        ("fdr_threshold", fdr_threshold, 0.0, 1.0, True),
+    ):
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError(f"{field_name} must be numeric and not boolean")
+        numeric_value = float(value)
+        if not math.isfinite(numeric_value):
+            raise ValueError(f"{field_name} must be finite")
+        if numeric_value < minimum or (
+            not minimum_inclusive and numeric_value == minimum
+        ):
+            raise ValueError(f"{field_name} is out of range")
+        if maximum is not None and numeric_value > maximum:
+            raise ValueError(f"{field_name} is out of range")
+    if normalization_method not in {"median_ratio", "cpm"}:
+        raise ValueError("normalization_method must be 'median_ratio' or 'cpm'")
+
     if mageck_summary is None and counts is None:
         raise ValueError("provide MAGeCK summary, counts, or both")
     if (counts is None) != (samples is None):
@@ -582,8 +695,10 @@ def rank_screen(
             "combined mode requires positive_tail_means and "
             "positive_lfc_means to describe the same phenotype direction"
         )
-    if not 0.0 <= fdr_threshold <= 1.0:
-        raise ValueError("fdr_threshold must lie in [0, 1]")
+    if mageck_summary is None and positive_tail_means is not None:
+        raise ValueError("positive_tail_means is only valid with MAGeCK input")
+    if counts is None and positive_lfc_means is not None:
+        raise ValueError("positive_lfc_means is only valid with count input")
 
     if screen_id is not None:
         screen_id = str(screen_id).strip()
@@ -645,9 +760,9 @@ def rank_screen(
         kind="stable",
         na_position="last",
     ).reset_index(drop=True)
-    qc = _qc_summary(ranked, mode=mode, fdr_threshold=fdr_threshold)
+    qc = summarize_screen_qc(ranked, mode=mode, fdr_threshold=fdr_threshold)
     return ScreenReportResult(
         ranked_candidates=ranked,
         qc_summary=qc,
-        report_markdown=_markdown_report(qc, ranked),
+        report_markdown=render_screen_report_markdown(qc, ranked),
     )

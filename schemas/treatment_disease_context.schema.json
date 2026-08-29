@@ -1,0 +1,516 @@
+{
+  "$defs": {
+    "BiomarkerAxisObservationStatus": {
+      "description": "Curator-visible availability state for a typed biomarker bundle.",
+      "enum": [
+        "observed",
+        "not_assessed",
+        "not_reported",
+        "insufficient_material",
+        "unknown"
+      ],
+      "title": "BiomarkerAxisObservationStatus",
+      "type": "string"
+    },
+    "BiomarkerFeatureType": {
+      "enum": [
+        "genomic_mutation",
+        "copy_number",
+        "fusion",
+        "rna_expression",
+        "protein_expression",
+        "epigenetic",
+        "genomic_signature",
+        "functional_status",
+        "other"
+      ],
+      "title": "BiomarkerFeatureType",
+      "type": "string"
+    },
+    "InterventionModality": {
+      "enum": [
+        "small_molecule",
+        "antibody",
+        "cell_therapy",
+        "gene_therapy",
+        "radiotherapy",
+        "combination",
+        "other",
+        "unknown"
+      ],
+      "title": "InterventionModality",
+      "type": "string"
+    },
+    "MolecularMeasurementTimepoint": {
+      "enum": [
+        "pretreatment",
+        "on_treatment",
+        "post_treatment",
+        "unknown"
+      ],
+      "title": "MolecularMeasurementTimepoint",
+      "type": "string"
+    },
+    "PerturbationModality": {
+      "enum": [
+        "CRISPR_KO",
+        "CRISPRa",
+        "CRISPRi",
+        "RNAi",
+        "overexpression",
+        "mutation",
+        "inhibitor",
+        "other"
+      ],
+      "title": "PerturbationModality",
+      "type": "string"
+    },
+    "PerturbedCompartment": {
+      "description": "Cell compartment in which the perturbation was introduced.",
+      "enum": [
+        "tumor_cell",
+        "immune_cell",
+        "other",
+        "unknown"
+      ],
+      "title": "PerturbedCompartment",
+      "type": "string"
+    },
+    "RegimenComponentRelation": {
+      "description": "How listed canonical active components form a regimen.",
+      "enum": [
+        "fixed_all_of",
+        "alternative_one_of",
+        "none",
+        "unresolved"
+      ],
+      "title": "RegimenComponentRelation",
+      "type": "string"
+    },
+    "ScreenEndpointCategory": {
+      "enum": [
+        "drug_response_viability",
+        "immune_killing",
+        "immune_cell_fitness",
+        "marker_expression",
+        "other",
+        "unknown"
+      ],
+      "title": "ScreenEndpointCategory",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One explicit treatment/disease question for a translation report.",
+  "properties": {
+    "context_id": {
+      "minLength": 1,
+      "title": "Context Id",
+      "type": "string"
+    },
+    "screen_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Screen Id"
+    },
+    "contrast_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Contrast Id"
+    },
+    "treatment_name": {
+      "minLength": 1,
+      "title": "Treatment Name",
+      "type": "string"
+    },
+    "treatment_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Treatment Id"
+    },
+    "treatment_ontology_name": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Treatment Ontology Name"
+    },
+    "treatment_ontology_version": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Treatment Ontology Version"
+    },
+    "treatment_modality": {
+      "$ref": "#/$defs/InterventionModality"
+    },
+    "regimen_name": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Regimen Name"
+    },
+    "regimen_active_exposure_ids_json": {
+      "anyOf": [
+        {
+          "minLength": 2,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Regimen Active Exposure Ids Json"
+    },
+    "regimen_component_relation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RegimenComponentRelation"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "regimen_active_exposures_verified": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Regimen Active Exposures Verified"
+    },
+    "regimen_active_exposure_identifier_source": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Regimen Active Exposure Identifier Source"
+    },
+    "regimen_active_exposure_identifier_version": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Regimen Active Exposure Identifier Version"
+    },
+    "cancer_type": {
+      "minLength": 1,
+      "title": "Cancer Type",
+      "type": "string"
+    },
+    "cancer_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cancer Id"
+    },
+    "disease_subtype": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Disease Subtype"
+    },
+    "disease_subtype_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Disease Subtype Id"
+    },
+    "disease_subtype_parent_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Disease Subtype Parent Id"
+    },
+    "disease_subtype_parent_binding_verified": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Disease Subtype Parent Binding Verified"
+    },
+    "disease_ontology_name": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Disease Ontology Name"
+    },
+    "disease_ontology_version": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Disease Ontology Version"
+    },
+    "stage": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Stage"
+    },
+    "biomarker_context": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Biomarker Context"
+    },
+    "biomarker_feature_type": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BiomarkerFeatureType"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "biomarker_state": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Biomarker State"
+    },
+    "biomarker_specimen_type": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Biomarker Specimen Type"
+    },
+    "biomarker_measurement_timepoint": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MolecularMeasurementTimepoint"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "biomarker_axes_informative_verified": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Biomarker Axes Informative Verified"
+    },
+    "biomarker_axes_observation_status": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BiomarkerAxisObservationStatus"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "line_of_therapy": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Line Of Therapy"
+    },
+    "screen_perturbation_modality": {
+      "$ref": "#/$defs/PerturbationModality"
+    },
+    "perturbed_compartment": {
+      "$ref": "#/$defs/PerturbedCompartment"
+    },
+    "screen_endpoint_category": {
+      "$ref": "#/$defs/ScreenEndpointCategory"
+    },
+    "context_date": {
+      "format": "date",
+      "title": "Context Date",
+      "type": "string"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "context_id",
+    "treatment_name",
+    "treatment_modality",
+    "cancer_type",
+    "screen_perturbation_modality",
+    "perturbed_compartment",
+    "screen_endpoint_category",
+    "context_date"
+  ],
+  "title": "TreatmentDiseaseContextRecord",
+  "type": "object",
+  "x-semantic-rules": [
+    "screen_id and contrast_id must be supplied together",
+    "treatment ID, ontology name, and ontology version are all-or-none",
+    "disease IDs require ontology name and ontology version",
+    "disease_subtype_id requires disease_subtype",
+    "subtypes require explicit parent verification; verified bindings require versioned subtype and cancer IDs with equal parent and cancer IDs",
+    "regimen name, canonical active-exposure IDs, component relation, verification, identifier source, and identifier version are all-or-none",
+    "v1 verified regimens require a singleton exposure equal to treatment_id and provenance matching the treatment ontology release",
+    "biomarker term, type, state, specimen, and timepoint are all-or-none",
+    "typed biomarker exactness requires observed status and attestation",
+    "scientific attestations require literal booleans",
+    "strict registry and exact curated status require versioned canonical treatment and cancer IDs"
+  ]
+}
