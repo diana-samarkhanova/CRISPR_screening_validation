@@ -113,6 +113,11 @@ def test_direct_model_fit_rejects_report_only_features() -> None:
         model.fit(pd.DataFrame())
 
 
+def test_success_model_rejects_unregistered_clinical_feature() -> None:
+    with pytest.raises(ValueError, match="reviewed allowlist"):
+        validate_success_feature_columns(["guide_n", "clinical_trial_phase_max"])
+
+
 def test_shared_raw_data_family_stays_in_one_oof_fold():
     path = ROOT / "examples" / "synthetic" / "labeled_gene_features.csv"
     frame = pd.read_csv(path)

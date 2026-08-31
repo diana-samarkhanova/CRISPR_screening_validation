@@ -289,6 +289,29 @@ under olaparib denotes candidate loss-induced resistance; favorable immune
 evidence does not turn that gene into an inhibitor target. Report the result as
 a PARPi–immune trade-off when the two axes disagree.
 
+## Clinical treatment-by-cancer registry context
+
+Run the clinical registry report independently of gene ranking. Define one
+versioned treatment concept, one versioned cancer concept, a cutoff date, and a
+checksum-pinned source asset. Do not match by a drug substring, pharmacologic
+class, broad parent cancer, comparator mention, prior-treatment mention, or
+unreviewed model suggestion.
+
+The eligible landscape contains curator-reviewed exact treatment and cancer
+mappings from interventional records in which the treatment has the
+experimental role. Report distinct source-family counts by status, phase,
+regimen, and whether aggregate results are posted. Do not treat a completed
+study as successful, absent posted results as a negative effect, or a
+combination outcome as attributable to one component. Zero eligible records
+means only that none were observed in the supplied frozen snapshot.
+
+ClinicalTrials.gov registry metadata remain study-level evidence. Regulatory
+indications, endpoint-level aggregate effects, primary publications, and
+treatment-linked patient molecular cohorts require separate contracts and
+claim-specific rules. TCGA/GDC data without documented treatment exposure and
+response may provide disease context or prognostic association, but cannot
+validate an olaparib-response biomarker.
+
 ## Prospective experiment
 
 After model freeze, select genes from:

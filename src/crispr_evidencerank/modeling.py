@@ -106,6 +106,14 @@ FEATURE_PROFILES = {
 
 DEFAULT_FEATURE_COLUMNS = FEATURE_PROFILES["screen_only"]
 
+# Fail closed: only reviewed, pre-outcome feature names may enter the current
+# validation-success benchmark.  New feature families require an explicit code
+# and protocol change instead of passing merely because their names avoid a
+# blacklist token.
+ALLOWED_SUCCESS_FEATURES = frozenset(
+    [*SCREEN_ONLY_FEATURE_COLUMNS, *DESIGN_FEATURE_COLUMNS]
+)
+
 FORBIDDEN_SUCCESS_FEATURES = {
     "label_code",
     "target",
@@ -146,6 +154,11 @@ def validate_success_feature_columns(feature_columns: list[str]) -> None:
         raise ValueError(
             "success-model features contain label, selection, or validation "
             f"leakage fields: {forbidden}"
+        )
+    unregistered = sorted(set(feature_columns) - ALLOWED_SUCCESS_FEATURES)
+    if unregistered:
+        raise ValueError(
+            f"success-model features are not in the reviewed allowlist: {unregistered}"
         )
 
 

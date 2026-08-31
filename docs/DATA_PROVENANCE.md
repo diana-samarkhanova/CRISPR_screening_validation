@@ -126,6 +126,18 @@ verified against its gene count. CLI bundles are computed from exact byte
 snapshots, re-hash inputs before atomic publication, and refuse to overwrite an
 existing output directory.
 
+The v0.4 clinical-trial registry layer is a separate treatment-by-cancer
+report. Matching pins exact concept IDs plus their mapping sources and releases;
+display names and free text are never implicit join keys. Eligible mappings
+must be marked exact, curator-reviewed, and linked to a review event ID/date.
+Each normalized row carries `source_asset_id` and the exact asset SHA-256, which
+must resolve to a validated `DataAssetRecord`. The report excludes snapshots or
+transformations first available after the cutoff and reports every other
+exclusion. A mutable current ClinicalTrials.gov record cannot be used to
+reconstruct historical status without a historical snapshot. Registry
+presence, phase, completion, and `results_posted` remain context rather than
+efficacy, gene evidence, or validation labels.
+
 ## ORCS intake and curation queue
 
 The ORCS 2.0.18 human index contains 1,952 observed screen records. Automated

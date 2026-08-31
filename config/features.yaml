@@ -205,6 +205,41 @@ feature_groups:
       - report_only_immuno_direction_unresolved_fraction
       - report_only_immuno_directional_support_record_n
       - report_only_immuno_rra_verified_list_n
+  clinical_registry_context:
+    implementation_status: report_only_implemented
+    allowed_for_primary_model: false
+    reason: >-
+      Trial-registry metadata is shared treatment-by-cancer context, not
+      gene-level evidence. Registry presence, phase, status, and posted-results
+      availability cannot establish efficacy or predict validation success.
+    safeguards:
+      - treatment_by_cancer_axis_only
+      - exact_versioned_concept_ids_only
+      - curator_reviewed_exact_mapping_required
+      - curator_review_event_provenance_required
+      - query_mapping_source_and_version_pinned
+      - names_used_for_display_and_provenance_only
+      - checksum_pinned_source_asset_required
+      - source_name_and_version_binding_required
+      - explicit_temporal_cutoff
+      - interventional_studies_only
+      - experimental_intervention_role_only
+      - source_family_deduplication
+      - registry_presence_not_efficacy
+      - results_posted_not_endpoint_met
+      - zero_rows_not_proof_of_absence
+      - no_validation_labels_or_success_model_features
+    report_outputs:
+      - report_only_clinical_context_available
+      - report_only_clinical_observed_record_n
+      - report_only_clinical_observed_study_n
+      - report_only_clinical_observed_source_family_n
+      - report_only_clinical_results_posted_family_n
+      - report_only_clinical_results_not_posted_family_n
+      - report_only_clinical_status_strata
+      - report_only_clinical_phase_category_strata
+      - report_only_clinical_intervention_role_strata
+      - report_only_clinical_regimen_strata
   author_selection:
     allowed_for_primary_model: false
     allowed_for_selection_model: true
@@ -272,3 +307,7 @@ forbidden_success_features:
   - causal_reversal_performed
   - author_validation_selection_flag
   - validation_figure_prominence
+  - clinical_trial_registry_presence
+  - clinical_trial_phase_max
+  - clinical_results_posted
+  - report_only_clinical_context

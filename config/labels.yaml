@@ -63,12 +63,15 @@ label_source_policy:
     - immune_dual_action_class
     - scrna_expression_association
     - tcga_or_icb_clinical_association
+    - clinical_trial_registry_presence
+    - clinical_trial_phase_or_status
+    - clinical_results_posted
     - absence_from_validation_section
   note: >-
     ORCS, ICRAFT, and other screen databases provide discovery, recurrence, and
     context evidence. They do not establish that a gene was independently
-    perturbed and reproduced the exact phenotype. Immune-context evidence is
-    auxiliary and cannot create V2, V3, F0, or D.
+    perturbed and reproduced the exact phenotype. Immune and clinical-registry
+    context are auxiliary and cannot create V2, V3, F0, or D.
 
 validation_protocol_policy:
   purpose: label_adjudication_and_reporting

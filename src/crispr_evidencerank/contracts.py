@@ -188,6 +188,83 @@ class InputDataLevel(StrEnum):
     UNKNOWN = "unknown"
 
 
+class ClinicalStudyType(StrEnum):
+    """Normalized ClinicalTrials.gov-compatible study type."""
+
+    INTERVENTIONAL = "interventional"
+    OBSERVATIONAL = "observational"
+    EXPANDED_ACCESS = "expanded_access"
+    OTHER = "other"
+    UNKNOWN = "unknown"
+
+
+class ClinicalStatusCategory(StrEnum):
+    """Coarse registry status without any efficacy interpretation."""
+
+    NOT_YET_RECRUITING = "not_yet_recruiting"
+    RECRUITING = "recruiting"
+    ACTIVE_NOT_RECRUITING = "active_not_recruiting"
+    ENROLLING_BY_INVITATION = "enrolling_by_invitation"
+    SUSPENDED = "suspended"
+    TERMINATED = "terminated"
+    COMPLETED = "completed"
+    WITHDRAWN = "withdrawn"
+    UNKNOWN = "unknown"
+
+
+class ClinicalPhaseCategory(StrEnum):
+    """Normalized phase; higher phase is not treated as evidence of efficacy."""
+
+    EARLY_PHASE_1 = "early_phase_1"
+    PHASE_1 = "phase_1"
+    PHASE_1_2 = "phase_1_2"
+    PHASE_2 = "phase_2"
+    PHASE_2_3 = "phase_2_3"
+    PHASE_3 = "phase_3"
+    PHASE_4 = "phase_4"
+    NOT_APPLICABLE = "not_applicable"
+    UNKNOWN = "unknown"
+
+
+class ClinicalInterventionRole(StrEnum):
+    EXPERIMENTAL = "experimental"
+    ACTIVE_COMPARATOR = "active_comparator"
+    PLACEBO_COMPARATOR = "placebo_comparator"
+    SHAM_COMPARATOR = "sham_comparator"
+    NO_INTERVENTION = "no_intervention"
+    OTHER = "other"
+    UNKNOWN = "unknown"
+
+
+class ClinicalRegimenContext(StrEnum):
+    MONOTHERAPY = "monotherapy"
+    COMBINATION = "combination"
+    ADD_ON = "add_on"
+    MAINTENANCE = "maintenance"
+    BACKGROUND = "background"
+    OTHER = "other"
+    UNKNOWN = "unknown"
+
+
+class ClinicalMappingRelation(StrEnum):
+    """Relationship between a source term and its normalized concept."""
+
+    EXACT = "exact"
+    BROADER_THAN_SOURCE = "broader_than_source"
+    NARROWER_THAN_SOURCE = "narrower_than_source"
+    RELATED = "related"
+    UNKNOWN = "unknown"
+
+
+class ClinicalMappingReviewStatus(StrEnum):
+    """Review state of a treatment or cancer concept mapping."""
+
+    CURATOR_REVIEWED = "curator_reviewed"
+    SOURCE_ASSERTED = "source_asserted"
+    AUTOMATED_UNREVIEWED = "automated_unreviewed"
+    UNKNOWN = "unknown"
+
+
 class SampleRole(StrEnum):
     CONTROL = "control"
     TREATMENT = "treatment"
@@ -2533,6 +2610,191 @@ class ImmuneScreenEvidenceRecord(StrictRecord):
         return self
 
 
+class ClinicalTrialEvidenceRecord(StrictRecord):
+    """Frozen study-level treatment-by-cancer registry evidence.
+
+    One row represents one source study, one normalized treatment concept, and
+    one normalized cancer concept.  It records registry presence and metadata;
+    it never represents efficacy, patient-level data, or validation of a CRISPR
+    hit.
+    """
+
+    primary_key = ("evidence_id",)
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True,
+        allow_inf_nan=False,
+        json_schema_extra={
+            "allOf": [
+                {
+                    "if": {
+                        "required": ["results_posted"],
+                        "properties": {"results_posted": {"const": True}},
+                    },
+                    "then": {"required": ["results_first_posted_date"]},
+                },
+                {
+                    "if": {
+                        "required": ["study_type"],
+                        "properties": {
+                            "study_type": {
+                                "enum": [
+                                    "observational",
+                                    "expanded_access",
+                                    "other",
+                                    "unknown",
+                                ]
+                            }
+                        },
+                    },
+                    "then": {
+                        "properties": {
+                            "phase_category": {"enum": ["not_applicable", "unknown"]}
+                        }
+                    },
+                },
+            ],
+            "x-semantic-rules": [
+                "available_date <= source_snapshot_date <= retrieved_date",
+                "record_last_update_date cannot follow source_snapshot_date",
+                "transformation_available_date cannot follow retrieved_date",
+                "results_posted is paired with results_first_posted_date and "
+                "the results date cannot follow the source snapshot",
+                "source_asset_id and source_asset_sha256 must resolve to a "
+                "checksum-pinned DataAssetRecord at report runtime",
+                "report eligibility requires exact curator-reviewed treatment "
+                "and cancer mappings",
+                "curator-reviewed mappings require a review event identifier and "
+                "review date no later than transformation availability",
+                "report eligibility requires an interventional study with the "
+                "treatment in the experimental role",
+                "used_for_label is always false",
+            ],
+        },
+    )
+
+    _SAFE_TEXT_PATTERN = (
+        r"^[^\s\x00-\x1f\x7f](?:[^\x00-\x1f\x7f]*"
+        r"[^\s\x00-\x1f\x7f])?$"
+    )
+
+    evidence_id: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    source_asset_id: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    source_asset_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_name: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    source_version: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    source_api_version: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    source_snapshot_date: date
+    source_study_id: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    source_family_id: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    source_record_version: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    record_last_update_date: date
+    study_type: ClinicalStudyType
+    source_overall_status: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    status_category: ClinicalStatusCategory
+    source_phase: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    phase_category: ClinicalPhaseCategory
+    source_treatment_text: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    treatment_concept_id: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    treatment_preferred_name: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    treatment_mapping_source: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    treatment_mapping_version: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    treatment_mapping_relation: ClinicalMappingRelation
+    treatment_mapping_review_status: ClinicalMappingReviewStatus
+    treatment_mapping_review_id: str | None = Field(
+        default=None,
+        min_length=1,
+        pattern=_SAFE_TEXT_PATTERN,
+    )
+    treatment_mapping_review_date: date | None = None
+    source_condition_text: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    cancer_concept_id: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    cancer_preferred_name: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    cancer_mapping_source: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    cancer_mapping_version: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    cancer_mapping_relation: ClinicalMappingRelation
+    cancer_mapping_review_status: ClinicalMappingReviewStatus
+    cancer_mapping_review_id: str | None = Field(
+        default=None,
+        min_length=1,
+        pattern=_SAFE_TEXT_PATTERN,
+    )
+    cancer_mapping_review_date: date | None = None
+    intervention_role: ClinicalInterventionRole
+    regimen_context: ClinicalRegimenContext
+    source_subtype_definition: str | None = Field(
+        default=None,
+        min_length=1,
+        pattern=_SAFE_TEXT_PATTERN,
+    )
+    results_posted: bool
+    results_first_posted_date: date | None = None
+    source_url: HttpUrl
+    source_locator: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    available_date: date
+    transformation_available_date: date
+    retrieved_date: date
+    used_for_label: Literal[False] = False
+    notes: str | None = None
+
+    @model_validator(mode="after")
+    def clinical_evidence_is_fail_closed(self) -> ClinicalTrialEvidenceRecord:
+        if self.available_date > self.source_snapshot_date:
+            raise ValueError("available_date cannot follow source_snapshot_date")
+        if self.source_snapshot_date > self.retrieved_date:
+            raise ValueError("source_snapshot_date cannot follow retrieved_date")
+        if self.record_last_update_date > self.source_snapshot_date:
+            raise ValueError(
+                "record_last_update_date cannot follow source_snapshot_date"
+            )
+        if self.transformation_available_date > self.retrieved_date:
+            raise ValueError(
+                "transformation_available_date cannot follow retrieved_date"
+            )
+        if self.results_posted != (self.results_first_posted_date is not None):
+            raise ValueError(
+                "results_posted and results_first_posted_date must be supplied together"
+            )
+        if (
+            self.results_first_posted_date is not None
+            and self.results_first_posted_date > self.source_snapshot_date
+        ):
+            raise ValueError(
+                "results_first_posted_date cannot follow source_snapshot_date"
+            )
+        if (
+            self.study_type != ClinicalStudyType.INTERVENTIONAL
+            and self.phase_category
+            not in {
+                ClinicalPhaseCategory.NOT_APPLICABLE,
+                ClinicalPhaseCategory.UNKNOWN,
+            }
+        ):
+            raise ValueError(
+                "non-interventional clinical evidence requires a not_applicable "
+                "or unknown phase"
+            )
+        for axis in ("treatment", "cancer"):
+            review_status = getattr(self, f"{axis}_mapping_review_status")
+            review_id = getattr(self, f"{axis}_mapping_review_id")
+            review_date = getattr(self, f"{axis}_mapping_review_date")
+            if review_status == ClinicalMappingReviewStatus.CURATOR_REVIEWED:
+                if review_id is None or review_date is None:
+                    raise ValueError(
+                        f"curator-reviewed {axis} mapping requires review ID and date"
+                    )
+                if review_date > self.transformation_available_date:
+                    raise ValueError(
+                        f"{axis} mapping review date cannot follow transformation "
+                        "availability"
+                    )
+            elif review_id is not None or review_date is not None:
+                raise ValueError(
+                    f"{axis} mapping review ID/date require curator_reviewed status"
+                )
+        return self
+
+
 class DataAssetRecord(StrictRecord):
     """Versioned pointer to raw or derived data without redistributing it."""
 
@@ -2675,6 +2937,7 @@ CONTRACTS: dict[str, type[StrictRecord]] = {
     "candidate": CandidateRecord,
     "evidence": EvidenceRecord,
     "immune_screen_evidence": ImmuneScreenEvidenceRecord,
+    "clinical_trial_evidence": ClinicalTrialEvidenceRecord,
     "external_screen_map": ExternalScreenMapRecord,
     "screen_intake": ScreenIntakeRecord,
     "curation_queue": CurationQueueRecord,

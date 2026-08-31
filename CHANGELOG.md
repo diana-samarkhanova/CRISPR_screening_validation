@@ -4,6 +4,29 @@ All notable project changes are recorded here. The project follows semantic
 versioning once public releases begin; development checkpoints use a `.devN`
 suffix and are not claims of a trained biological model.
 
+## 0.4.0.dev0 — clinical treatment-by-cancer context
+
+- Added the strict `clinical_trial_evidence` contract for one frozen source
+  study × treatment concept × cancer concept row, with controlled study type,
+  status, phase, intervention role, and regimen fields.
+- Bound every normalized clinical row to a checksum-pinned `DataAssetRecord`
+  and enforced source/version/date consistency before reporting.
+- Added `summarize-clinical-context`, a mapping-release-pinned,
+  curator-reviewed exact concept-ID, temporal-cutoff, source-family-aware report
+  of observed experimental-role interventional registry studies.
+- Kept clinical output on the treatment × cancer axis rather than repeating it
+  per gene; all derived summary fields are `report_only_clinical_*` and cannot
+  change a CRISPR rank or create a validation label.
+- Distinguished registry presence, study status, phase, regimen, and aggregate
+  results availability from efficacy; zero matches means only not observed in
+  the supplied snapshot.
+- Replaced blacklist-only success-model protection with a reviewed feature
+  allowlist so arbitrarily named clinical or post-cutoff fields fail closed.
+- Added packaged schema/lock provenance, installed-wheel CI coverage, and a
+  second input-hash check immediately before atomic bundle publication.
+- Added a synthetic olaparib–TNBC example and documented why TNBC, HER2-negative
+  disease, HRD, somatic BRCA, and germline BRCA are not interchangeable.
+
 ## 0.3.0.dev0 — screen report and immune-context engine
 
 - Added `rank-screen`, a one-command bundle for MAGeCK gene summaries, raw

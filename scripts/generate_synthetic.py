@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 
 import numpy as np
@@ -15,6 +17,239 @@ from crispr_evidencerank.features import (
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "examples" / "synthetic"
 RNG = np.random.default_rng(20260730)
+
+
+def generate_clinical_context_fixture() -> None:
+    """Write a deterministic, explicitly non-clinical registry fixture."""
+
+    clinical_out = OUT / "clinical_context"
+    clinical_out.mkdir(parents=True, exist_ok=True)
+    snapshot = {
+        "apiVersion": "2.0.5-synthetic",
+        "dataTimestamp": "2026-08-30T00:00:00Z",
+        "query": {
+            "treatmentConceptId": "NCIT:C71721",
+            "cancerConceptId": "NCIT:C71732",
+        },
+        "studyIds": [
+            "SYN-OLAP-TNBC-001",
+            "SYN-OLAP-TNBC-002",
+            "SYN-OLAP-BREAST-003",
+            "SYN-TAL-TNBC-004",
+            "SYN-OBS-OLAP-TNBC-005",
+        ],
+    }
+    snapshot_bytes = (json.dumps(snapshot, indent=2) + "\n").encode()
+    snapshot_path = clinical_out / "source_snapshot.json"
+    snapshot_path.write_bytes(snapshot_bytes)
+    snapshot_sha = hashlib.sha256(snapshot_bytes).hexdigest()
+    asset_id = "synthetic:ctgov:olaparib-tnbc:2026-08-30"
+
+    asset = {
+        "asset_id": asset_id,
+        "source_name": "ClinicalTrials.gov",
+        "source_version": "synthetic-2026-08-30",
+        "asset_role": "registry_api_snapshot",
+        "accession": "synthetic-olaparib-tnbc-query",
+        "source_url": "https://clinicaltrials.gov/api/v2/studies",
+        "available_date": "2026-08-30",
+        "retrieved_date": "2026-08-30",
+        "retrieved_at_utc": "2026-08-30T00:00:00Z",
+        "sha256": snapshot_sha,
+        "byte_size": len(snapshot_bytes),
+        "checksum_provenance": "project_computed_synthetic_fixture",
+        "license_spdx": None,
+        "license_terms_url": None,
+        "rights_holder": "OpenAI synthetic fixture",
+        "redistribution_raw": "false",
+        "redistribution_derived": "false",
+        "study_id": None,
+        "screen_id": None,
+        "source_family_id": None,
+        "raw_data_family_id": None,
+        "download_method": "synthetic_offline_fixture",
+        "transformation_entrypoint": "manual_synthetic_normalization",
+        "code_commit": "fixture-v1",
+        "curator_status": "synthetic_test_only",
+        "notes": "No real trial record or patient data is included.",
+    }
+    pd.DataFrame([asset]).to_csv(
+        clinical_out / "assets.tsv",
+        sep="\t",
+        index=False,
+    )
+
+    common = {
+        "evidence_id": None,
+        "source_asset_id": asset_id,
+        "source_asset_sha256": snapshot_sha,
+        "source_name": "ClinicalTrials.gov",
+        "source_version": "synthetic-2026-08-30",
+        "source_api_version": "2.0.5-synthetic",
+        "source_snapshot_date": "2026-08-30",
+        "source_study_id": None,
+        "source_family_id": None,
+        "source_record_version": None,
+        "record_last_update_date": None,
+        "study_type": "interventional",
+        "source_overall_status": None,
+        "status_category": None,
+        "source_phase": None,
+        "phase_category": None,
+        "source_treatment_text": "Olaparib",
+        "treatment_concept_id": "NCIT:C71721",
+        "treatment_preferred_name": "Olaparib",
+        "treatment_mapping_source": "NCIt",
+        "treatment_mapping_version": "2026-08-01",
+        "treatment_mapping_relation": "exact",
+        "treatment_mapping_review_status": "curator_reviewed",
+        "treatment_mapping_review_id": "synthetic-map-review:olaparib:2026-08-30",
+        "treatment_mapping_review_date": "2026-08-30",
+        "source_condition_text": "Triple-Negative Breast Cancer",
+        "cancer_concept_id": "NCIT:C71732",
+        "cancer_preferred_name": "Triple-Negative Breast Carcinoma",
+        "cancer_mapping_source": "NCIt",
+        "cancer_mapping_version": "2026-08-01",
+        "cancer_mapping_relation": "exact",
+        "cancer_mapping_review_status": "curator_reviewed",
+        "cancer_mapping_review_id": "synthetic-map-review:tnbc:2026-08-30",
+        "cancer_mapping_review_date": "2026-08-30",
+        "intervention_role": "experimental",
+        "regimen_context": "monotherapy",
+        "source_subtype_definition": "Standard TNBC (synthetic definition)",
+        "results_posted": "false",
+        "results_first_posted_date": None,
+        "source_url": None,
+        "source_locator": None,
+        "available_date": None,
+        "transformation_available_date": "2026-08-30",
+        "retrieved_date": "2026-08-30",
+        "used_for_label": "false",
+        "notes": None,
+    }
+    rows = [
+        common
+        | {
+            "evidence_id": "clinical-syn-001",
+            "source_study_id": "SYN-OLAP-TNBC-001",
+            "source_family_id": "ctgov:SYN-OLAP-TNBC-001",
+            "source_record_version": "2026-08-20",
+            "record_last_update_date": "2026-08-20",
+            "source_overall_status": "COMPLETED",
+            "status_category": "completed",
+            "source_phase": "PHASE3",
+            "phase_category": "phase_3",
+            "source_subtype_definition": (
+                "ER and PR negative; HER2 negative (synthetic definition)"
+            ),
+            "results_posted": "true",
+            "results_first_posted_date": "2026-06-01",
+            "source_url": ("https://clinicaltrials.gov/study/SYN-OLAP-TNBC-001"),
+            "source_locator": "protocolSection.identificationModule.nctId",
+            "available_date": "2020-01-01",
+            "notes": (
+                "Synthetic completed monotherapy fixture; results presence is "
+                "not efficacy."
+            ),
+        },
+        common
+        | {
+            "evidence_id": "clinical-syn-002",
+            "source_study_id": "SYN-OLAP-TNBC-002",
+            "source_family_id": "ctgov:SYN-OLAP-TNBC-002",
+            "source_record_version": "2026-08-10",
+            "record_last_update_date": "2026-08-10",
+            "source_overall_status": "RECRUITING",
+            "status_category": "recruiting",
+            "source_phase": "PHASE2",
+            "phase_category": "phase_2",
+            "source_treatment_text": "Olaparib plus synthetic agent",
+            "regimen_context": "combination",
+            "source_subtype_definition": "Trial-defined TNBC (synthetic definition)",
+            "source_url": ("https://clinicaltrials.gov/study/SYN-OLAP-TNBC-002"),
+            "source_locator": "protocolSection.armsInterventionsModule",
+            "available_date": "2024-01-01",
+            "notes": (
+                "Synthetic active combination fixture; no component-level "
+                "efficacy attribution."
+            ),
+        },
+        common
+        | {
+            "evidence_id": "clinical-syn-003",
+            "source_study_id": "SYN-OLAP-BREAST-003",
+            "source_family_id": "ctgov:SYN-OLAP-BREAST-003",
+            "source_record_version": "2026-07-01",
+            "record_last_update_date": "2026-07-01",
+            "source_overall_status": "COMPLETED",
+            "status_category": "completed",
+            "source_phase": "PHASE3",
+            "phase_category": "phase_3",
+            "source_condition_text": "Breast Cancer",
+            "cancer_concept_id": "NCIT:C4872",
+            "cancer_preferred_name": "Breast Carcinoma",
+            "source_subtype_definition": "HER2-negative population broader than TNBC",
+            "results_posted": "true",
+            "results_first_posted_date": "2025-05-01",
+            "source_url": ("https://clinicaltrials.gov/study/SYN-OLAP-BREAST-003"),
+            "source_locator": "protocolSection.conditionsModule",
+            "available_date": "2019-01-01",
+            "notes": (
+                "Synthetic broader-disease fixture; exact TNBC matching must "
+                "exclude it."
+            ),
+        },
+        common
+        | {
+            "evidence_id": "clinical-syn-004",
+            "source_study_id": "SYN-TAL-TNBC-004",
+            "source_family_id": "ctgov:SYN-TAL-TNBC-004",
+            "source_record_version": "2026-07-15",
+            "record_last_update_date": "2026-07-15",
+            "source_overall_status": "ACTIVE_NOT_RECRUITING",
+            "status_category": "active_not_recruiting",
+            "source_phase": "PHASE2",
+            "phase_category": "phase_2",
+            "source_treatment_text": "Talazoparib",
+            "treatment_concept_id": "NCIT:C95733",
+            "treatment_preferred_name": "Talazoparib",
+            "source_url": "https://clinicaltrials.gov/study/SYN-TAL-TNBC-004",
+            "source_locator": "protocolSection.armsInterventionsModule",
+            "available_date": "2023-01-01",
+            "notes": (
+                "Synthetic treatment-mismatch fixture; PARP inhibitor class is "
+                "not an exact olaparib match."
+            ),
+        },
+        common
+        | {
+            "evidence_id": "clinical-syn-005",
+            "source_study_id": "SYN-OBS-OLAP-TNBC-005",
+            "source_family_id": "ctgov:SYN-OBS-OLAP-TNBC-005",
+            "source_record_version": "2026-06-01",
+            "record_last_update_date": "2026-06-01",
+            "study_type": "observational",
+            "source_overall_status": "RECRUITING",
+            "status_category": "recruiting",
+            "source_phase": "NOT_APPLICABLE",
+            "phase_category": "not_applicable",
+            "source_treatment_text": "Prior olaparib exposure",
+            "intervention_role": "no_intervention",
+            "regimen_context": "background",
+            "source_url": ("https://clinicaltrials.gov/study/SYN-OBS-OLAP-TNBC-005"),
+            "source_locator": "protocolSection.designModule",
+            "available_date": "2025-01-01",
+            "notes": (
+                "Synthetic observational fixture; excluded from direct "
+                "interventional landscape."
+            ),
+        },
+    ]
+    pd.DataFrame(rows).to_csv(
+        clinical_out / "evidence.tsv",
+        sep="\t",
+        index=False,
+    )
 
 
 def label_for_gene(gene_index: int, study_index: int) -> str:
@@ -437,6 +672,7 @@ def main() -> None:
         index=False,
         float_format="%.10g",
     )
+    generate_clinical_context_fixture()
     print(
         {
             "studies": len(studies_frame),

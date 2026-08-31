@@ -16,11 +16,12 @@ or a single database score as experimental validation.
 
 ## Status
 
-Version `0.3.0.dev0` is a reproducible development system, not a released
-pretrained model. It adds a one-command report for a new MAGeCK/count screen and
-an auxiliary ICRAFT-inspired immune-context method to the v0.2 normalized
-experimental-design, provenance, feature-profile, and leakage-control
-foundation. It includes:
+Version `0.4.0.dev0` is a reproducible development system, not a released
+pretrained model. It includes one-command MAGeCK/count reporting, an auxiliary
+ICRAFT-inspired immune-context method, and a separate checksum-bound clinical
+treatment-by-cancer registry report on top of the normalized experimental-
+design, provenance, feature-profile, and leakage-control foundation. It
+includes:
 
 - normalized records for studies, screens, contrasts, samples, gene scores,
   validation events, and external evidence;
@@ -33,6 +34,8 @@ foundation. It includes:
   human-readable report;
 - a report-only immune-screen evidence contract, tumor/immune dual-action
   classification, provenance-aware recurrence, and verified-full-list RRA;
+- a report-only clinical-trial contract and exact concept-ID treatment-by-cancer
+  landscape that is source-asset bound and cannot change gene ranking;
 - storage for raw and CNV-corrected scores without silently substituting a
   homemade correction;
 - a two-stage baseline that models both author selection for testing and
@@ -171,6 +174,8 @@ treatment, duration, or comparator fields remain missing.
    sources.
    The ICRAFT-inspired immune-context layer remains a separate report-only layer;
    it cannot enter the success model from a mutable current snapshot.
+   Clinical trial-registry context is a separate treatment-by-cancer report and
+   is never repeated as gene-level support.
 5. `deduplication`: group publications, reanalyses, repositories, and ORCS
    records derived from the same experimental material into a source/raw family.
 6. `selection model`: estimate which hits authors chose to test.
@@ -263,6 +268,36 @@ reuse-rights review. The immune bundle contains `immune_context.tsv`,
 `immune_context_exclusions.tsv`, `immune_context_used_evidence.tsv`,
 `rank_list_audit.tsv`, and `summary.json`; primary screen axes are retained in
 the joined report. See `docs/IMMUNE_CONTEXT_METHOD.md`.
+
+## Clinical treatment-by-cancer context
+
+The clinical module describes the interventional-study landscape for one exact
+normalized treatment concept and one exact normalized cancer concept. It does
+not join the same trial metadata to every gene, calculate efficacy, or modify a
+CRISPR rank. Every normalized row must resolve to a checksum-pinned source asset,
+and only evidence available by the declared cutoff is used.
+
+```bash
+crispr-evidencerank summarize-clinical-context \
+  --evidence examples/synthetic/clinical_context/evidence.tsv \
+  --assets examples/synthetic/clinical_context/assets.tsv \
+  --treatment-concept-id NCIT:C71721 \
+  --treatment-mapping-source NCIt \
+  --treatment-mapping-version 2026-08-01 \
+  --cancer-concept-id NCIT:C71732 \
+  --cancer-mapping-source NCIt \
+  --cancer-mapping-version 2026-08-01 \
+  --cutoff-date 2026-08-31 \
+  --output-dir data/processed/synthetic_clinical_context
+```
+
+The example represents olaparib and triple-negative breast carcinoma with
+synthetic registry rows only. Curator-reviewed exact concept matching excludes
+broad breast cancer, other PARP inhibitors, observational records, and
+non-experimental intervention mentions. A zero count means
+`not observed in the supplied snapshot`, not `no trials exist`. Registry status,
+phase, and the presence of posted aggregate results are descriptive metadata,
+not evidence that an endpoint was met. See `docs/CLINICAL_CONTEXT_METHOD.md`.
 
 For a release-pinned BioGRID ORCS archive:
 

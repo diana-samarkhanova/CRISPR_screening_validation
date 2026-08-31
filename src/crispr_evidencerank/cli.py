@@ -6,9 +6,12 @@ import argparse
 import hashlib
 import json
 import os
+import platform
 import shutil
 import tempfile
 from datetime import UTC, date, datetime
+from importlib import metadata as importlib_metadata
+from importlib import resources
 from io import BytesIO
 from pathlib import Path
 from typing import get_args
@@ -16,8 +19,11 @@ from typing import get_args
 import pandas as pd
 
 from . import __version__
+from .clinical_context import ClinicalContextResult, summarize_clinical_context
 from .contracts import (
     CONTRACTS,
+    ClinicalTrialEvidenceRecord,
+    DataAssetRecord,
     ImmuneScreenEvidenceRecord,
     PerturbationModality,
     validate_records,
@@ -245,6 +251,145 @@ def command_summarize_immuno_context(args: argparse.Namespace) -> int:
         result,
         args.output_dir,
         input_paths=(args.evidence, args.candidates),
+    )
+    print(json.dumps(result.metadata, indent=2, sort_keys=True))
+    return 0
+
+
+def _write_clinical_context_bundle(
+    result: ClinicalContextResult,
+    output_dir: str | Path,
+    *,
+    input_paths: tuple[str | Path, ...],
+    input_snapshots: dict[str, dict[str, str]],
+) -> None:
+    output_dir = Path(output_dir)
+    output_names = (
+        "clinical_context.tsv",
+        "clinical_context_studies.tsv",
+        "clinical_context_exclusions.tsv",
+        "clinical_context_used_assets.tsv",
+        "summary.json",
+    )
+    resolved_inputs = {Path(path).resolve() for path in input_paths}
+    if any((output_dir / name).resolve() in resolved_inputs for name in output_names):
+        raise ValueError("clinical-context outputs cannot overwrite an input file")
+    if output_dir.exists():
+        raise FileExistsError(f"clinical-context output directory exists: {output_dir}")
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(
+        tempfile.mkdtemp(
+            prefix=f".{output_dir.name}.staging-",
+            dir=output_dir.parent,
+        )
+    )
+    try:
+        _write_frame(result.summary, staging / "clinical_context.tsv")
+        _write_frame(result.studies, staging / "clinical_context_studies.tsv")
+        _write_frame(
+            result.exclusions,
+            staging / "clinical_context_exclusions.tsv",
+        )
+        _write_frame(
+            result.used_assets,
+            staging / "clinical_context_used_assets.tsv",
+        )
+        result.metadata["outputs"] = {
+            name: {
+                "filename": filename,
+                "sha256": _file_sha256(staging / filename),
+            }
+            for name, filename in (
+                ("summary", "clinical_context.tsv"),
+                ("studies", "clinical_context_studies.tsv"),
+                ("exclusions", "clinical_context_exclusions.tsv"),
+                ("used_assets", "clinical_context_used_assets.tsv"),
+            )
+        }
+        (staging / "summary.json").write_text(
+            json.dumps(result.metadata, allow_nan=False, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        _assert_input_snapshots_unchanged(input_snapshots)
+        os.replace(staging, output_dir)
+    except Exception:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+
+
+def _clinical_software_provenance() -> dict[str, object]:
+    metadata_bytes = (
+        resources.files("crispr_evidencerank")
+        .joinpath("_build_metadata.json")
+        .read_bytes()
+    )
+    build_metadata = json.loads(metadata_bytes)
+    required_hashes = ("dependency_lock_sha256", "clinical_schema_sha256")
+    for name in required_hashes:
+        value = build_metadata.get(name)
+        if (
+            not isinstance(value, str)
+            or len(value) != 64
+            or any(character not in "0123456789abcdef" for character in value)
+        ):
+            raise RuntimeError(f"invalid packaged build metadata field: {name}")
+
+    runtime_dependencies = {}
+    for distribution in ("numpy", "pandas", "pydantic", "PyYAML", "scikit-learn"):
+        runtime_dependencies[distribution] = importlib_metadata.version(distribution)
+    provenance: dict[str, object] = {
+        "package_version": __version__,
+        "python_version": platform.python_version(),
+        "clinical_contract": "clinical_trial_evidence",
+        "build_metadata_format_version": build_metadata.get("format_version"),
+        "build_metadata_sha256": hashlib.sha256(metadata_bytes).hexdigest(),
+        "dependency_lock_sha256": build_metadata["dependency_lock_sha256"],
+        "clinical_schema_sha256": build_metadata["clinical_schema_sha256"],
+        "runtime_dependencies": runtime_dependencies,
+    }
+    provenance["build_revision"] = os.environ.get("CRISPR_EVIDENCERANK_BUILD_REVISION")
+    return provenance
+
+
+def command_summarize_clinical_context(args: argparse.Namespace) -> int:
+    evidence, evidence_snapshot = _read_table_snapshot(
+        args.evidence,
+        dtype=_contract_string_fields(ClinicalTrialEvidenceRecord),
+    )
+    assets, assets_snapshot = _read_table_snapshot(
+        args.assets,
+        dtype=_contract_string_fields(DataAssetRecord),
+    )
+    result = summarize_clinical_context(
+        evidence,
+        assets,
+        treatment_concept_id=args.treatment_concept_id,
+        treatment_mapping_source=args.treatment_mapping_source,
+        treatment_mapping_version=args.treatment_mapping_version,
+        cancer_concept_id=args.cancer_concept_id,
+        cancer_mapping_source=args.cancer_mapping_source,
+        cancer_mapping_version=args.cancer_mapping_version,
+        cutoff_date=args.cutoff_date,
+        excluded_source_families=args.exclude_source_family,
+    )
+    result.metadata.update(
+        {
+            "bundle_type": "clinical_context",
+            "bundle_schema_version": 1,
+            "created_at_utc": datetime.now(UTC).isoformat(),
+            "software": _clinical_software_provenance(),
+            "inputs": {
+                "evidence": evidence_snapshot,
+                "assets": assets_snapshot,
+            },
+        }
+    )
+    _assert_input_snapshots_unchanged(result.metadata["inputs"])
+    _write_clinical_context_bundle(
+        result,
+        args.output_dir,
+        input_paths=(args.evidence, args.assets),
+        input_snapshots=result.metadata["inputs"],
     )
     print(json.dumps(result.metadata, indent=2, sort_keys=True))
     return 0
@@ -855,6 +1000,34 @@ def build_parser() -> argparse.ArgumentParser:
     )
     immuno_context.add_argument("--output-dir", required=True)
     immuno_context.set_defaults(func=command_summarize_immuno_context)
+
+    clinical_context = subparsers.add_parser(
+        "summarize-clinical-context",
+        help=(
+            "report a frozen exact treatment-by-cancer interventional-trial "
+            "landscape without changing gene ranking"
+        ),
+    )
+    clinical_context.add_argument("--evidence", required=True)
+    clinical_context.add_argument("--assets", required=True)
+    clinical_context.add_argument("--treatment-concept-id", required=True)
+    clinical_context.add_argument("--treatment-mapping-source", required=True)
+    clinical_context.add_argument("--treatment-mapping-version", required=True)
+    clinical_context.add_argument("--cancer-concept-id", required=True)
+    clinical_context.add_argument("--cancer-mapping-source", required=True)
+    clinical_context.add_argument("--cancer-mapping-version", required=True)
+    clinical_context.add_argument(
+        "--cutoff-date",
+        type=date.fromisoformat,
+        required=True,
+    )
+    clinical_context.add_argument(
+        "--exclude-source-family",
+        action="append",
+        default=[],
+    )
+    clinical_context.add_argument("--output-dir", required=True)
+    clinical_context.set_defaults(func=command_summarize_clinical_context)
 
     benchmark = subparsers.add_parser(
         "benchmark", help="run grouped out-of-fold baseline evaluation"

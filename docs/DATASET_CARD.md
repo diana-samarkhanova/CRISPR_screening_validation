@@ -8,9 +8,12 @@ orthogonal experimental reproduction.
 
 ## Current state
 
-Version `0.2.0.dev0` contains schemas, curation rules, an intake manifest, and
-synthetic fixtures. It does not contain a completed biological training
-dataset, a pretrained model, or calibrated probabilities.
+Version `0.4.0.dev0` contains schemas, curation rules, an intake manifest,
+synthetic fixtures, a screen-signal report, and independent report-only immune
+and clinical-context engines. It does not contain a completed biological
+training dataset, a pretrained model, or calibrated probabilities. Clinical
+registry context is treatment-by-cancer metadata, not gene-level evidence or a
+validation label.
 
 The first ten ORCS queue records have completed primary and independent second
 full-text review. Eight expose only author-derived score tables, one exposes a

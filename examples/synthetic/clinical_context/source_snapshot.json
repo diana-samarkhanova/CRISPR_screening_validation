@@ -1,0 +1,15 @@
+{
+  "apiVersion": "2.0.5-synthetic",
+  "dataTimestamp": "2026-08-30T00:00:00Z",
+  "query": {
+    "treatmentConceptId": "NCIT:C71721",
+    "cancerConceptId": "NCIT:C71732"
+  },
+  "studyIds": [
+    "SYN-OLAP-TNBC-001",
+    "SYN-OLAP-TNBC-002",
+    "SYN-OLAP-BREAST-003",
+    "SYN-TAL-TNBC-004",
+    "SYN-OBS-OLAP-TNBC-005"
+  ]
+}

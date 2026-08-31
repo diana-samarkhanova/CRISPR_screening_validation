@@ -1,6 +1,18 @@
-# Development checkpoint — v0.2.0.dev0
+# Development checkpoint — v0.4.0.dev0
 
-Date: 2026-07-30
+Updated: 2026-08-31
+
+The v0.4 checkpoint retains the v0.2 design contract described below and adds
+checksum-bound screen, immune-context, and clinical treatment-by-cancer report
+engines. These are development/reporting components; the real harmonized
+training set, adjudicated benchmark, pretrained model, and calibrated
+validation probability still do not exist.
+
+Release verification on Python 3.11 passes 353 tests at 88.24% statement
+coverage, repository and formatting guards, the smoke benchmark, deterministic
+schema/fixture regeneration, and an installed-wheel end-to-end run. The
+synthetic clinical fixture contains five non-patient registry rows and one
+checksum-pinned source asset.
 
 ## Executable baseline inherited from v0.1
 

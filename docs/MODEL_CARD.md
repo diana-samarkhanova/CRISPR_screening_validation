@@ -86,6 +86,14 @@ programmatically forbidden from the current success model. Candidate rows from
 `rank-screen` retain their screen, contrast, direction, tail, and signal rank;
 the immune axis neither filters nor reorders them.
 
+The clinical-context command is independent of genes and writes only
+`report_only_clinical_*` treatment-by-cancer descriptors. Registry presence,
+phase, recruitment status, and posted aggregate results are not efficacy and
+cannot enter the feature matrix, change a rank, or create a validation label.
+Every normalized clinical row must resolve to a frozen checksum-pinned source
+asset. Patient omics and regulatory indications are not inferred from trial
+registry metadata.
+
 ## Known limitations
 
 - validation events are selectively reported;

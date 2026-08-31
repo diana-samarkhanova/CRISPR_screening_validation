@@ -26,6 +26,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -54,6 +56,8 @@ jobs:
         run: |
           uv run python scripts/export_schemas.py
           git diff --exit-code -- schemas
+          uv run python scripts/export_build_metadata.py
+          git diff --exit-code -- src/crispr_evidencerank/_build_metadata.json
           uv run python scripts/generate_synthetic.py
           git diff --exit-code -- examples/synthetic
 
@@ -67,15 +71,26 @@ jobs:
       - name: Run smoke test
         run: uv run python scripts/smoke_test.py
 
-      - name: Run installed CLI reports end to end
+      - name: Build and install wheel
         run: |
-          uv run crispr-evidencerank rank-screen \
+          uv build
+          uv pip install \
+            --python .venv/bin/python \
+            --no-deps \
+            --force-reinstall \
+            dist/*.whl
+
+      - name: Run installed CLI reports end to end
+        env:
+          CRISPR_EVIDENCERANK_BUILD_REVISION: ${{ github.sha }}
+        run: |
+          .venv/bin/crispr-evidencerank rank-screen \
             --mageck-summary examples/synthetic/mageck_gene_summary.tsv \
             --screen-id synthetic_olaparib \
             --contrast-id olaparib_vs_vehicle \
             --positive-tail-means resistance \
             --output-dir /tmp/screen-report
-          uv run crispr-evidencerank summarize-immuno-context \
+          .venv/bin/crispr-evidencerank summarize-immuno-context \
             --evidence examples/synthetic/immune_context/evidence.tsv \
             --candidates /tmp/screen-report/ranked_candidates.tsv \
             --cutoff-date 2025-04-08 \
@@ -83,11 +98,23 @@ jobs:
             --dual-action-group-id ko_antitumor_function \
             --dual-action-group-version synthetic-v1 \
             --output-dir /tmp/immune-context
+          .venv/bin/crispr-evidencerank summarize-clinical-context \
+            --evidence examples/synthetic/clinical_context/evidence.tsv \
+            --assets examples/synthetic/clinical_context/assets.tsv \
+            --treatment-concept-id NCIT:C71721 \
+            --treatment-mapping-source NCIt \
+            --treatment-mapping-version 2026-08-01 \
+            --cancer-concept-id NCIT:C71732 \
+            --cancer-mapping-source NCIt \
+            --cancer-mapping-version 2026-08-01 \
+            --cutoff-date 2026-08-31 \
+            --output-dir /tmp/clinical-context
           test -s /tmp/screen-report/ranked_candidates.tsv
           test -s /tmp/screen-report/run_manifest.json
           test -s /tmp/immune-context/immune_context.tsv
           test -s /tmp/immune-context/immune_context_used_evidence.tsv
           test -s /tmp/immune-context/summary.json
-
-      - name: Build distribution
-        run: uv build
+          test -s /tmp/clinical-context/clinical_context.tsv
+          test -s /tmp/clinical-context/clinical_context_studies.tsv
+          test -s /tmp/clinical-context/clinical_context_used_assets.tsv
+          test -s /tmp/clinical-context/summary.json
