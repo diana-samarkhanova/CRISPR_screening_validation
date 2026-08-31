@@ -18,6 +18,11 @@ import numpy as np
 import pandas as pd
 
 from . import __version__
+from .adjudication import (
+    finalize_adjudication,
+    hash_validation_events,
+    prepare_adjudication_packet,
+)
 from .contracts import (
     CONTRACTS,
     BiomarkerAxisObservationStatus,
@@ -2107,6 +2112,47 @@ def command_complete_curation_reviews(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_prepare_validation_adjudication(args: argparse.Namespace) -> int:
+    manifest = prepare_adjudication_packet(
+        args.completed_review_manifest,
+        args.output_dir,
+        expected_completed_review_manifest_sha256=(
+            args.expected_completed_review_manifest_sha256
+        ),
+        expected_comparison_sha256=args.expected_comparison_sha256,
+        packet_id=args.packet_id,
+        prepared_date=args.prepared_date,
+    )
+    print(json.dumps(manifest, indent=2, sort_keys=True))
+    return 0
+
+
+def command_finalize_validation_adjudication(args: argparse.Namespace) -> int:
+    manifest = finalize_adjudication(
+        args.packet_manifest,
+        args.decisions,
+        args.validation_events,
+        args.output_dir,
+        expected_packet_manifest_sha256=args.expected_packet_manifest_sha256,
+        expected_decisions_sha256=args.expected_decisions_sha256,
+        expected_validation_events_sha256=(args.expected_validation_events_sha256),
+        adjudicated_date=args.adjudicated_date,
+    )
+    print(json.dumps(manifest, indent=2, sort_keys=True))
+    return 0
+
+
+def command_hash_validation_events(args: argparse.Namespace) -> int:
+    hashes, metadata = hash_validation_events(args.validation_events)
+    _write_frame(hashes, args.output)
+    metadata["output"] = {
+        "filename": Path(args.output).name,
+        "sha256": _file_sha256(args.output),
+    }
+    print(json.dumps(metadata, indent=2, sort_keys=True))
+    return 0
+
+
 def command_ingest_orcs_screen(args: argparse.Namespace) -> int:
     metadata = read_table(args.index_metadata) if args.index_metadata else None
     parsed = parse_orcs_screen_scores(
@@ -2142,6 +2188,12 @@ def command_ingest_orcs_screen(args: argparse.Namespace) -> int:
 
 
 def command_benchmark(args: argparse.Namespace) -> int:
+    if not args.development_synthetic_labels_only:
+        raise ValueError(
+            "real-label benchmark execution is disabled until a checksum-verified "
+            "released-compendium manifest is implemented; use "
+            "--development-synthetic-labels-only solely for synthetic tests"
+        )
     frame = read_table(args.table)
     if args.features and args.feature_profile:
         raise ValueError("--features and --feature-profile are mutually exclusive")
@@ -2161,8 +2213,22 @@ def command_benchmark(args: argparse.Namespace) -> int:
         n_splits=args.folds,
         model_kind=args.model_kind,
     )
+    predictions.insert(0, "evaluation_scope", "development_only")
+    predictions.insert(1, "scientific_use_prohibited", True)
+    predictions.insert(2, "label_provenance", "synthetic_unverified")
     _write_frame(predictions, args.output)
-    print(json.dumps(metrics, indent=2, sort_keys=True))
+    print(
+        json.dumps(
+            {
+                "evaluation_scope": "development_only",
+                "scientific_use_prohibited": True,
+                "label_provenance": "synthetic_unverified",
+                "metrics": metrics,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
     return 0
 
 
@@ -2329,6 +2395,61 @@ def build_parser() -> argparse.ArgumentParser:
         "--assessed-date", type=date.fromisoformat, required=True
     )
     review_completion.set_defaults(func=command_complete_curation_reviews)
+
+    adjudication_preparation = subparsers.add_parser(
+        "prepare-validation-adjudication",
+        help=(
+            "prepare an unsigned human adjudication packet from a "
+            "checksum-pinned completed review bundle"
+        ),
+    )
+    adjudication_preparation.add_argument("--completed-review-manifest", required=True)
+    adjudication_preparation.add_argument(
+        "--expected-completed-review-manifest-sha256", required=True
+    )
+    adjudication_preparation.add_argument("--expected-comparison-sha256", required=True)
+    adjudication_preparation.add_argument("--packet-id", required=True)
+    adjudication_preparation.add_argument(
+        "--prepared-date", type=date.fromisoformat, required=True
+    )
+    adjudication_preparation.add_argument("--output-dir", required=True)
+    adjudication_preparation.set_defaults(func=command_prepare_validation_adjudication)
+
+    adjudication_finalization = subparsers.add_parser(
+        "finalize-validation-adjudication",
+        help=(
+            "atomically release checksum-pinned human adjudication decisions "
+            "and validation events"
+        ),
+    )
+    adjudication_finalization.add_argument("--packet-manifest", required=True)
+    adjudication_finalization.add_argument(
+        "--expected-packet-manifest-sha256", required=True
+    )
+    adjudication_finalization.add_argument("--decisions", required=True)
+    adjudication_finalization.add_argument("--expected-decisions-sha256", required=True)
+    adjudication_finalization.add_argument("--validation-events", required=True)
+    adjudication_finalization.add_argument(
+        "--expected-validation-events-sha256", required=True
+    )
+    adjudication_finalization.add_argument(
+        "--adjudicated-date", type=date.fromisoformat, required=True
+    )
+    adjudication_finalization.add_argument("--output-dir", required=True)
+    adjudication_finalization.set_defaults(
+        func=command_finalize_validation_adjudication
+    )
+
+    event_hashing = subparsers.add_parser(
+        "hash-validation-events",
+        help=(
+            "validate validation events and emit canonical row hashes without "
+            "assigning labels"
+        ),
+    )
+    event_hashing.add_argument("--validation-events", required=True)
+    event_hashing.add_argument("--output", required=True)
+    event_hashing.set_defaults(func=command_hash_validation_events)
 
     rank = subparsers.add_parser(
         "rank-screen",
@@ -2587,6 +2708,14 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark.add_argument("--group-column", default="study_id")
     benchmark.add_argument("--screen-column", default="screen_id")
     benchmark.add_argument("--folds", type=int, default=5)
+    benchmark.add_argument(
+        "--development-synthetic-labels-only",
+        action="store_true",
+        help=(
+            "explicitly mark this run as development-only synthetic evaluation; "
+            "real released-label benchmarking remains disabled"
+        ),
+    )
     benchmark.add_argument(
         "--model-kind",
         choices=["logistic", "hist_gradient_boosting"],

@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from crispr_evidencerank.cli import build_parser
 from crispr_evidencerank.evaluation import _composite_query_keys
 from crispr_evidencerank.modeling import (
     ReproducibilityModel,
@@ -14,6 +15,42 @@ from crispr_evidencerank.modeling import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_benchmark_cli_defaults_to_denying_unreleased_labels(tmp_path: Path):
+    args = build_parser().parse_args(
+        [
+            "benchmark",
+            "--table",
+            str(ROOT / "examples" / "synthetic" / "labeled_gene_features.csv"),
+            "--output",
+            str(tmp_path / "predictions.tsv"),
+        ]
+    )
+    with pytest.raises(ValueError, match="real-label benchmark execution is disabled"):
+        args.func(args)
+    assert not (tmp_path / "predictions.tsv").exists()
+
+
+def test_synthetic_benchmark_cli_watermarks_every_output(tmp_path: Path):
+    output = tmp_path / "predictions.tsv"
+    args = build_parser().parse_args(
+        [
+            "benchmark",
+            "--table",
+            str(ROOT / "examples" / "synthetic" / "labeled_gene_features.csv"),
+            "--output",
+            str(output),
+            "--folds",
+            "4",
+            "--development-synthetic-labels-only",
+        ]
+    )
+    assert args.func(args) == 0
+    predictions = pd.read_csv(output, sep="\t")
+    assert predictions["evaluation_scope"].eq("development_only").all()
+    assert predictions["scientific_use_prohibited"].all()
+    assert predictions["label_provenance"].eq("synthetic_unverified").all()
 
 
 def test_grouped_oof_predictions_cover_every_row():

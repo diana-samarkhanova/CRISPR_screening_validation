@@ -2,19 +2,22 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import re
 import unicodedata
+from dataclasses import dataclass
 from datetime import date, datetime
 from enum import StrEnum
+from pathlib import Path
 from typing import Any, ClassVar, Literal
 
 import numpy as np
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
-from .labels import CANDIDATE_KEY, LabelCode, adjudicate_validation_events
+from .labels import CANDIDATE_KEY, LabelCode, _resolve_released_validation_events
 
 
 class PerturbationModality(StrEnum):
@@ -1003,6 +1006,22 @@ class ReviewComparisonStatus(StrEnum):
     SINGLE_CURATOR_ONLY = "single_curator_only"
 
 
+class AdjudicationDecisionDisposition(StrEnum):
+    """Human disposition for one immutable review-comparison item."""
+
+    RELEASE_VALIDATION_EVENT = "release_validation_event"
+    NO_QUALIFYING_EVENT = "no_qualifying_event"
+    DEFER_UNRESOLVED = "defer_unresolved"
+
+
+class FollowupRosterStatus(StrEnum):
+    """How completely a source reports the genes selected for follow-up."""
+
+    COMPLETE_FOLLOWUP_ROSTER = "complete_followup_roster"
+    PARTIAL_EXPLICIT_TESTED_ROSTER = "partial_explicit_tested_roster"
+    POSITIVE_ONLY_OR_UNCLEAR = "positive_only_or_unclear"
+
+
 class RunInclusionStatus(StrEnum):
     INCLUDED_DRUG_CONTRAST = "included_drug_contrast"
     EXCLUDED_OTHER_SCREEN = "excluded_other_screen"
@@ -1908,6 +1927,170 @@ class ReviewComparisonRecord(StrictRecord):
         return self
 
 
+class AdjudicationPacketRecord(StrictRecord):
+    """Read-only evidence card for one pending human decision.
+
+    The contract deliberately has no final label or disposition field.  It is
+    a checksum-bound prompt, not a released validation outcome.
+    """
+
+    primary_key = ("packet_item_id",)
+
+    packet_item_id: str = Field(min_length=1)
+    packet_id: str = Field(min_length=1)
+    comparison_id: str = Field(min_length=1)
+    comparison_row_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    parent_dual_review_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    batch_id: str = Field(min_length=1)
+    queue_id: str = Field(min_length=1)
+    queue_rank: int = Field(ge=1)
+    screen_id: str = Field(min_length=1)
+    external_screen_id: str = Field(min_length=1)
+    gene_symbol: str = Field(min_length=1)
+    source_family_id: str = Field(min_length=1)
+    doi: str = Field(min_length=1)
+    paper_url: HttpUrl
+    full_text_url: HttpUrl
+    supplement_url: HttpUrl
+    reviewer_a_review_id: str = Field(min_length=1)
+    reviewer_a_curator: str = Field(min_length=1)
+    reviewer_a_row_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    reviewer_a_evidence_level: ReviewEvidenceLevel
+    reviewer_a_source_locator: str = Field(min_length=1)
+    reviewer_a_screen_model: str = Field(min_length=1)
+    reviewer_a_treatment_contrast: str = Field(min_length=1)
+    reviewer_a_screen_replication: str = Field(min_length=1)
+    reviewer_a_notes: str | None = None
+    reviewer_b_review_id: str = Field(min_length=1)
+    reviewer_b_curator: str = Field(min_length=1)
+    reviewer_b_row_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    reviewer_b_evidence_level: ReviewEvidenceLevel
+    reviewer_b_source_locator: str = Field(min_length=1)
+    reviewer_b_screen_model: str = Field(min_length=1)
+    reviewer_b_treatment_contrast: str = Field(min_length=1)
+    reviewer_b_screen_replication: str = Field(min_length=1)
+    reviewer_b_notes: str | None = None
+    comparison_assessed_date: date
+    human_adjudication_required: bool = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def require_literal_boolean(cls, value: Any) -> Any:
+        return _require_boolean_fields(
+            value,
+            field_names={"human_adjudication_required"},
+        )
+
+    @model_validator(mode="after")
+    def packet_item_is_read_only_and_linked(self) -> AdjudicationPacketRecord:
+        if self.human_adjudication_required is not True:
+            raise ValueError("adjudication packet items require a human decision")
+        if self.reviewer_a_review_id == self.reviewer_b_review_id:
+            raise ValueError("packet reviewer IDs must be distinct")
+        if _normalized_claim_text(self.reviewer_a_curator) == _normalized_claim_text(
+            self.reviewer_b_curator
+        ):
+            raise ValueError("packet curator identities must be distinct")
+        _validate_stable_identifier(self.packet_id, field_name="packet_id")
+        _validate_stable_identifier(
+            self.packet_item_id,
+            field_name="packet_item_id",
+        )
+        return self
+
+
+class AdjudicationDecisionRecord(StrictRecord):
+    """Named human decision linked to one immutable packet item."""
+
+    primary_key = ("decision_id",)
+
+    decision_id: str = Field(min_length=1)
+    packet_id: str = Field(min_length=1)
+    packet_item_id: str = Field(min_length=1)
+    comparison_id: str = Field(min_length=1)
+    comparison_row_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    reviewer_a_review_id: str = Field(min_length=1)
+    reviewer_a_row_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    reviewer_b_review_id: str = Field(min_length=1)
+    reviewer_b_row_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    parent_dual_review_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    packet_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    batch_id: str = Field(min_length=1)
+    screen_id: str = Field(min_length=1)
+    gene_symbol: str = Field(min_length=1)
+    disposition: AdjudicationDecisionDisposition
+    validation_event_id: str | None = None
+    validation_event_row_sha256: str | None = Field(
+        default=None,
+        pattern=r"^[0-9a-f]{64}$",
+    )
+    followup_roster_status: FollowupRosterStatus
+    adjudicator_name: str = Field(min_length=1)
+    adjudicator_id: str = Field(min_length=1)
+    adjudicator_affiliation: str = Field(min_length=1)
+    adjudicated_date: date
+    source_evidence_reviewed_attested: bool
+    independent_human_decision_attested: bool
+    reviewer_identity_independence_attested: bool
+    model_outputs_unseen_attested: bool
+    no_automated_label_assignment_attested: bool
+    conflict_of_interest_declared: bool
+    conflict_of_interest_notes: str | None = None
+    evidence_source_locator: str = Field(min_length=1)
+    decision_rationale: str = Field(min_length=1)
+
+    @model_validator(mode="before")
+    @classmethod
+    def require_literal_attestations(cls, value: Any) -> Any:
+        return _require_boolean_fields(
+            value,
+            field_names={
+                "source_evidence_reviewed_attested",
+                "independent_human_decision_attested",
+                "reviewer_identity_independence_attested",
+                "model_outputs_unseen_attested",
+                "no_automated_label_assignment_attested",
+                "conflict_of_interest_declared",
+            },
+        )
+
+    @model_validator(mode="after")
+    def decision_is_explicit_and_attested(self) -> AdjudicationDecisionRecord:
+        _validate_stable_identifier(self.decision_id, field_name="decision_id")
+        _validate_stable_identifier(self.packet_id, field_name="packet_id")
+        _validate_stable_identifier(
+            self.packet_item_id,
+            field_name="packet_item_id",
+        )
+        _validate_stable_identifier(
+            self.adjudicator_id,
+            field_name="adjudicator_id",
+        )
+        if not all(
+            (
+                self.source_evidence_reviewed_attested,
+                self.independent_human_decision_attested,
+                self.reviewer_identity_independence_attested,
+                self.model_outputs_unseen_attested,
+                self.no_automated_label_assignment_attested,
+            )
+        ):
+            raise ValueError("all human adjudication attestations must be true")
+        if self.conflict_of_interest_declared and not self.conflict_of_interest_notes:
+            raise ValueError("declared conflicts require conflict_of_interest_notes")
+        is_release = (
+            self.disposition == AdjudicationDecisionDisposition.RELEASE_VALIDATION_EVENT
+        )
+        if is_release != bool(self.validation_event_id) or is_release != bool(
+            self.validation_event_row_sha256
+        ):
+            raise ValueError(
+                "release_validation_event decisions require both an event ID and "
+                "its canonical row SHA-256; non-release decisions require neither"
+            )
+        return self
+
+
 class EligibilityCheckRecord(StrictRecord):
     """Auditable result for one intake rule applied to one screen."""
 
@@ -2213,6 +2396,19 @@ class GeneScoreRecord(StrictRecord):
         return self
 
 
+BENCHMARK_ADJUDICATION_STATUSES = frozenset(
+    {
+        "adjudicated",
+        "consensus",
+        "consensus_adjudicated",
+        "double_curated",
+        "dual_curator_consensus",
+        "approved_for_benchmark",
+        "verified_for_benchmark",
+    }
+)
+
+
 _VALIDATION_EVENT_JSON_SCHEMA = {
     "allOf": [
         {
@@ -2246,13 +2442,16 @@ _VALIDATION_EVENT_JSON_SCHEMA = {
                     "perturbation_confirmed",
                     "phenotype_reproduced",
                     "appropriate_control",
+                    "assay_adequate",
                 ],
                 "properties": {
                     "testing_status": {"const": "tested"},
                     "perturbation_confirmed": {"const": True},
                     "phenotype_reproduced": {"const": True},
                     "appropriate_control": {"const": True},
+                    "assay_adequate": {"const": True},
                     "opposite_direction_reproduced": {"enum": [False, None]},
+                    "phenotype_direction": {"enum": ["resistance", "sensitization"]},
                 },
                 "anyOf": [
                     {
@@ -2294,14 +2493,32 @@ _VALIDATION_EVENT_JSON_SCHEMA = {
                     "perturbation_confirmed",
                     "assay_adequate",
                     "phenotype_reproduced",
+                    "appropriate_control",
                 ],
                 "properties": {
                     "testing_status": {"const": "tested"},
                     "perturbation_confirmed": {"const": True},
                     "assay_adequate": {"const": True},
                     "phenotype_reproduced": {"const": False},
+                    "appropriate_control": {"const": True},
                     "opposite_direction_reproduced": {"enum": [False, None]},
+                    "phenotype_direction": {"enum": ["resistance", "sensitization"]},
                 },
+                "anyOf": [
+                    {
+                        "required": ["independent_reagent_count"],
+                        "properties": {
+                            "independent_reagent_count": {
+                                "type": "integer",
+                                "minimum": 2,
+                            }
+                        },
+                    },
+                    {
+                        "required": ["orthogonal_perturbation"],
+                        "properties": {"orthogonal_perturbation": {"const": True}},
+                    },
+                ],
             },
         },
         {
@@ -2312,13 +2529,33 @@ _VALIDATION_EVENT_JSON_SCHEMA = {
                     "perturbation_confirmed",
                     "phenotype_reproduced",
                     "opposite_direction_reproduced",
+                    "appropriate_control",
+                    "assay_adequate",
                 ],
                 "properties": {
                     "testing_status": {"const": "tested"},
                     "perturbation_confirmed": {"const": True},
                     "phenotype_reproduced": {"const": False},
                     "opposite_direction_reproduced": {"const": True},
+                    "appropriate_control": {"const": True},
+                    "assay_adequate": {"const": True},
+                    "phenotype_direction": {"enum": ["resistance", "sensitization"]},
                 },
+                "anyOf": [
+                    {
+                        "required": ["independent_reagent_count"],
+                        "properties": {
+                            "independent_reagent_count": {
+                                "type": "integer",
+                                "minimum": 2,
+                            }
+                        },
+                    },
+                    {
+                        "required": ["orthogonal_perturbation"],
+                        "properties": {"orthogonal_perturbation": {"const": True}},
+                    },
+                ],
             },
         },
         {
@@ -2337,6 +2574,26 @@ _VALIDATION_EVENT_JSON_SCHEMA = {
                     "effect_size": {"type": "null"},
                     "p_value": {"type": "null"},
                 },
+            },
+        },
+        {
+            "if": {
+                "properties": {
+                    "adjudication_status": {
+                        "enum": sorted(BENCHMARK_ADJUDICATION_STATUSES)
+                    }
+                }
+            },
+            "then": {
+                "required": [
+                    "curator",
+                    "source_family_id",
+                    "evidence_available_date",
+                    "review_comparison_id",
+                    "adjudication_decision_id",
+                    "adjudication_packet_id",
+                    "adjudication_method_version",
+                ]
             },
         },
         {
@@ -2401,6 +2658,12 @@ class ValidationEventRecord(StrictRecord):
     second_model_tested: bool | None = None
     source_url: HttpUrl
     source_locator: str = Field(min_length=1)
+    source_family_id: str | None = None
+    evidence_available_date: date | None = None
+    review_comparison_id: str | None = None
+    adjudication_decision_id: str | None = None
+    adjudication_packet_id: str | None = None
+    adjudication_method_version: str | None = None
     curator: str | None = None
     adjudication_status: str = "single_curator"
     notes: str | None = None
@@ -2434,6 +2697,13 @@ class ValidationEventRecord(StrictRecord):
                 raise ValueError("V2/V3 cannot reproduce the opposite direction")
             if self.appropriate_control is not True:
                 raise ValueError("V2/V3 require an appropriate control")
+            if self.assay_adequate is not True:
+                raise ValueError("V2/V3 require an adequate assay")
+            if self.phenotype_direction not in {
+                PhenotypeDirection.RESISTANCE,
+                PhenotypeDirection.SENSITIZATION,
+            }:
+                raise ValueError("V2/V3 require a resolved phenotype direction")
             reagent_rule_met = (
                 self.independent_reagent_count or 0
             ) >= 2 or self.orthogonal_perturbation is True
@@ -2453,22 +2723,52 @@ class ValidationEventRecord(StrictRecord):
                 self.testing_status != TestingStatus.TESTED
                 or self.perturbation_confirmed is not True
                 or self.assay_adequate is not True
+                or self.appropriate_control is not True
                 or self.phenotype_reproduced is not False
                 or self.opposite_direction_reproduced is True
             ):
                 raise ValueError(
                     "F0 requires a tested, confirmed perturbation, adequate assay, "
-                    "and non-reproduced phenotype"
+                    "appropriate control, and non-reproduced phenotype"
+                )
+            if self.phenotype_direction not in {
+                PhenotypeDirection.RESISTANCE,
+                PhenotypeDirection.SENSITIZATION,
+            }:
+                raise ValueError("F0 requires a resolved phenotype direction")
+            if not (
+                (self.independent_reagent_count or 0) >= 2
+                or self.orthogonal_perturbation is True
+            ):
+                raise ValueError(
+                    "F0 requires at least two independent reagents or an "
+                    "orthogonal perturbation strategy"
                 )
         if self.label_code == LabelCode.D:
             if (
                 self.testing_status != TestingStatus.TESTED
                 or self.perturbation_confirmed is not True
+                or self.assay_adequate is not True
+                or self.appropriate_control is not True
                 or self.phenotype_reproduced is not False
                 or self.opposite_direction_reproduced is not True
             ):
                 raise ValueError(
-                    "D requires confirmed testing with the opposite phenotype"
+                    "D requires confirmed testing, adequate assay and control, "
+                    "with the opposite phenotype"
+                )
+            if self.phenotype_direction not in {
+                PhenotypeDirection.RESISTANCE,
+                PhenotypeDirection.SENSITIZATION,
+            }:
+                raise ValueError("D requires a resolved phenotype direction")
+            if not (
+                (self.independent_reagent_count or 0) >= 2
+                or self.orthogonal_perturbation is True
+            ):
+                raise ValueError(
+                    "D requires at least two independent reagents or an "
+                    "orthogonal perturbation strategy"
                 )
         if (
             self.label_code == LabelCode.U
@@ -2496,6 +2796,25 @@ class ValidationEventRecord(StrictRecord):
             and self.testing_status != TestingStatus.TESTED
         ):
             raise ValueError("V3/V2/V1/F0/D/A/T require testing_status=tested")
+        if self.adjudication_status in BENCHMARK_ADJUDICATION_STATUSES:
+            required_lineage = {
+                "curator": self.curator,
+                "source_family_id": self.source_family_id,
+                "evidence_available_date": self.evidence_available_date,
+                "review_comparison_id": self.review_comparison_id,
+                "adjudication_decision_id": self.adjudication_decision_id,
+                "adjudication_packet_id": self.adjudication_packet_id,
+                "adjudication_method_version": self.adjudication_method_version,
+            }
+            missing = sorted(
+                name
+                for name, value in required_lineage.items()
+                if value is None or (isinstance(value, str) and not value.strip())
+            )
+            if missing:
+                raise ValueError(
+                    f"benchmark adjudication requires checksum-bound lineage: {missing}"
+                )
         return self
 
 
@@ -5529,6 +5848,8 @@ CONTRACTS: dict[str, type[StrictRecord]] = {
     "curation_queue": CurationQueueRecord,
     "full_text_review": FullTextReviewRecord,
     "review_comparison": ReviewComparisonRecord,
+    "adjudication_packet": AdjudicationPacketRecord,
+    "adjudication_decision": AdjudicationDecisionRecord,
     "run_accession_inventory": RunAccessionInventoryRecord,
     "run_contrast_scope": RunContrastScopeRecord,
     "run_accession_map": RunAccessionMapRecord,
@@ -5596,6 +5917,260 @@ def validate_records(
     return valid, pd.DataFrame(errors)
 
 
+def _canonical_record_sha256(record: StrictRecord) -> str:
+    payload = json.dumps(
+        record.model_dump(mode="json"),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _validated_record_sha256(
+    frame: pd.DataFrame | None,
+    model: type[StrictRecord],
+    *,
+    key_field: str,
+    allow_empty: bool,
+) -> tuple[pd.DataFrame, dict[str, str]]:
+    if frame is None or frame.empty:
+        if allow_empty:
+            return pd.DataFrame(columns=list(model.model_fields)), {}
+        raise ValueError(f"{model.__name__} release table contains no records")
+    valid, errors = validate_records(frame, model)
+    if not errors.empty or len(valid) != len(frame):
+        raise ValueError(
+            f"{model.__name__} release rows failed contract validation: "
+            f"{errors.head(5).to_dict(orient='records')}"
+        )
+    hashes: dict[str, str] = {}
+    for _, row in valid.iterrows():
+        parsed = model.model_validate(
+            {
+                key: (None if pd.isna(value) else value)
+                for key, value in row.to_dict().items()
+            }
+        )
+        key = str(getattr(parsed, key_field))
+        if key in hashes:
+            raise ValueError(f"duplicate release record key: {key}")
+        hashes[key] = _canonical_record_sha256(parsed)
+    return valid, hashes
+
+
+@dataclass(frozen=True)
+class _VerifiedAdjudicationRelease:
+    manifest_sha256: str
+    decisions: pd.DataFrame
+    validation_events: pd.DataFrame
+    decision_record_sha256: dict[str, str]
+    validation_event_record_sha256: dict[str, str]
+
+
+def _verify_adjudication_release_manifest(
+    manifest_path: str | Path,
+    expected_sha256: str,
+    *,
+    adjudication_decisions: pd.DataFrame | None,
+    validation_events: pd.DataFrame | None,
+) -> _VerifiedAdjudicationRelease:
+    expected = expected_sha256.strip()
+    if len(expected) != 64 or any(
+        character not in "0123456789abcdef" for character in expected
+    ):
+        raise ValueError(
+            "expected_adjudication_release_manifest_sha256 must be a lowercase SHA-256"
+        )
+    content = Path(manifest_path).read_bytes()
+    if hashlib.sha256(content).hexdigest() != expected:
+        raise ValueError(
+            "adjudication release manifest SHA-256 does not match expected"
+        )
+    try:
+        manifest = json.loads(content.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(
+            "adjudication release manifest is not valid UTF-8 JSON"
+        ) from exc
+    if not isinstance(manifest, dict):
+        raise ValueError("adjudication release manifest must be a JSON object")
+    required_state = {
+        "schema": "crispr-evidencerank.adjudication-release-manifest",
+        "schema_version": 1,
+        "method_version": "validation_adjudication_v1",
+        "status": "human_adjudication_released_without_readiness_promotion",
+        "benchmark_ready_count": 0,
+    }
+    for key, required in required_state.items():
+        if manifest.get(key) != required:
+            raise ValueError(f"adjudication release manifest has invalid {key}")
+
+    valid_decisions, decision_hashes = _validated_record_sha256(
+        adjudication_decisions,
+        AdjudicationDecisionRecord,
+        key_field="decision_id",
+        allow_empty=False,
+    )
+    valid_events, event_hashes = _validated_record_sha256(
+        validation_events,
+        ValidationEventRecord,
+        key_field="event_id",
+        allow_empty=True,
+    )
+    declared_hashes = manifest.get("record_sha256")
+    if not isinstance(declared_hashes, dict):
+        raise ValueError("adjudication release manifest omits record_sha256")
+    if declared_hashes.get("decisions") != decision_hashes:
+        raise ValueError("decision records differ from the pinned adjudication release")
+    if declared_hashes.get("validation_events") != event_hashes:
+        raise ValueError(
+            "validation-event records differ from the pinned adjudication release"
+        )
+    packet_item_hashes = declared_hashes.get("packet_items")
+    if not isinstance(packet_item_hashes, dict) or any(
+        not isinstance(item_id, str)
+        or not isinstance(row_hash, str)
+        or len(row_hash) != 64
+        or any(character not in "0123456789abcdef" for character in row_hash)
+        for item_id, row_hash in (
+            packet_item_hashes.items() if isinstance(packet_item_hashes, dict) else []
+        )
+    ):
+        raise ValueError("adjudication release has invalid packet-item hashes")
+    if manifest.get("decision_count") != len(valid_decisions):
+        raise ValueError("adjudication release decision_count is inconsistent")
+    if manifest.get("packet_item_count") != len(packet_item_hashes):
+        raise ValueError("adjudication release packet-item count is inconsistent")
+    if manifest.get("released_event_count") != len(valid_events):
+        raise ValueError("adjudication release event count is inconsistent")
+
+    decision_packet_items = valid_decisions["packet_item_id"].astype(str)
+    if decision_packet_items.duplicated().any() or set(decision_packet_items) != set(
+        packet_item_hashes
+    ):
+        raise ValueError(
+            "adjudication decisions do not cover packet items exactly once"
+        )
+
+    released = valid_decisions.loc[
+        valid_decisions["disposition"]
+        .astype(str)
+        .eq(AdjudicationDecisionDisposition.RELEASE_VALIDATION_EVENT.value)
+    ]
+    released_event_ids = set(released["validation_event_id"].astype(str))
+    if released["validation_event_id"].astype(str).duplicated().any() or (
+        released_event_ids != set(event_hashes)
+    ):
+        raise ValueError("adjudication release graph is incomplete or inconsistent")
+    released_by_event = {
+        str(row["validation_event_id"]): row for _, row in released.iterrows()
+    }
+    parent_packet = manifest.get("parent_packet_manifest")
+    if not isinstance(parent_packet, dict) or not isinstance(
+        parent_packet.get("sha256"), str
+    ):
+        raise ValueError("adjudication release omits its parent packet checksum")
+    try:
+        manifest_adjudicated_date = pd.Timestamp(manifest["adjudicated_date"]).date()
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(
+            "adjudication release has an invalid adjudicated_date"
+        ) from exc
+    parsed_events = {
+        str(row["event_id"]): ValidationEventRecord.model_validate(
+            {
+                key: (None if pd.isna(value) else value)
+                for key, value in row.to_dict().items()
+            }
+        )
+        for _, row in valid_events.iterrows()
+    }
+    for _, row in valid_decisions.iterrows():
+        decision = AdjudicationDecisionRecord.model_validate(
+            {
+                key: (None if pd.isna(value) else value)
+                for key, value in row.to_dict().items()
+            }
+        )
+        if (
+            decision.adjudicated_date != manifest_adjudicated_date
+            or decision.packet_manifest_sha256 != parent_packet["sha256"]
+            or decision.packet_id != manifest.get("packet_id")
+        ):
+            raise ValueError(
+                "adjudication release mixes decisions from different packets or dates"
+            )
+    for event_id, event_hash in event_hashes.items():
+        decision = AdjudicationDecisionRecord.model_validate(
+            {
+                key: (None if pd.isna(value) else value)
+                for key, value in released_by_event[event_id].to_dict().items()
+            }
+        )
+        event = parsed_events[event_id]
+        if decision.validation_event_row_sha256 != event_hash:
+            raise ValueError(
+                "adjudication decision does not bind its released event row"
+            )
+        graph_matches = (
+            event.adjudication_decision_id == decision.decision_id
+            and event.screen_id == decision.screen_id
+            and event.gene_symbol == decision.gene_symbol
+            and event.adjudication_packet_id == decision.packet_id
+            and event.review_comparison_id == decision.comparison_id
+            and _normalized_claim_text(event.curator or "")
+            == _normalized_claim_text(decision.adjudicator_name)
+            and event.adjudication_method_version == "validation_adjudication_v1"
+            and event.adjudication_status == "consensus_adjudicated"
+            and event.evidence_available_date is not None
+            and event.evidence_available_date <= decision.adjudicated_date
+            and decision.adjudicated_date == manifest_adjudicated_date
+            and decision.packet_manifest_sha256 == parent_packet["sha256"]
+            and decision.packet_id == manifest.get("packet_id")
+        )
+        if not graph_matches:
+            raise ValueError(
+                "adjudication release contains an inconsistent decision/event graph"
+            )
+    disposition_counts = {
+        str(key): int(value)
+        for key, value in valid_decisions["disposition"]
+        .astype(str)
+        .value_counts()
+        .sort_index()
+        .items()
+    }
+    label_counts = {
+        str(key): int(value)
+        for key, value in valid_events.get("label_code", pd.Series(dtype=str))
+        .astype(str)
+        .value_counts()
+        .sort_index()
+        .items()
+    }
+    if manifest.get("disposition_counts") != disposition_counts:
+        raise ValueError("adjudication release disposition counts are inconsistent")
+    if manifest.get("label_counts") != label_counts:
+        raise ValueError("adjudication release label counts are inconsistent")
+    primary_count = int(
+        valid_events.get("label_code", pd.Series(dtype=str))
+        .astype(str)
+        .isin({"V2", "V3", "F0", "D"})
+        .sum()
+    )
+    if manifest.get("released_primary_label_count") != primary_count:
+        raise ValueError("adjudication release primary-label count is inconsistent")
+    return _VerifiedAdjudicationRelease(
+        manifest_sha256=expected,
+        decisions=valid_decisions,
+        validation_events=valid_events,
+        decision_record_sha256=decision_hashes,
+        validation_event_record_sha256=event_hashes,
+    )
+
+
 _PRIMARY_VALIDATION_LABELS = frozenset(
     {LabelCode.V2, LabelCode.V3, LabelCode.F0, LabelCode.D}
 )
@@ -5609,17 +6184,7 @@ _BENCHMARK_APPROVED_CURATOR_STATUSES = frozenset(
         "curated_for_benchmark",
     }
 )
-_BENCHMARK_ADJUDICATION_STATUSES = frozenset(
-    {
-        "adjudicated",
-        "consensus",
-        "consensus_adjudicated",
-        "double_curated",
-        "dual_curator_consensus",
-        "approved_for_benchmark",
-        "verified_for_benchmark",
-    }
-)
+_BENCHMARK_ADJUDICATION_STATUSES = BENCHMARK_ADJUDICATION_STATUSES
 
 
 def _fact_text(value: object) -> str | None:
@@ -5714,6 +6279,8 @@ def _benchmark_fact_failures(
     samples: pd.DataFrame | None,
     gene_scores: pd.DataFrame | None,
     validation_events: pd.DataFrame | None,
+    adjudication_decisions: pd.DataFrame | None,
+    verified_adjudication_release: _VerifiedAdjudicationRelease | None,
     data_assets: pd.DataFrame | None,
 ) -> list[str]:
     """Derive policy-v2 readiness gates from linked registry facts.
@@ -5724,7 +6291,7 @@ def _benchmark_fact_failures(
 
     failures: list[str] = []
     screen_rows = _screen_records(screens, screen_id)
-    screen_row = screen_rows[0] if screen_rows else {}
+    screen_row = screen_rows[0] if len(screen_rows) == 1 else {}
     source_family = _fact_text(screen_row.get("source_family_id"))
     raw_family = _fact_text(screen_row.get("raw_data_family_id"))
     if source_family is None:
@@ -5806,10 +6373,56 @@ def _benchmark_fact_failures(
     if not rights_verified:
         failures.append("rights.source_and_raw_data")
 
+    event_records = _screen_records(validation_events, screen_id)
+    parsed_events: list[ValidationEventRecord] = []
+    invalid_event_present = False
+    for event in event_records:
+        clean_event = {
+            key: (None if pd.isna(value) else value) for key, value in event.items()
+        }
+        try:
+            parsed_events.append(ValidationEventRecord.model_validate(clean_event))
+        except (TypeError, ValueError):
+            invalid_event_present = True
+
+    parsed_decisions: list[AdjudicationDecisionRecord] = []
+    invalid_decision_present = False
+    for decision in _screen_records(adjudication_decisions, screen_id):
+        clean_decision = {
+            key: (None if pd.isna(value) else value) for key, value in decision.items()
+        }
+        try:
+            parsed_decisions.append(
+                AdjudicationDecisionRecord.model_validate(clean_decision)
+            )
+        except (TypeError, ValueError):
+            invalid_decision_present = True
+    released_decisions = [
+        decision
+        for decision in parsed_decisions
+        if decision.disposition
+        == AdjudicationDecisionDisposition.RELEASE_VALIDATION_EVENT
+    ]
+    released_event_ids = [
+        str(decision.validation_event_id) for decision in released_decisions
+    ]
+    if len(released_event_ids) != len(set(released_event_ids)):
+        invalid_decision_present = True
+    parsed_event_ids = [event.event_id for event in parsed_events]
+    if len(parsed_event_ids) != len(set(parsed_event_ids)):
+        invalid_event_present = True
+    if set(released_event_ids) != set(parsed_event_ids):
+        invalid_decision_present = True
+    decision_by_event = {
+        str(decision.validation_event_id): decision for decision in released_decisions
+    }
+    if verified_adjudication_release is None:
+        invalid_decision_present = True
+
     primary_event_present = False
-    for event in _screen_records(validation_events, screen_id):
-        event_contrast = _fact_text(event.get("contrast_id"))
-        event_gene = _fact_text(event.get("gene_symbol"))
+    for parsed in parsed_events:
+        event_contrast = _fact_text(parsed.contrast_id)
+        event_gene = _fact_text(parsed.gene_symbol)
         if (
             event_contrast not in signal_bearing_contrasts
             or (
@@ -5820,29 +6433,79 @@ def _benchmark_fact_failures(
         ):
             continue
         directions = score_directions[(event_contrast, event_gene)]
-        event_direction = _fact_token(event.get("phenotype_direction"))
-        if (
-            directions
-            and None not in directions
-            and PhenotypeDirection.UNKNOWN.value not in directions
-            and event_direction not in directions
+        event_direction = _fact_token(parsed.phenotype_direction)
+        if directions != {event_direction}:
+            continue
+        contrast_matches = [
+            contrast
+            for contrast in contrast_rows
+            if _fact_text(contrast.get("contrast_id")) == event_contrast
+        ]
+        if len(contrast_matches) != 1:
+            continue
+        contrast = contrast_matches[0]
+        expected_direction = _fact_token(contrast.get("intended_direction"))
+        if expected_direction != event_direction:
+            continue
+        if _fact_token(parsed.drug_name) != _fact_token(contrast.get("treatment_name")):
+            continue
+        if _fact_token(parsed.cell_line) != _fact_token(screen_row.get("cell_line")):
+            continue
+        if _fact_token(parsed.perturbation_modality) != _fact_token(
+            screen_row.get("perturbation_modality")
         ):
             continue
-        clean_event = {
-            key: (None if pd.isna(value) else value) for key, value in event.items()
-        }
-        try:
-            parsed = ValidationEventRecord.model_validate(clean_event)
-        except (TypeError, ValueError):
+        if _fact_text(parsed.study_id) != _fact_text(screen_row.get("study_id")):
+            continue
+        if _fact_text(parsed.source_family_id) != source_family:
+            continue
+        decision = decision_by_event.get(parsed.event_id)
+        if decision is None:
+            continue
+        if verified_adjudication_release is None:
+            continue
+        if (
+            decision.decision_id
+            not in verified_adjudication_release.decision_record_sha256
+            or parsed.event_id
+            not in verified_adjudication_release.validation_event_record_sha256
+        ):
+            continue
+        if (
+            decision.decision_id != parsed.adjudication_decision_id
+            or decision.packet_id != parsed.adjudication_packet_id
+            or decision.comparison_id != parsed.review_comparison_id
+            or decision.screen_id != parsed.screen_id
+            or decision.gene_symbol != parsed.gene_symbol
+            or _normalized_claim_text(decision.adjudicator_name)
+            != _normalized_claim_text(parsed.curator or "")
+        ):
+            continue
+        event_row_sha256 = hashlib.sha256(
+            json.dumps(
+                parsed.model_dump(mode="json"),
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            ).encode("utf-8")
+        ).hexdigest()
+        if decision.validation_event_row_sha256 != event_row_sha256:
+            continue
+        if (
+            parsed.evidence_available_date is None
+            or parsed.evidence_available_date > decision.adjudicated_date
+            or parsed.adjudication_method_version != "validation_adjudication_v1"
+        ):
             continue
         adjudication_status = _fact_token(parsed.adjudication_status)
         if (
             parsed.label_code in _PRIMARY_VALIDATION_LABELS
-            and adjudication_status in _BENCHMARK_ADJUDICATION_STATUSES
+            and adjudication_status == "consensus_adjudicated"
         ):
             primary_event_present = True
             break
-    if not primary_event_present:
+    if invalid_event_present or invalid_decision_present or not primary_event_present:
         failures.append("labels.adjudicated_validation_event")
     return failures
 
@@ -5859,6 +6522,9 @@ def validate_registry_integrity(
     gene_scores: pd.DataFrame | None = None,
     candidates: pd.DataFrame | None = None,
     validation_events: pd.DataFrame | None = None,
+    adjudication_decisions: pd.DataFrame | None = None,
+    adjudication_release_manifest: str | Path | None = None,
+    expected_adjudication_release_manifest_sha256: str | None = None,
     evidence: pd.DataFrame | None = None,
     external_screen_maps: pd.DataFrame | None = None,
     screen_intake: pd.DataFrame | None = None,
@@ -5869,6 +6535,68 @@ def validate_registry_integrity(
     """Check core foreign-key relationships across normalized registry tables."""
 
     errors: list[dict[str, Any]] = []
+    verified_adjudication_release: _VerifiedAdjudicationRelease | None = None
+    release_arguments_present = (
+        adjudication_release_manifest is not None,
+        expected_adjudication_release_manifest_sha256 is not None,
+    )
+    if any(release_arguments_present) and not all(release_arguments_present):
+        errors.append(
+            {
+                "table": "adjudication_release_manifest",
+                "row_number": 1,
+                "error": (
+                    "both adjudication_release_manifest and its expected SHA-256 "
+                    "are required"
+                ),
+            }
+        )
+    elif all(release_arguments_present):
+        try:
+            verified_adjudication_release = _verify_adjudication_release_manifest(
+                adjudication_release_manifest,
+                str(expected_adjudication_release_manifest_sha256),
+                adjudication_decisions=adjudication_decisions,
+                validation_events=validation_events,
+            )
+        except (OSError, TypeError, ValueError) as exc:
+            errors.append(
+                {
+                    "table": "adjudication_release_manifest",
+                    "row_number": 1,
+                    "error": str(exc),
+                }
+            )
+
+    effective_validation_events = (
+        verified_adjudication_release.validation_events
+        if verified_adjudication_release is not None
+        else validation_events
+    )
+    effective_adjudication_decisions = (
+        verified_adjudication_release.decisions
+        if verified_adjudication_release is not None
+        else adjudication_decisions
+    )
+    for table_name, table, model in (
+        ("validation_events", validation_events, ValidationEventRecord),
+        (
+            "adjudication_decisions",
+            adjudication_decisions,
+            AdjudicationDecisionRecord,
+        ),
+    ):
+        if table is None or table.empty:
+            continue
+        _, contract_errors = validate_records(table, model)
+        for contract_error in contract_errors.to_dict(orient="records"):
+            errors.append(
+                {
+                    "table": table_name,
+                    "row_number": contract_error["row_number"],
+                    "error": contract_error["error"],
+                }
+            )
     study_ids = set(studies.get("study_id", pd.Series(dtype=str)).dropna())
     screen_ids = set(screens.get("screen_id", pd.Series(dtype=str)).dropna())
     library_ids = (
@@ -5940,6 +6668,7 @@ def validate_registry_integrity(
         ("external_screen_maps", external_screen_maps),
         ("screen_intake", screen_intake),
         ("eligibility_checks", eligibility_checks),
+        ("adjudication_decisions", adjudication_decisions),
     ):
         if table is None:
             continue
@@ -6218,7 +6947,9 @@ def validate_registry_integrity(
                     contrasts=contrasts,
                     samples=samples,
                     gene_scores=gene_scores,
-                    validation_events=validation_events,
+                    validation_events=effective_validation_events,
+                    adjudication_decisions=effective_adjudication_decisions,
+                    verified_adjudication_release=(verified_adjudication_release),
                     data_assets=data_assets,
                 )
                 if fact_failures:
@@ -6338,66 +7069,94 @@ def validate_registry_integrity(
                         }
                     )
 
-    if candidates is not None and validation_events is not None:
-        try:
-            adjudicated = adjudicate_validation_events(validation_events)
-        except ValueError as exc:
+    if candidates is not None:
+        non_u_candidate_present = bool(
+            candidates.get("label_code", pd.Series(dtype=str))
+            .astype(str)
+            .ne(LabelCode.U.value)
+            .any()
+        )
+        validation_event_rows_present = (
+            validation_events is not None and not validation_events.empty
+        )
+        release_required = non_u_candidate_present or validation_event_rows_present
+        if release_required and verified_adjudication_release is None:
             errors.append(
                 {
                     "table": "validation_events",
                     "row_number": 1,
-                    "error": str(exc),
+                    "error": (
+                        "candidate labels require a checksum-verified "
+                        "adjudication release manifest"
+                    ),
                 }
             )
-        else:
-            candidate_lookup = {
-                tuple(row[column] for column in CANDIDATE_KEY): row
-                for _, row in candidates.iterrows()
-            }
-            adjudicated_keys = set()
-            for _, event_row in adjudicated.iterrows():
-                key = tuple(event_row[column] for column in CANDIDATE_KEY)
-                adjudicated_keys.add(key)
-                candidate_row = candidate_lookup.get(key)
-                if candidate_row is None:
-                    errors.append(
-                        {
-                            "table": "validation_events",
-                            "row_number": 1,
-                            "error": (
-                                f"adjudicated event key has no candidate row: {key}"
-                            ),
-                        }
-                    )
-                elif str(candidate_row["label_code"]) != str(event_row["label_code"]):
-                    errors.append(
-                        {
-                            "table": "candidates",
-                            "row_number": 1,
-                            "error": (
-                                f"candidate label {candidate_row['label_code']} "
-                                "does not match event adjudication "
-                                f"{event_row['label_code']} for {key}"
-                            ),
-                        }
-                    )
-            for row_number, (_, candidate_row) in enumerate(
-                candidates.iterrows(), start=2
-            ):
-                key = tuple(candidate_row[column] for column in CANDIDATE_KEY)
-                if (
-                    str(candidate_row["label_code"]) != LabelCode.U.value
-                    and key not in adjudicated_keys
+        elif verified_adjudication_release is not None:
+            try:
+                adjudicated = _resolve_released_validation_events(
+                    effective_validation_events,
+                    effective_adjudication_decisions,
+                )
+            except ValueError as exc:
+                errors.append(
+                    {
+                        "table": "validation_events",
+                        "row_number": 1,
+                        "error": str(exc),
+                    }
+                )
+            else:
+                candidate_lookup = {
+                    tuple(row[column] for column in CANDIDATE_KEY): row
+                    for _, row in candidates.iterrows()
+                }
+                adjudicated_keys = set()
+                for _, event_row in adjudicated.iterrows():
+                    key = tuple(event_row[column] for column in CANDIDATE_KEY)
+                    adjudicated_keys.add(key)
+                    candidate_row = candidate_lookup.get(key)
+                    if candidate_row is None:
+                        errors.append(
+                            {
+                                "table": "validation_events",
+                                "row_number": 1,
+                                "error": (
+                                    f"adjudicated event key has no candidate row: {key}"
+                                ),
+                            }
+                        )
+                    elif str(candidate_row["label_code"]) != str(
+                        event_row["label_code"]
+                    ):
+                        errors.append(
+                            {
+                                "table": "candidates",
+                                "row_number": 1,
+                                "error": (
+                                    f"candidate label {candidate_row['label_code']} "
+                                    "does not match event adjudication "
+                                    f"{event_row['label_code']} for {key}"
+                                ),
+                            }
+                        )
+                for row_number, (_, candidate_row) in enumerate(
+                    candidates.iterrows(), start=2
                 ):
-                    errors.append(
-                        {
-                            "table": "candidates",
-                            "row_number": row_number,
-                            "error": (
-                                f"non-U candidate has no linked validation event: {key}"
-                            ),
-                        }
-                    )
+                    key = tuple(candidate_row[column] for column in CANDIDATE_KEY)
+                    if (
+                        str(candidate_row["label_code"]) != LabelCode.U.value
+                        and key not in adjudicated_keys
+                    ):
+                        errors.append(
+                            {
+                                "table": "candidates",
+                                "row_number": row_number,
+                                "error": (
+                                    "non-U candidate has no linked validation "
+                                    f"event: {key}"
+                                ),
+                            }
+                        )
 
     if contrasts is not None:
         for table_name, table in (

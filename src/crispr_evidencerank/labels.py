@@ -77,14 +77,69 @@ CANDIDATE_KEY = (
 )
 
 
-def adjudicate_validation_events(events: pd.DataFrame) -> pd.DataFrame:
-    """Resolve linked event rows to one conservative candidate-level label."""
+def _resolve_released_validation_events(
+    events: pd.DataFrame,
+    adjudication_decisions: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Purely resolve prevalidated, release-verified events to candidate labels.
 
-    required = {*CANDIDATE_KEY, "label_code"}
+    This private helper is not a release verifier. Callers must first validate
+    the full contracts and a checksum-pinned adjudication release manifest.
+    """
+
+    required = {
+        *CANDIDATE_KEY,
+        "event_id",
+        "label_code",
+        "adjudication_decision_id",
+        "adjudication_status",
+    }
     missing = required - set(events.columns)
     if missing:
         raise ValueError(f"validation events are missing columns: {sorted(missing)}")
-    linked = events.dropna(subset=list(CANDIDATE_KEY)).copy()
+    if adjudication_decisions is None:
+        linked = events.iloc[0:0].copy()
+    else:
+        decision_required = {
+            "decision_id",
+            "disposition",
+            "validation_event_id",
+        }
+        decision_missing = decision_required - set(adjudication_decisions.columns)
+        if decision_missing:
+            raise ValueError(
+                "adjudication decisions are missing columns: "
+                f"{sorted(decision_missing)}"
+            )
+        released = adjudication_decisions.loc[
+            adjudication_decisions["disposition"]
+            .astype(str)
+            .eq("release_validation_event")
+        ].copy()
+        if released["validation_event_id"].isna().any():
+            raise ValueError("released decisions require validation_event_id")
+        if released["validation_event_id"].astype(str).duplicated().any():
+            raise ValueError("one validation event cannot be released twice")
+        decision_by_event = {
+            str(row["validation_event_id"]): str(row["decision_id"])
+            for _, row in released.iterrows()
+        }
+        linked = events.loc[
+            events["event_id"].astype(str).isin(decision_by_event)
+        ].copy()
+        linked = linked.loc[
+            linked.apply(
+                lambda row: (
+                    str(row["adjudication_decision_id"])
+                    == decision_by_event.get(str(row["event_id"]))
+                ),
+                axis=1,
+            )
+        ]
+        linked = linked.loc[
+            linked["adjudication_status"].astype(str).eq("consensus_adjudicated")
+        ]
+    linked = linked.dropna(subset=list(CANDIDATE_KEY)).copy()
     if linked.empty:
         return pd.DataFrame(
             columns=[*CANDIDATE_KEY, "label_code", "validation_event_count"]

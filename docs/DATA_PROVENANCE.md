@@ -282,3 +282,40 @@ evidence-level disagreement, and two single-curator observations across 20
 gene-level rows. Every row still requires named human adjudication; comparison
 is excluded from selection, design features, readiness derivation, and released
 labels.
+
+## Human adjudication provenance
+
+`prepare-validation-adjudication` verifies the completed-review manifest and
+comparison checksums before creating an unsigned evidence packet. Packet rows
+bind the source-family, screen, gene, both review records, their row digests,
+and the parent manifest digest. Reviewer agreement remains a comparison state,
+not a label.
+
+Exactly one named human decision is required for every immutable packet item.
+Its provenance includes adjudicator identity and affiliation, decision date,
+source locator, rationale, conflict declaration, and attestations that the
+source was reviewed, the decision was independent, model outputs were unseen,
+and no automated label assignment occurred. The only dispositions are
+`release_validation_event`, `no_qualifying_event`, and `defer_unresolved`.
+The latter two release no event; in particular, `no_qualifying_event` cannot be
+reinterpreted as `U` or `F0`.
+
+`finalize-validation-adjudication` requires expected SHA-256 values for its
+packet manifest, decision table, and validation-event table. Each release
+decision also binds the exact canonical validation-event row SHA-256. The
+supported `hash-validation-events` command validates the event contract and
+emits these hashes without assigning labels. The
+command requires exact decision coverage, validates any released event, and
+publishes atomically without overwriting an existing destination.
+Adjudication lineage alone cannot satisfy corpus readiness: the release
+manifest retains `benchmark_ready_count=0` until independent quantitative
+data/QC, rights, comparator/sample-map, and source/raw-family checks pass. The
+checked-in pilot contains only an unsigned packet and blank worksheets, never
+real signed human decisions.
+
+The pinned release manifest is the registry trust root. It records canonical
+hashes for every packet item, decision, and event; candidate reconciliation
+rejects bare or partial TSVs even when they are internally self-consistent.
+Stable reviewer person identifiers are unavailable in the frozen pilot, so
+identity independence is human-attested and explicitly not presented as
+cryptographic proof.

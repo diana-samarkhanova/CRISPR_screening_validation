@@ -1,0 +1,253 @@
+{
+  "$defs": {
+    "ReviewEvidenceLevel": {
+      "description": "Per-gene evidence level extracted from one full-text review.",
+      "enum": [
+        "candidate_v3",
+        "candidate_v2",
+        "candidate_v1",
+        "nonqualifying",
+        "not_annotated"
+      ],
+      "title": "ReviewEvidenceLevel",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Read-only evidence card for one pending human decision.\n\nThe contract deliberately has no final label or disposition field.  It is\na checksum-bound prompt, not a released validation outcome.",
+  "properties": {
+    "packet_item_id": {
+      "minLength": 1,
+      "title": "Packet Item Id",
+      "type": "string"
+    },
+    "packet_id": {
+      "minLength": 1,
+      "title": "Packet Id",
+      "type": "string"
+    },
+    "comparison_id": {
+      "minLength": 1,
+      "title": "Comparison Id",
+      "type": "string"
+    },
+    "comparison_row_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Comparison Row Sha256",
+      "type": "string"
+    },
+    "parent_dual_review_manifest_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Parent Dual Review Manifest Sha256",
+      "type": "string"
+    },
+    "batch_id": {
+      "minLength": 1,
+      "title": "Batch Id",
+      "type": "string"
+    },
+    "queue_id": {
+      "minLength": 1,
+      "title": "Queue Id",
+      "type": "string"
+    },
+    "queue_rank": {
+      "minimum": 1,
+      "title": "Queue Rank",
+      "type": "integer"
+    },
+    "screen_id": {
+      "minLength": 1,
+      "title": "Screen Id",
+      "type": "string"
+    },
+    "external_screen_id": {
+      "minLength": 1,
+      "title": "External Screen Id",
+      "type": "string"
+    },
+    "gene_symbol": {
+      "minLength": 1,
+      "title": "Gene Symbol",
+      "type": "string"
+    },
+    "source_family_id": {
+      "minLength": 1,
+      "title": "Source Family Id",
+      "type": "string"
+    },
+    "doi": {
+      "minLength": 1,
+      "title": "Doi",
+      "type": "string"
+    },
+    "paper_url": {
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Paper Url",
+      "type": "string"
+    },
+    "full_text_url": {
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Full Text Url",
+      "type": "string"
+    },
+    "supplement_url": {
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Supplement Url",
+      "type": "string"
+    },
+    "reviewer_a_review_id": {
+      "minLength": 1,
+      "title": "Reviewer A Review Id",
+      "type": "string"
+    },
+    "reviewer_a_curator": {
+      "minLength": 1,
+      "title": "Reviewer A Curator",
+      "type": "string"
+    },
+    "reviewer_a_row_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Reviewer A Row Sha256",
+      "type": "string"
+    },
+    "reviewer_a_evidence_level": {
+      "$ref": "#/$defs/ReviewEvidenceLevel"
+    },
+    "reviewer_a_source_locator": {
+      "minLength": 1,
+      "title": "Reviewer A Source Locator",
+      "type": "string"
+    },
+    "reviewer_a_screen_model": {
+      "minLength": 1,
+      "title": "Reviewer A Screen Model",
+      "type": "string"
+    },
+    "reviewer_a_treatment_contrast": {
+      "minLength": 1,
+      "title": "Reviewer A Treatment Contrast",
+      "type": "string"
+    },
+    "reviewer_a_screen_replication": {
+      "minLength": 1,
+      "title": "Reviewer A Screen Replication",
+      "type": "string"
+    },
+    "reviewer_a_notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reviewer A Notes"
+    },
+    "reviewer_b_review_id": {
+      "minLength": 1,
+      "title": "Reviewer B Review Id",
+      "type": "string"
+    },
+    "reviewer_b_curator": {
+      "minLength": 1,
+      "title": "Reviewer B Curator",
+      "type": "string"
+    },
+    "reviewer_b_row_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Reviewer B Row Sha256",
+      "type": "string"
+    },
+    "reviewer_b_evidence_level": {
+      "$ref": "#/$defs/ReviewEvidenceLevel"
+    },
+    "reviewer_b_source_locator": {
+      "minLength": 1,
+      "title": "Reviewer B Source Locator",
+      "type": "string"
+    },
+    "reviewer_b_screen_model": {
+      "minLength": 1,
+      "title": "Reviewer B Screen Model",
+      "type": "string"
+    },
+    "reviewer_b_treatment_contrast": {
+      "minLength": 1,
+      "title": "Reviewer B Treatment Contrast",
+      "type": "string"
+    },
+    "reviewer_b_screen_replication": {
+      "minLength": 1,
+      "title": "Reviewer B Screen Replication",
+      "type": "string"
+    },
+    "reviewer_b_notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reviewer B Notes"
+    },
+    "comparison_assessed_date": {
+      "format": "date",
+      "title": "Comparison Assessed Date",
+      "type": "string"
+    },
+    "human_adjudication_required": {
+      "default": true,
+      "title": "Human Adjudication Required",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "packet_item_id",
+    "packet_id",
+    "comparison_id",
+    "comparison_row_sha256",
+    "parent_dual_review_manifest_sha256",
+    "batch_id",
+    "queue_id",
+    "queue_rank",
+    "screen_id",
+    "external_screen_id",
+    "gene_symbol",
+    "source_family_id",
+    "doi",
+    "paper_url",
+    "full_text_url",
+    "supplement_url",
+    "reviewer_a_review_id",
+    "reviewer_a_curator",
+    "reviewer_a_row_sha256",
+    "reviewer_a_evidence_level",
+    "reviewer_a_source_locator",
+    "reviewer_a_screen_model",
+    "reviewer_a_treatment_contrast",
+    "reviewer_a_screen_replication",
+    "reviewer_b_review_id",
+    "reviewer_b_curator",
+    "reviewer_b_row_sha256",
+    "reviewer_b_evidence_level",
+    "reviewer_b_source_locator",
+    "reviewer_b_screen_model",
+    "reviewer_b_treatment_contrast",
+    "reviewer_b_screen_replication",
+    "comparison_assessed_date"
+  ],
+  "title": "AdjudicationPacketRecord",
+  "type": "object"
+}

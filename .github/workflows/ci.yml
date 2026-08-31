@@ -82,6 +82,17 @@ jobs:
 
       - name: Run wheel-installed CLI reports end to end
         run: |
+          /tmp/crispr-evidencerank-wheel/bin/crispr-evidencerank \
+            prepare-validation-adjudication \
+            --completed-review-manifest \
+              data/manifests/orcs_2.0.18/curation_batches/batch_001/dual_review_manifest.json \
+            --expected-completed-review-manifest-sha256 \
+              4482acfaf1b9670d4e7c5e2dfa65cdf98ce6b24a69995ca7ebe34ff0abed2bf8 \
+            --expected-comparison-sha256 \
+              203da9c7a4f904df61a71940f99c883c1b5c67afac200a2af2686fb685b6660b \
+            --packet-id orcs-2.0.18-batch-001-adjudication-ci \
+            --prepared-date 2026-08-29 \
+            --output-dir /tmp/validation-adjudication-packet
           /tmp/crispr-evidencerank-wheel/bin/crispr-evidencerank rank-screen \
             --mageck-summary examples/synthetic/mageck_gene_summary.tsv \
             --screen-id synthetic_olaparib \
@@ -150,3 +161,23 @@ jobs:
           test -s /tmp/translation-context/clinical_trials.tsv
           test -s /tmp/translation-context/candidate_translation_context.tsv
           test -s /tmp/translation-context/summary.json
+          /tmp/crispr-evidencerank-wheel/bin/python - <<'PY'
+          import csv
+          import json
+          from pathlib import Path
+
+          output = Path("/tmp/validation-adjudication-packet")
+          manifest = json.loads(
+              (output / "adjudication_packet_manifest.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          with (output / "adjudication_packet.tsv").open(
+              encoding="utf-8", newline=""
+          ) as handle:
+              packet_rows = list(csv.DictReader(handle, delimiter="\t"))
+          assert len(packet_rows) == 20
+          assert manifest["record_count"] == 20
+          assert manifest["released_label_count"] == 0
+          assert manifest["benchmark_ready_count"] == 0
+          PY

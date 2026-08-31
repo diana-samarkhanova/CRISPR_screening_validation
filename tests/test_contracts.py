@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from crispr_evidencerank.contracts import (
     CONTRACTS,
     INTAKE_POLICY_V2_BENCHMARK_RULE_IDS,
     INTAKE_POLICY_V2_SCOPE_RULE_IDS,
+    AdjudicationDecisionRecord,
     CandidateRecord,
     ContrastRecord,
     DataAssetRecord,
@@ -406,7 +408,23 @@ def _passing_policy_checks(intake_id, screen_id):
     ]
 
 
-def _ready_registry_facts(*, include_validation=True, include_rights=True):
+def _canonical_model_sha256(record: ValidationEventRecord | AdjudicationDecisionRecord):
+    payload = json.dumps(
+        record.model_dump(mode="json"),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _ready_registry_facts(
+    tmp_path: Path,
+    *,
+    include_validation=True,
+    include_rights=True,
+):
     asset = {
         "asset_id": "A1",
         "screen_id": "SC1",
@@ -420,7 +438,90 @@ def _ready_registry_facts(*, include_validation=True, include_rights=True):
     if include_rights:
         asset["license_terms_url"] = "https://example.org/terms"
     validation_event = base_event()
-    validation_event["adjudication_status"] = "consensus_adjudicated"
+    validation_event.update(
+        {
+            "source_family_id": "SF1",
+            "evidence_available_date": "2025-01-01",
+            "review_comparison_id": "CMP1",
+            "adjudication_decision_id": "DEC1",
+            "adjudication_packet_id": "PACKET1",
+            "adjudication_method_version": "validation_adjudication_v1",
+            "adjudication_status": "consensus_adjudicated",
+        }
+    )
+    adjudication_decision = {
+        "decision_id": "DEC1",
+        "packet_id": "PACKET1",
+        "packet_item_id": "PACKET1:SC1:GENE1",
+        "comparison_id": "CMP1",
+        "comparison_row_sha256": "a" * 64,
+        "reviewer_a_review_id": "REV1",
+        "reviewer_a_row_sha256": "b" * 64,
+        "reviewer_b_review_id": "REV2",
+        "reviewer_b_row_sha256": "c" * 64,
+        "parent_dual_review_manifest_sha256": "d" * 64,
+        "packet_manifest_sha256": "e" * 64,
+        "batch_id": "BATCH1",
+        "screen_id": "SC1",
+        "gene_symbol": "GENE1",
+        "disposition": "release_validation_event",
+        "validation_event_id": "E1",
+        "validation_event_row_sha256": _canonical_model_sha256(
+            ValidationEventRecord.model_validate(validation_event)
+        ),
+        "followup_roster_status": "complete_followup_roster",
+        "adjudicator_name": "Diana",
+        "adjudicator_id": "ADJ1",
+        "adjudicator_affiliation": "Example Lab",
+        "adjudicated_date": "2025-01-02",
+        "source_evidence_reviewed_attested": True,
+        "independent_human_decision_attested": True,
+        "reviewer_identity_independence_attested": True,
+        "model_outputs_unseen_attested": True,
+        "no_automated_label_assignment_attested": True,
+        "conflict_of_interest_declared": False,
+        "conflict_of_interest_notes": None,
+        "evidence_source_locator": "Figure 2",
+        "decision_rationale": "Independent follow-up satisfies the V2 contract.",
+    }
+    parsed_event = ValidationEventRecord.model_validate(validation_event)
+    parsed_decision = AdjudicationDecisionRecord.model_validate(adjudication_decision)
+    release_manifest = {
+        "schema": "crispr-evidencerank.adjudication-release-manifest",
+        "schema_version": 1,
+        "method_version": "validation_adjudication_v1",
+        "status": "human_adjudication_released_without_readiness_promotion",
+        "packet_id": "PACKET1",
+        "adjudicated_date": "2025-01-02",
+        "parent_packet_manifest": {
+            "filename": "adjudication_packet_manifest.json",
+            "sha256": "e" * 64,
+        },
+        "decision_count": 1,
+        "packet_item_count": 1,
+        "released_event_count": 1,
+        "released_primary_label_count": 1,
+        "disposition_counts": {"release_validation_event": 1},
+        "label_counts": {"V2": 1},
+        "record_sha256": {
+            "decisions": {
+                parsed_decision.decision_id: _canonical_model_sha256(parsed_decision)
+            },
+            "packet_items": {parsed_decision.packet_item_id: "f" * 64},
+            "validation_events": {
+                parsed_event.event_id: _canonical_model_sha256(parsed_event)
+            },
+        },
+        "benchmark_ready_count": 0,
+    }
+    release_manifest_path = tmp_path / "adjudication_release_manifest.json"
+    release_manifest_path.write_text(
+        json.dumps(release_manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    release_manifest_sha256 = hashlib.sha256(
+        release_manifest_path.read_bytes()
+    ).hexdigest()
     facts = {
         "studies": pd.DataFrame([{"study_id": "S1"}]),
         "screens": pd.DataFrame(
@@ -430,6 +531,8 @@ def _ready_registry_facts(*, include_validation=True, include_rights=True):
                     "study_id": "S1",
                     "source_family_id": "SF1",
                     "raw_data_family_id": "RF1",
+                    "cell_line": "CELL",
+                    "perturbation_modality": "CRISPR_KO",
                 }
             ]
         ),
@@ -440,6 +543,7 @@ def _ready_registry_facts(*, include_validation=True, include_rights=True):
                     "contrast_id": "C1",
                     "treatment_name": "DRUG",
                     "control_type": "vehicle",
+                    "intended_direction": "resistance",
                 }
             ]
         ),
@@ -467,12 +571,22 @@ def _ready_registry_facts(*, include_validation=True, include_rights=True):
                     "gene_symbol": "GENE1",
                     "score": 1.0,
                     "author_hit": True,
+                    "direction": "resistance",
                 }
             ]
         ),
         "data_assets": pd.DataFrame([asset]),
         "validation_events": (
             pd.DataFrame([validation_event]) if include_validation else None
+        ),
+        "adjudication_decisions": (
+            pd.DataFrame([adjudication_decision]) if include_validation else None
+        ),
+        "adjudication_release_manifest": (
+            release_manifest_path if include_validation else None
+        ),
+        "expected_adjudication_release_manifest_sha256": (
+            release_manifest_sha256 if include_validation else None
         ),
     }
     return facts
@@ -643,9 +757,9 @@ def test_registry_rejects_all_pass_ready_assertion_without_linked_facts():
     assert "labels.adjudicated_validation_event" in message
 
 
-def test_registry_accepts_ready_status_only_with_linked_fact_evidence():
+def test_registry_accepts_ready_status_only_with_linked_fact_evidence(tmp_path: Path):
     errors = validate_registry_integrity(
-        **_ready_registry_facts(),
+        **_ready_registry_facts(tmp_path),
         screen_intake=pd.DataFrame(
             [
                 _intake_row(
@@ -662,9 +776,147 @@ def test_registry_accepts_ready_status_only_with_linked_fact_evidence():
     assert errors.empty
 
 
-def test_registry_does_not_treat_orcs_author_hit_as_validation_evidence():
+def test_self_consistent_event_and_decision_without_pinned_release_are_not_ready(
+    tmp_path: Path,
+):
+    facts = _ready_registry_facts(tmp_path)
+    facts.pop("adjudication_release_manifest")
+    facts.pop("expected_adjudication_release_manifest_sha256")
+
     errors = validate_registry_integrity(
-        **_ready_registry_facts(include_validation=False),
+        **facts,
+        screen_intake=pd.DataFrame(
+            [
+                _intake_row(
+                    "I1",
+                    "SC1",
+                    status="benchmark_ready",
+                    candidate=True,
+                    benchmark_ready=True,
+                )
+            ]
+        ),
+        eligibility_checks=pd.DataFrame(_passing_policy_checks("I1", "SC1")),
+    )
+
+    assert "labels.adjudicated_validation_event" in "\n".join(errors["error"])
+
+
+def test_minimal_non_u_candidate_forgery_returns_integrity_errors():
+    errors = validate_registry_integrity(
+        studies=pd.DataFrame([{"study_id": "S1"}]),
+        screens=pd.DataFrame([{"screen_id": "SC1", "study_id": "S1"}]),
+        candidates=pd.DataFrame([{"label_code": "V2"}]),
+    )
+
+    assert not errors.empty
+    assert (
+        errors["error"]
+        .str.contains(
+            "candidate labels require a checksum-verified "
+            "adjudication release manifest",
+            regex=False,
+        )
+        .any()
+    )
+
+
+@pytest.mark.parametrize(
+    ("field", "wrong_value"),
+    [
+        ("drug_name", "OTHER_DRUG"),
+        ("cell_line", "OTHER_CELL"),
+        ("perturbation_modality", "CRISPRa"),
+        ("phenotype_direction", "sensitization"),
+    ],
+)
+def test_registry_rejects_validation_event_with_mismatched_screen_context(
+    tmp_path: Path,
+    field,
+    wrong_value,
+):
+    facts = _ready_registry_facts(tmp_path)
+    facts["validation_events"].loc[0, field] = wrong_value
+    errors = validate_registry_integrity(
+        **facts,
+        screen_intake=pd.DataFrame(
+            [
+                _intake_row(
+                    "I1",
+                    "SC1",
+                    status="benchmark_ready",
+                    candidate=True,
+                    benchmark_ready=True,
+                )
+            ]
+        ),
+        eligibility_checks=pd.DataFrame(_passing_policy_checks("I1", "SC1")),
+    )
+    assert "labels.adjudicated_validation_event" in "\n".join(errors["error"])
+
+
+def test_registry_rejects_unknown_gene_score_direction_for_labeled_event(
+    tmp_path: Path,
+):
+    facts = _ready_registry_facts(tmp_path)
+    facts["gene_scores"].loc[0, "direction"] = None
+    errors = validate_registry_integrity(
+        **facts,
+        screen_intake=pd.DataFrame(
+            [
+                _intake_row(
+                    "I1",
+                    "SC1",
+                    status="benchmark_ready",
+                    candidate=True,
+                    benchmark_ready=True,
+                )
+            ]
+        ),
+        eligibility_checks=pd.DataFrame(_passing_policy_checks("I1", "SC1")),
+    )
+    assert "labels.adjudicated_validation_event" in "\n".join(errors["error"])
+
+
+def test_registry_invalid_extra_event_cannot_hide_behind_valid_event(tmp_path: Path):
+    facts = _ready_registry_facts(tmp_path)
+    invalid_event = facts["validation_events"].iloc[0].to_dict()
+    invalid_event.update(
+        {
+            "event_id": "E_BAD",
+            "label_code": "V3",
+            "rescue_performed": False,
+            "causal_reversal_performed": False,
+            "adjudication_decision_id": "DEC_BAD",
+        }
+    )
+    facts["validation_events"] = pd.concat(
+        [facts["validation_events"], pd.DataFrame([invalid_event])],
+        ignore_index=True,
+    )
+    errors = validate_registry_integrity(
+        **facts,
+        screen_intake=pd.DataFrame(
+            [
+                _intake_row(
+                    "I1",
+                    "SC1",
+                    status="benchmark_ready",
+                    candidate=True,
+                    benchmark_ready=True,
+                )
+            ]
+        ),
+        eligibility_checks=pd.DataFrame(_passing_policy_checks("I1", "SC1")),
+    )
+    assert "labels.adjudicated_validation_event" in "\n".join(errors["error"])
+
+
+def test_registry_does_not_treat_orcs_author_hit_as_validation_evidence(
+    tmp_path: Path,
+):
+    errors = validate_registry_integrity(
+        **_ready_registry_facts(tmp_path, include_validation=False),
         screen_intake=pd.DataFrame(
             [
                 _intake_row(
@@ -682,8 +934,8 @@ def test_registry_does_not_treat_orcs_author_hit_as_validation_evidence():
     assert "labels.adjudicated_validation_event" in message
 
 
-def test_registry_requires_reviewed_validation_event_adjudication():
-    facts = _ready_registry_facts()
+def test_registry_requires_reviewed_validation_event_adjudication(tmp_path: Path):
+    facts = _ready_registry_facts(tmp_path)
     facts["validation_events"].loc[0, "adjudication_status"] = "single_curator"
     errors = validate_registry_integrity(
         **facts,
@@ -704,8 +956,10 @@ def test_registry_requires_reviewed_validation_event_adjudication():
     assert "labels.adjudicated_validation_event" in message
 
 
-def test_registry_requires_signal_and_validation_on_same_contrast_and_gene():
-    facts = _ready_registry_facts()
+def test_registry_requires_signal_and_validation_on_same_contrast_and_gene(
+    tmp_path: Path,
+):
+    facts = _ready_registry_facts(tmp_path)
     facts["contrasts"] = pd.concat(
         [
             facts["contrasts"],
@@ -762,7 +1016,7 @@ def test_registry_requires_signal_and_validation_on_same_contrast_and_gene():
     )
     assert "labels.adjudicated_validation_event" in "\n".join(errors["error"])
 
-    facts = _ready_registry_facts()
+    facts = _ready_registry_facts(tmp_path)
     facts["validation_events"].loc[0, "gene_symbol"] = "OTHER_GENE"
     errors = validate_registry_integrity(
         **facts,
@@ -781,7 +1035,7 @@ def test_registry_requires_signal_and_validation_on_same_contrast_and_gene():
     )
     assert "labels.adjudicated_validation_event" in "\n".join(errors["error"])
 
-    facts = _ready_registry_facts()
+    facts = _ready_registry_facts(tmp_path)
     facts["gene_scores"].loc[0, "direction"] = "sensitization"
     errors = validate_registry_integrity(
         **facts,
@@ -801,8 +1055,10 @@ def test_registry_requires_signal_and_validation_on_same_contrast_and_gene():
     assert "labels.adjudicated_validation_event" in "\n".join(errors["error"])
 
 
-def test_registry_does_not_treat_author_hit_as_quantitative_screen_signal():
-    facts = _ready_registry_facts()
+def test_registry_does_not_treat_author_hit_as_quantitative_screen_signal(
+    tmp_path: Path,
+):
+    facts = _ready_registry_facts(tmp_path)
     facts["gene_scores"] = facts["gene_scores"].drop(columns="score")
     errors = validate_registry_integrity(
         **facts,
@@ -823,9 +1079,9 @@ def test_registry_does_not_treat_author_hit_as_quantitative_screen_signal():
     assert "data.count_level_signal" in message
 
 
-def test_registry_requires_documented_rights_for_ready_signal_asset():
+def test_registry_requires_documented_rights_for_ready_signal_asset(tmp_path: Path):
     errors = validate_registry_integrity(
-        **_ready_registry_facts(include_rights=False),
+        **_ready_registry_facts(tmp_path, include_rights=False),
         screen_intake=pd.DataFrame(
             [
                 _intake_row(
@@ -843,8 +1099,8 @@ def test_registry_requires_documented_rights_for_ready_signal_asset():
     assert "rights.source_and_raw_data" in message
 
 
-def test_registry_rejects_unapproved_status_substring_for_ready_asset():
-    facts = _ready_registry_facts()
+def test_registry_rejects_unapproved_status_substring_for_ready_asset(tmp_path: Path):
+    facts = _ready_registry_facts(tmp_path)
     facts["data_assets"].loc[0, "curator_status"] = "unapproved"
     errors = validate_registry_integrity(
         **facts,

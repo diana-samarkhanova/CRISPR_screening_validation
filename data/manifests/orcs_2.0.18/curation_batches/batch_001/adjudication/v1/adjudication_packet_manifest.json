@@ -1,0 +1,57 @@
+{
+  "benchmark_ready_count": 0,
+  "human_adjudication_required": true,
+  "method_version": "validation_adjudication_v1",
+  "outputs": {
+    "decision_template": {
+      "decision_outcome_fields_prefilled": false,
+      "filename": "adjudication_decisions.template.tsv",
+      "record_count": 20,
+      "sha256": "f20489edc40e543f3de93fb2c8633183bb4fd80c0c50dec4d4cbea7503533c12"
+    },
+    "packet": {
+      "filename": "adjudication_packet.tsv",
+      "record_count": 20,
+      "sha256": "fe131f77c5a82e651dd73a8d87495c0e5aa148087fef5f5edb95fa28cae4dd8e"
+    },
+    "readme": {
+      "filename": "README.md",
+      "sha256": "24c45aa47ebf7c578ff729e9c0713eac2e0d1c5ece11e075ad0a8d5b96b0b892"
+    },
+    "validation_event_template": {
+      "filename": "validation_events.template.tsv",
+      "label_fields_prefilled": false,
+      "record_count": 20,
+      "sha256": "d7b9499cc54f8e6ebe50556902aaedf9e47652850f2a17be9c4946be95b4adcd"
+    }
+  },
+  "packet_id": "orcs-2.0.18-batch-001-adjudication-v1",
+  "parent_dual_review_manifest": {
+    "filename": "dual_review_manifest.json",
+    "sha256": "4482acfaf1b9670d4e7c5e2dfa65cdf98ce6b24a69995ca7ebe34ff0abed2bf8"
+  },
+  "prepared_date": "2026-08-29",
+  "record_count": 20,
+  "released_label_count": 0,
+  "schema": "crispr-evidencerank.adjudication-packet-manifest",
+  "schema_version": 1,
+  "source_files": {
+    "comparison": {
+      "filename": "review_comparison.tsv",
+      "sha256": "203da9c7a4f904df61a71940f99c883c1b5c67afac200a2af2686fb685b6660b"
+    },
+    "primary_reviews": {
+      "filename": "reviews.tsv",
+      "sha256": "b44822515c4236593d4910e4f0160c5114691cd220fc2d4b2c2d98fa0bb9eb6f"
+    },
+    "secondary_reviews": {
+      "filename": "reviews_curator_2.tsv",
+      "sha256": "e75e9fe42159098fe861fca46d27cbfe849a14c2c2166a241de778759b8ab4a5"
+    },
+    "selection": {
+      "filename": "selection.tsv",
+      "sha256": "b3f2de96e2b29999522ca7086d855f4ef8dd5e248f0f0e79b22aaeb7789afd8c"
+    }
+  },
+  "status": "unsigned_pending_human_adjudication"
+}

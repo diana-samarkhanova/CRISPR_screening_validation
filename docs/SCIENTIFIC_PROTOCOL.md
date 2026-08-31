@@ -133,11 +133,47 @@ are resolved without seeing model predictions. Each event records:
 - technical adequacy;
 - exact source locator.
 
-Checksums, distinct review IDs, and distinct curator identifiers preserve the
-two review streams but cannot prove cognitive independence. Blinding is a
-documented process control, not a cryptographic property. A named human
-adjudicator must therefore inspect the source evidence and reviewer differences
-before any candidate grade becomes a released label.
+Checksums, distinct review IDs, and distinct curator descriptions preserve the
+two review streams but cannot prove cognitive independence. The frozen pilot
+does not contain stable reviewer person identifiers. Independence and blinding
+are therefore explicit human process attestations plus a display-name sanity
+check, not cryptographic identity proof. A named human adjudicator must inspect
+the source evidence and reviewer differences before any candidate grade becomes
+a released label.
+
+The adjudication workflow is deliberately human-only. Reviewer agreement is
+not a label, and neither reviewer evidence level is copied into a final event.
+`prepare-validation-adjudication` creates a neutral, checksum-bound packet with
+blank decision and event worksheets. For every packet item, exactly one named
+human decision is required, with one of three dispositions:
+
+- `release_validation_event`, linked by its canonical row SHA-256 to one
+  complete validation-event row;
+- `no_qualifying_event`, which emits no validation label;
+- `defer_unresolved`, which also emits no validation label.
+
+Each decision attests that the cited source was reviewed, the human decision
+was independent, model outputs were unseen, and no automated label assignment
+occurred. `finalize-validation-adjudication` requires expected checksums for
+the packet manifest, decisions, and validation-event input, and rejects
+incomplete packet coverage, identity drift, invalid attestations, or a release
+decision whose event-row checksum does not match its contract-valid event.
+`hash-validation-events` is the supported label-neutral route for deriving the
+canonical event-row hashes and exact input-table checksum.
+`no_qualifying_event` cannot be converted to `U` or `F0`: `U` concerns testing
+status, while `F0` requires a successful perturbation and an adequate
+experiment that failed to reproduce the phenotype.
+
+Finalization releases adjudication records but does not promote a screen. Its
+manifest remains at `benchmark_ready_count=0` until the independent
+count-level signal/QC, rights, comparator/sample-map, source/raw-family, and
+other policy gates pass. Only unsigned packets and blank worksheets are
+bundled in the repository; real signed human decisions are not included.
+Later registry promotion requires the pinned adjudication release manifest and
+its canonical packet-item, decision, and event record hashes; bare TSVs cannot
+establish a training label. Until a released-compendium manifest exists, the
+benchmark CLI is default-deny and permits only visibly watermarked development
+synthetic runs.
 
 `F0` requires a successful perturbation and adequate assay. A failed edit or
 missing assay is `T`, not a biological negative.
