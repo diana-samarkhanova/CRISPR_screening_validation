@@ -81,7 +81,7 @@ def main() -> None:
     assert len(valid) == len(events)
     assert errors.empty
     validation_schema = ValidationEventRecord.model_json_schema()
-    assert len(validation_schema.get("allOf", [])) == 8
+    assert len(validation_schema.get("allOf", [])) == 9
     reagent_schema = validation_schema["allOf"][2]["then"]["anyOf"][0]["properties"][
         "independent_reagent_count"
     ]
