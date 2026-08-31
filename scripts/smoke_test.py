@@ -99,7 +99,7 @@ def main() -> None:
         **registry_tables,
         validation_events=events,
     )
-    assert integrity_errors.to_dict(orient="records") == [
+    expected_release_errors = [
         {
             "table": "validation_events",
             "row_number": 1,
@@ -109,7 +109,13 @@ def main() -> None:
             ),
         }
     ]
-    assert validate_registry_integrity(**registry_tables).empty
+    assert integrity_errors.to_dict(orient="records") == expected_release_errors
+    candidate_only_errors = validate_registry_integrity(**registry_tables)
+    assert candidate_only_errors.to_dict(orient="records") == expected_release_errors
+    structural_tables = {
+        name: table for name, table in registry_tables.items() if name != "candidates"
+    }
+    assert validate_registry_integrity(**structural_tables).empty
 
     samples = pd.read_csv(ROOT / "examples/synthetic/sample_sheet.csv")
     counts = pd.read_csv(ROOT / "examples/synthetic/guide_counts.csv")
