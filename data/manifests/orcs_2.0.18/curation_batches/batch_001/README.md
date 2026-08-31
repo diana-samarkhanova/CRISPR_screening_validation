@@ -56,6 +56,15 @@ They are outcomes and must never be joined into pre-follow-up model features.
 Even exact reviewer agreement is not a released label. ORCS hit calls and
 author ranks remain discovery evidence, never validation labels.
 
+## Human adjudication packet
+
+`adjudication/v1/` is an unsigned, checksum-bound packet derived from the exact
+canonical bytes of `dual_review_manifest.json` and all four declared review
+inputs. It contains 20 immutable evidence cards plus blank decision and event
+worksheets. It contains no final disposition, released label, signed human
+decision, or benchmark-ready row. A later human release must cover all 20
+packet items exactly once and remain a separate checksum-pinned artifact.
+
 Review tables are checksum-bound evidence snapshots. Later accession, rights,
 or sample-map audits are stored separately rather than silently rewriting a
 curator's earlier observation.

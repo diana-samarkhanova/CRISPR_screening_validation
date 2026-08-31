@@ -157,10 +157,19 @@
           "appropriate_control": {
             "const": true
           },
+          "assay_adequate": {
+            "const": true
+          },
           "opposite_direction_reproduced": {
             "enum": [
               false,
               null
+            ]
+          },
+          "phenotype_direction": {
+            "enum": [
+              "resistance",
+              "sensitization"
             ]
           }
         },
@@ -168,7 +177,8 @@
           "testing_status",
           "perturbation_confirmed",
           "phenotype_reproduced",
-          "appropriate_control"
+          "appropriate_control",
+          "assay_adequate"
         ]
       }
     },
@@ -214,6 +224,29 @@
         }
       },
       "then": {
+        "anyOf": [
+          {
+            "properties": {
+              "independent_reagent_count": {
+                "minimum": 2,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "independent_reagent_count"
+            ]
+          },
+          {
+            "properties": {
+              "orthogonal_perturbation": {
+                "const": true
+              }
+            },
+            "required": [
+              "orthogonal_perturbation"
+            ]
+          }
+        ],
         "properties": {
           "testing_status": {
             "const": "tested"
@@ -227,10 +260,19 @@
           "phenotype_reproduced": {
             "const": false
           },
+          "appropriate_control": {
+            "const": true
+          },
           "opposite_direction_reproduced": {
             "enum": [
               false,
               null
+            ]
+          },
+          "phenotype_direction": {
+            "enum": [
+              "resistance",
+              "sensitization"
             ]
           }
         },
@@ -238,7 +280,8 @@
           "testing_status",
           "perturbation_confirmed",
           "assay_adequate",
-          "phenotype_reproduced"
+          "phenotype_reproduced",
+          "appropriate_control"
         ]
       }
     },
@@ -251,6 +294,29 @@
         }
       },
       "then": {
+        "anyOf": [
+          {
+            "properties": {
+              "independent_reagent_count": {
+                "minimum": 2,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "independent_reagent_count"
+            ]
+          },
+          {
+            "properties": {
+              "orthogonal_perturbation": {
+                "const": true
+              }
+            },
+            "required": [
+              "orthogonal_perturbation"
+            ]
+          }
+        ],
         "properties": {
           "testing_status": {
             "const": "tested"
@@ -263,13 +329,27 @@
           },
           "opposite_direction_reproduced": {
             "const": true
+          },
+          "appropriate_control": {
+            "const": true
+          },
+          "assay_adequate": {
+            "const": true
+          },
+          "phenotype_direction": {
+            "enum": [
+              "resistance",
+              "sensitization"
+            ]
           }
         },
         "required": [
           "testing_status",
           "perturbation_confirmed",
           "phenotype_reproduced",
-          "opposite_direction_reproduced"
+          "opposite_direction_reproduced",
+          "appropriate_control",
+          "assay_adequate"
         ]
       }
     },
@@ -340,6 +420,34 @@
         },
         "required": [
           "testing_status"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "adjudication_status": {
+            "enum": [
+              "adjudicated",
+              "approved_for_benchmark",
+              "consensus",
+              "consensus_adjudicated",
+              "double_curated",
+              "dual_curator_consensus",
+              "verified_for_benchmark"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "curator",
+          "source_family_id",
+          "evidence_available_date",
+          "review_comparison_id",
+          "adjudication_decision_id",
+          "adjudication_packet_id",
+          "adjudication_method_version"
         ]
       }
     },
@@ -697,6 +805,79 @@
       "minLength": 1,
       "title": "Source Locator",
       "type": "string"
+    },
+    "source_family_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Family Id"
+    },
+    "evidence_available_date": {
+      "anyOf": [
+        {
+          "format": "date",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidence Available Date"
+    },
+    "review_comparison_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Review Comparison Id"
+    },
+    "adjudication_decision_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Adjudication Decision Id"
+    },
+    "adjudication_packet_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Adjudication Packet Id"
+    },
+    "adjudication_method_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Adjudication Method Version"
     },
     "curator": {
       "anyOf": [

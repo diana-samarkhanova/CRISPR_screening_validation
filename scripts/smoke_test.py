@@ -81,22 +81,41 @@ def main() -> None:
     assert len(valid) == len(events)
     assert errors.empty
     validation_schema = ValidationEventRecord.model_json_schema()
-    assert len(validation_schema.get("allOf", [])) == 8
+    assert len(validation_schema.get("allOf", [])) == 9
     reagent_schema = validation_schema["allOf"][2]["then"]["anyOf"][0]["properties"][
         "independent_reagent_count"
     ]
     assert reagent_schema["type"] == "integer"
+    registry_tables = {
+        "studies": pd.read_csv(ROOT / "examples/synthetic/studies.csv"),
+        "screens": pd.read_csv(ROOT / "examples/synthetic/screens.csv"),
+        "libraries": pd.read_csv(ROOT / "examples/synthetic/libraries.csv"),
+        "screen_designs": pd.read_csv(ROOT / "examples/synthetic/screen_designs.csv"),
+        "contrasts": pd.read_csv(ROOT / "examples/synthetic/contrasts.csv"),
+        "samples": pd.read_csv(ROOT / "examples/synthetic/sample_sheet.csv"),
+        "candidates": pd.read_csv(ROOT / "examples/synthetic/candidate_status.csv"),
+    }
     integrity_errors = validate_registry_integrity(
-        studies=pd.read_csv(ROOT / "examples/synthetic/studies.csv"),
-        screens=pd.read_csv(ROOT / "examples/synthetic/screens.csv"),
-        libraries=pd.read_csv(ROOT / "examples/synthetic/libraries.csv"),
-        screen_designs=pd.read_csv(ROOT / "examples/synthetic/screen_designs.csv"),
-        contrasts=pd.read_csv(ROOT / "examples/synthetic/contrasts.csv"),
-        samples=pd.read_csv(ROOT / "examples/synthetic/sample_sheet.csv"),
-        candidates=pd.read_csv(ROOT / "examples/synthetic/candidate_status.csv"),
+        **registry_tables,
         validation_events=events,
     )
-    assert integrity_errors.empty, integrity_errors.to_dict(orient="records")
+    expected_release_errors = [
+        {
+            "table": "validation_events",
+            "row_number": 1,
+            "error": (
+                "candidate labels require a checksum-verified adjudication "
+                "release manifest"
+            ),
+        }
+    ]
+    assert integrity_errors.to_dict(orient="records") == expected_release_errors
+    candidate_only_errors = validate_registry_integrity(**registry_tables)
+    assert candidate_only_errors.to_dict(orient="records") == expected_release_errors
+    structural_tables = {
+        name: table for name, table in registry_tables.items() if name != "candidates"
+    }
+    assert validate_registry_integrity(**structural_tables).empty
 
     samples = pd.read_csv(ROOT / "examples/synthetic/sample_sheet.csv")
     counts = pd.read_csv(ROOT / "examples/synthetic/guide_counts.csv")

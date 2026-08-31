@@ -1,0 +1,227 @@
+{
+  "$defs": {
+    "AdjudicationDecisionDisposition": {
+      "description": "Human disposition for one immutable review-comparison item.",
+      "enum": [
+        "release_validation_event",
+        "no_qualifying_event",
+        "defer_unresolved"
+      ],
+      "title": "AdjudicationDecisionDisposition",
+      "type": "string"
+    },
+    "FollowupRosterStatus": {
+      "description": "How completely a source reports the genes selected for follow-up.",
+      "enum": [
+        "complete_followup_roster",
+        "partial_explicit_tested_roster",
+        "positive_only_or_unclear"
+      ],
+      "title": "FollowupRosterStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Named human decision linked to one immutable packet item.",
+  "properties": {
+    "decision_id": {
+      "minLength": 1,
+      "title": "Decision Id",
+      "type": "string"
+    },
+    "packet_id": {
+      "minLength": 1,
+      "title": "Packet Id",
+      "type": "string"
+    },
+    "packet_item_id": {
+      "minLength": 1,
+      "title": "Packet Item Id",
+      "type": "string"
+    },
+    "comparison_id": {
+      "minLength": 1,
+      "title": "Comparison Id",
+      "type": "string"
+    },
+    "comparison_row_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Comparison Row Sha256",
+      "type": "string"
+    },
+    "reviewer_a_review_id": {
+      "minLength": 1,
+      "title": "Reviewer A Review Id",
+      "type": "string"
+    },
+    "reviewer_a_row_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Reviewer A Row Sha256",
+      "type": "string"
+    },
+    "reviewer_b_review_id": {
+      "minLength": 1,
+      "title": "Reviewer B Review Id",
+      "type": "string"
+    },
+    "reviewer_b_row_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Reviewer B Row Sha256",
+      "type": "string"
+    },
+    "parent_dual_review_manifest_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Parent Dual Review Manifest Sha256",
+      "type": "string"
+    },
+    "packet_manifest_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Packet Manifest Sha256",
+      "type": "string"
+    },
+    "batch_id": {
+      "minLength": 1,
+      "title": "Batch Id",
+      "type": "string"
+    },
+    "screen_id": {
+      "minLength": 1,
+      "title": "Screen Id",
+      "type": "string"
+    },
+    "gene_symbol": {
+      "minLength": 1,
+      "title": "Gene Symbol",
+      "type": "string"
+    },
+    "disposition": {
+      "$ref": "#/$defs/AdjudicationDecisionDisposition"
+    },
+    "validation_event_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Validation Event Id"
+    },
+    "validation_event_row_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Validation Event Row Sha256"
+    },
+    "followup_roster_status": {
+      "$ref": "#/$defs/FollowupRosterStatus"
+    },
+    "adjudicator_name": {
+      "minLength": 1,
+      "title": "Adjudicator Name",
+      "type": "string"
+    },
+    "adjudicator_id": {
+      "minLength": 1,
+      "title": "Adjudicator Id",
+      "type": "string"
+    },
+    "adjudicator_affiliation": {
+      "minLength": 1,
+      "title": "Adjudicator Affiliation",
+      "type": "string"
+    },
+    "adjudicated_date": {
+      "format": "date",
+      "title": "Adjudicated Date",
+      "type": "string"
+    },
+    "source_evidence_reviewed_attested": {
+      "title": "Source Evidence Reviewed Attested",
+      "type": "boolean"
+    },
+    "independent_human_decision_attested": {
+      "title": "Independent Human Decision Attested",
+      "type": "boolean"
+    },
+    "reviewer_identity_independence_attested": {
+      "title": "Reviewer Identity Independence Attested",
+      "type": "boolean"
+    },
+    "model_outputs_unseen_attested": {
+      "title": "Model Outputs Unseen Attested",
+      "type": "boolean"
+    },
+    "no_automated_label_assignment_attested": {
+      "title": "No Automated Label Assignment Attested",
+      "type": "boolean"
+    },
+    "conflict_of_interest_declared": {
+      "title": "Conflict Of Interest Declared",
+      "type": "boolean"
+    },
+    "conflict_of_interest_notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Conflict Of Interest Notes"
+    },
+    "evidence_source_locator": {
+      "minLength": 1,
+      "title": "Evidence Source Locator",
+      "type": "string"
+    },
+    "decision_rationale": {
+      "minLength": 1,
+      "title": "Decision Rationale",
+      "type": "string"
+    }
+  },
+  "required": [
+    "decision_id",
+    "packet_id",
+    "packet_item_id",
+    "comparison_id",
+    "comparison_row_sha256",
+    "reviewer_a_review_id",
+    "reviewer_a_row_sha256",
+    "reviewer_b_review_id",
+    "reviewer_b_row_sha256",
+    "parent_dual_review_manifest_sha256",
+    "packet_manifest_sha256",
+    "batch_id",
+    "screen_id",
+    "gene_symbol",
+    "disposition",
+    "followup_roster_status",
+    "adjudicator_name",
+    "adjudicator_id",
+    "adjudicator_affiliation",
+    "adjudicated_date",
+    "source_evidence_reviewed_attested",
+    "independent_human_decision_attested",
+    "reviewer_identity_independence_attested",
+    "model_outputs_unseen_attested",
+    "no_automated_label_assignment_attested",
+    "conflict_of_interest_declared",
+    "evidence_source_locator",
+    "decision_rationale"
+  ],
+  "title": "AdjudicationDecisionRecord",
+  "type": "object"
+}

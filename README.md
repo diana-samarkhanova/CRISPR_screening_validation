@@ -36,6 +36,8 @@ provenance, feature-profile, and leakage-control foundation. It includes:
 - a current-snapshot ClinicalTrials.gov v2 adapter plus strictly separate
   curated patient-molecular and preclinical evidence contracts, with typed
   biomarker and preclinical screen-context axes;
+- a checksum-bound, human-only validation-adjudication workflow that prepares
+  neutral packets and releases only explicit named-curator decisions;
 - storage for raw and CNV-corrected scores without silently substituting a
   homemade correction;
 - a two-stage baseline that models both author selection for testing and
@@ -525,6 +527,82 @@ present and passing, including comparator/sample reconstruction, count-level
 signal, source and raw-data families, rights, and adjudicated validation
 events. A draft `single_curator` event remains useful for curation but cannot
 open the benchmark gate until it receives an approved consensus status.
+
+## Human validation adjudication
+
+Reviewer agreement is evidence for a human adjudicator to inspect, not a
+validation label. The software never maps a provisional agreement or reviewer
+evidence level to `V2`, `V3`, `F0`, or `D`. It first creates a neutral,
+checksum-bound packet from the completed dual-review bundle:
+
+```bash
+crispr-evidencerank prepare-validation-adjudication \
+  --completed-review-manifest dual_review_manifest.json \
+  --expected-completed-review-manifest-sha256 \
+  "$COMPLETED_REVIEW_MANIFEST_SHA256" \
+  --expected-comparison-sha256 "$REVIEW_COMPARISON_SHA256" \
+  --packet-id orcs-2.0.18-batch-001-adjudication-v1 \
+  --prepared-date 2026-08-29 \
+  --output-dir adjudication_packet
+```
+
+A named human must inspect the cited evidence and provide exactly one decision
+for every packet item. The permitted dispositions are:
+
+- `release_validation_event`: one complete, contract-valid event is supplied;
+- `no_qualifying_event`: the cited material does not establish a qualifying
+  event, so no label is emitted;
+- `defer_unresolved`: the evidence remains unresolved and no label is emitted.
+
+`no_qualifying_event` is neither `U` nor `F0`: absence of a qualifying event
+does not establish an untested gene or a successful negative validation
+experiment. Every decision must attest that the source was reviewed, the
+decision was made independently by a human, model outputs were unseen, and no
+label was assigned automatically. Finalization verifies exact packet coverage,
+checksums, identities, attestations, and any linked validation event. Each
+release decision binds the exact canonical event-row SHA-256 before publishing
+an atomic release bundle. Generate those hashes with the supported neutral
+helper, then copy the hash for each released `event_id` into the corresponding
+decision row:
+
+```bash
+crispr-evidencerank hash-validation-events \
+  --validation-events completed_validation_events.tsv \
+  --output validation_event_hashes.tsv
+```
+
+The helper validates the full event contract, reports the exact input-table
+SHA-256, and performs no label assignment. Finalize with those pinned bytes:
+
+```bash
+crispr-evidencerank finalize-validation-adjudication \
+  --packet-manifest adjudication_packet/adjudication_packet_manifest.json \
+  --expected-packet-manifest-sha256 "$ADJUDICATION_PACKET_MANIFEST_SHA256" \
+  --decisions completed_adjudication_decisions.tsv \
+  --expected-decisions-sha256 "$ADJUDICATION_DECISIONS_SHA256" \
+  --validation-events completed_validation_events.tsv \
+  --expected-validation-events-sha256 "$VALIDATION_EVENTS_SHA256" \
+  --adjudicated-date 2026-08-29 \
+  --output-dir adjudication_release
+```
+
+An adjudication release deliberately reports `benchmark_ready_count=0`.
+Benchmark readiness is derived later from independent count-level data/QC,
+rights, comparator/sample-map, and provenance gates as well as the released
+event. Registry promotion additionally requires the explicitly pinned release
+manifest; self-consistent event and decision TSVs are not a trust root. The
+release manifest binds every packet item, human decision, and event by canonical
+record SHA-256. The frozen pilot reviews lack stable person identifiers, so
+reviewer/adjudicator independence is an explicit human attestation plus a
+display-name sanity check, not cryptographic identity proof. The repository
+bundles only the unsigned packet and blank worksheets; it contains no real
+signed human decisions.
+
+Until a released-compendium manifest is implemented, the `benchmark` CLI
+default-denies all labeled runs. Its only escape hatch is
+`--development-synthetic-labels-only`; every resulting row is watermarked
+`development_only`, `synthetic_unverified`, and
+`scientific_use_prohibited=true`.
 
 ## Training-label policy
 

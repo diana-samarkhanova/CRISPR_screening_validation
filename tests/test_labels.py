@@ -1,4 +1,11 @@
-from crispr_evidencerank.labels import LabelCode, model_target, resolve_event_labels
+import pandas as pd
+
+from crispr_evidencerank.labels import (
+    LabelCode,
+    _resolve_released_validation_events,
+    model_target,
+    resolve_event_labels,
+)
 
 
 def test_primary_label_mapping():
@@ -32,3 +39,33 @@ def test_conflicting_events_become_ambiguous():
 def test_empty_or_unlabeled_events_resolve_conservatively():
     assert resolve_event_labels([]) == LabelCode.U
     assert resolve_event_labels(["T", "A"]) == LabelCode.T
+
+
+def test_single_curator_event_is_not_released_as_candidate_label():
+    events = pd.DataFrame(
+        [
+            {
+                "event_id": "E1",
+                "screen_id": "SC1",
+                "contrast_id": "C1",
+                "gene_symbol": "GENE1",
+                "phenotype_direction": "resistance",
+                "label_code": "V2",
+                "adjudication_decision_id": "DEC1",
+                "adjudication_status": "single_curator",
+            }
+        ]
+    )
+    decisions = pd.DataFrame(
+        [
+            {
+                "decision_id": "DEC1",
+                "disposition": "release_validation_event",
+                "validation_event_id": "E1",
+            }
+        ]
+    )
+
+    adjudicated = _resolve_released_validation_events(events, decisions)
+
+    assert adjudicated.empty

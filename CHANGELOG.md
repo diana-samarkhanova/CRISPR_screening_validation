@@ -166,6 +166,23 @@ suffix and are not claims of a trained biological model.
   agreements, one evidence-level disagreement, and two single-curator
   observations. Human adjudication remains explicitly pending, and comparison
   cannot release a benchmark label.
+- Added `prepare-validation-adjudication` and
+  `finalize-validation-adjudication` for a checksum-bound, human-only decision
+  workflow. Review agreement cannot create a label; exactly one named human
+  decision is required per packet item, with `release_validation_event`,
+  `no_qualifying_event`, or `defer_unresolved` disposition and attestations
+  including that model outputs were unseen.
+- Required expected packet, decision, and validation-event checksums during
+  finalization and bound every released decision to the canonical SHA-256 of
+  its validation-event row.
+- Added a label-neutral `hash-validation-events` helper, exact packet-item
+  coverage, a pinned release-manifest trust root with canonical per-record
+  hashes, and default-deny benchmarking outside visibly watermarked synthetic
+  development runs.
+- Prohibited `no_qualifying_event` from becoming `U` or `F0`, retained
+  `benchmark_ready_count=0` after adjudication until independent data/QC,
+  rights, sample-map, and provenance gates pass, and bundled no real signed
+  decisions.
 - Added `complete-curation-reviews`, which requires the exact remaining review
   complement plus authenticated predecessor and progress checksums, then
   publishes a self-contained eleven-file bundle atomically for cooperating CLI
