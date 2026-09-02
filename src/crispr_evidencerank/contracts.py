@@ -2,12 +2,21 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date, datetime
 from enum import StrEnum
-from typing import Any, ClassVar, Literal
+from typing import Annotated, Any, ClassVar, Literal
 
 import pandas as pd
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    StrictBool,
+    model_validator,
+)
 
 from .labels import CANDIDATE_KEY, LabelCode, adjudicate_validation_events
 
@@ -2795,6 +2804,485 @@ class ClinicalTrialEvidenceRecord(StrictRecord):
         return self
 
 
+class ClinicalTrialsGovStudyInventoryRecord(StrictRecord):
+    """Deterministic study projection from one frozen API page.
+
+    The inventory is an intake artifact, not normalized clinical evidence.  It
+    preserves projected source strings, while exact null-versus-missing structure
+    remains authoritative only in the retained raw JSON.  It cannot be used as a
+    validation label or a success-model feature.
+    """
+
+    primary_key = ("snapshot_id", "source_study_id")
+
+    snapshot_id: str = Field(min_length=1)
+    source_study_id: str = Field(pattern=r"^NCT\d{8}$")
+    source_family_id: str = Field(min_length=1)
+    source_asset_id: str = Field(min_length=1)
+    source_asset_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_page_index: int = Field(ge=1)
+    source_study_index: int = Field(ge=0)
+    source_version_holder: str | None = Field(
+        default=None,
+        pattern=r"^\d{4}(?:-\d{2}(?:-\d{2})?)?$",
+    )
+    record_last_update_date: str | None = Field(
+        default=None,
+        pattern=r"^\d{4}(?:-\d{2}(?:-\d{2})?)?$",
+    )
+    study_first_post_date: str | None = Field(
+        default=None,
+        pattern=r"^\d{4}(?:-\d{2}(?:-\d{2})?)?$",
+    )
+    results_first_post_date: str | None = Field(
+        default=None,
+        pattern=r"^\d{4}(?:-\d{2}(?:-\d{2})?)?$",
+    )
+    source_study_type: str | None = Field(default=None, min_length=1)
+    source_overall_status: str | None = Field(default=None, min_length=1)
+    source_brief_title: str | None = Field(default=None, min_length=1)
+    source_official_title: str | None = Field(default=None, min_length=1)
+    source_phases_json: str
+    source_conditions_json: str
+    source_keywords_json: str
+    source_design_json: str
+    source_interventions_json: str
+    source_arm_groups_json: str
+    population_scope_locator_candidates_json: str
+    population_scope_text_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_has_results: bool | None = None
+    source_url: HttpUrl
+    retrieved_at_utc: datetime
+    tsv_formula_escape_applied: bool
+    normalization_status: Literal["raw_registry_inventory_only"] = (
+        "raw_registry_inventory_only"
+    )
+    used_for_label: Literal[False] = False
+
+    @model_validator(mode="after")
+    def inventory_is_source_faithful(
+        self,
+    ) -> ClinicalTrialsGovStudyInventoryRecord:
+        offset = self.retrieved_at_utc.utcoffset()
+        if offset is None or offset.total_seconds() != 0:
+            raise ValueError("retrieved_at_utc must include the UTC timezone")
+        for field_name in (
+            "source_phases_json",
+            "source_conditions_json",
+            "source_keywords_json",
+            "source_interventions_json",
+            "source_arm_groups_json",
+            "population_scope_locator_candidates_json",
+        ):
+            try:
+                value = json.loads(getattr(self, field_name))
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"{field_name} must contain valid JSON") from exc
+            if not isinstance(value, list):
+                raise ValueError(f"{field_name} must encode a JSON list")
+        try:
+            design_value = json.loads(self.source_design_json)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("source_design_json must contain valid JSON") from exc
+        if not isinstance(design_value, dict):
+            raise ValueError("source_design_json must encode a JSON object")
+        return self
+
+
+class ClinicalTrialsGovCurationCandidateRecord(StrictRecord):
+    """Unreviewed study-level intervention/condition co-mention for curation."""
+
+    primary_key = ("snapshot_id", "candidate_id")
+
+    candidate_id: str = Field(min_length=1)
+    snapshot_id: str = Field(min_length=1)
+    source_study_id: str = Field(pattern=r"^NCT\d{8}$")
+    source_family_id: str = Field(min_length=1)
+    source_asset_id: str = Field(min_length=1)
+    source_asset_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_page_index: int = Field(ge=1)
+    source_study_index: int = Field(ge=0)
+    source_intervention_index: int | None = Field(default=None, ge=0)
+    source_condition_index: int | None = Field(default=None, ge=0)
+    source_treatment_locator: str | None = Field(default=None, min_length=1)
+    source_condition_locator: str | None = Field(default=None, min_length=1)
+    source_treatment_text: str | None = Field(default=None, min_length=1)
+    source_intervention_type: str | None = Field(default=None, min_length=1)
+    source_arm_group_labels_json: str
+    source_other_names_json: str
+    source_linked_arm_groups_json: str
+    source_unmatched_arm_group_labels_json: str
+    source_linked_arm_locators_json: str
+    population_scope_locator_candidates_json: str
+    population_scope_text_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_condition_text: str | None = Field(default=None, min_length=1)
+    query_intervention_text: str = Field(min_length=1)
+    query_condition_text: str = Field(min_length=1)
+    treatment_concept_id: None = None
+    treatment_mapping_relation: Literal["unknown"] = "unknown"
+    treatment_mapping_review_status: Literal["not_performed"] = "not_performed"
+    cancer_concept_id: None = None
+    cancer_mapping_relation: Literal["unknown"] = "unknown"
+    cancer_mapping_review_status: Literal["not_performed"] = "not_performed"
+    intervention_role: Literal["unknown"] = "unknown"
+    regimen_context: Literal["unknown"] = "unknown"
+    population_scope_review_status: Literal["not_performed"] = "not_performed"
+    treatment_cancer_linkage_status: Literal["not_performed"] = "not_performed"
+    treatment_cancer_linkage_locator: None = None
+    co_mention_only: Literal[True] = True
+    blocker_codes_json: str
+    normalization_status: Literal[
+        "requires_curator_review",
+        "missing_source_intervention",
+        "missing_source_condition",
+        "missing_source_intervention_and_condition",
+    ]
+    exclusion_reason: Literal[
+        "unreviewed_study_level_co_mention",
+        "missing_source_intervention",
+        "missing_source_condition",
+        "missing_source_intervention_and_condition",
+    ]
+    tsv_formula_escape_applied: bool
+    eligible_for_clinical_context: Literal[False] = False
+    used_for_label: Literal[False] = False
+
+    @model_validator(mode="after")
+    def candidate_stays_fail_closed(
+        self,
+    ) -> ClinicalTrialsGovCurationCandidateRecord:
+        if not self.candidate_id.startswith(f"{self.snapshot_id}:"):
+            raise ValueError("candidate_id must be namespaced by snapshot_id")
+        for field_name in (
+            "source_arm_group_labels_json",
+            "source_other_names_json",
+            "source_linked_arm_groups_json",
+            "source_unmatched_arm_group_labels_json",
+            "source_linked_arm_locators_json",
+            "population_scope_locator_candidates_json",
+            "blocker_codes_json",
+        ):
+            try:
+                value = json.loads(getattr(self, field_name))
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"{field_name} must contain valid JSON") from exc
+            if not isinstance(value, list):
+                raise ValueError(f"{field_name} must encode a JSON list")
+
+        intervention_present = self.source_intervention_index is not None
+        if intervention_present != (self.source_treatment_text is not None):
+            raise ValueError(
+                "source intervention index and treatment text must be supplied together"
+            )
+        if intervention_present != (self.source_treatment_locator is not None):
+            raise ValueError(
+                "source intervention index and locator must be supplied together"
+            )
+        if not intervention_present and self.source_intervention_type is not None:
+            raise ValueError("source intervention type requires a source intervention")
+        condition_present = self.source_condition_index is not None
+        if condition_present != (self.source_condition_text is not None):
+            raise ValueError(
+                "source condition index and condition text must be supplied together"
+            )
+        if condition_present != (self.source_condition_locator is not None):
+            raise ValueError(
+                "source condition index and locator must be supplied together"
+            )
+
+        if intervention_present and condition_present:
+            expected = "requires_curator_review"
+            expected_reason = "unreviewed_study_level_co_mention"
+        elif intervention_present:
+            expected = "missing_source_condition"
+            expected_reason = expected
+        elif condition_present:
+            expected = "missing_source_intervention"
+            expected_reason = expected
+        else:
+            expected = "missing_source_intervention_and_condition"
+            expected_reason = expected
+        if self.normalization_status != expected:
+            raise ValueError(
+                "normalization_status is inconsistent with source term presence"
+            )
+        if self.exclusion_reason != expected_reason:
+            raise ValueError(
+                "exclusion_reason is inconsistent with source term presence"
+            )
+        return self
+
+
+def _require_exact_true(value: object) -> bool:
+    if value is not True:
+        raise ValueError("value must be the JSON boolean true")
+    return True
+
+
+def _require_exact_false(value: object) -> bool:
+    if value is not False:
+        raise ValueError("value must be the JSON boolean false")
+    return False
+
+
+def _require_exact_integer_one(value: object) -> int:
+    if type(value) is not int or value != 1:
+        raise ValueError("value must be the JSON integer 1")
+    return 1
+
+
+_ExactTrue = Annotated[Literal[True], BeforeValidator(_require_exact_true)]
+_ExactFalse = Annotated[Literal[False], BeforeValidator(_require_exact_false)]
+_ExactIntegerOne = Annotated[Literal[1], BeforeValidator(_require_exact_integer_one)]
+
+
+class ClinicalTrialsGovManifestSource(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    name: Literal[
+        "ClinicalTrials.gov",
+        "ClinicalTrials.gov synthetic fixture",
+        "ClinicalTrials.gov API-shaped injected transport",
+    ]
+    synthetic_fixture: StrictBool
+    transport_mode: Literal["live_https", "injected"]
+    clock_mode: Literal["system_utc", "injected"]
+    elapsed_clock_mode: Literal["system_monotonic", "injected"]
+    api_base_url: HttpUrl
+    studies_endpoint: HttpUrl
+    version_endpoint: HttpUrl
+    api_documentation_url: HttpUrl
+    terms_url: HttpUrl
+    api_version: str = Field(min_length=1)
+    data_timestamp: str = Field(min_length=1)
+    data_timestamp_timezone_interpretation: str = Field(min_length=1)
+    mutable_registry: StrictBool | None
+
+    @model_validator(mode="after")
+    def source_mode_is_explicit(self) -> ClinicalTrialsGovManifestSource:
+        if self.synthetic_fixture:
+            if self.name != "ClinicalTrials.gov synthetic fixture":
+                raise ValueError("synthetic fixture must use the synthetic source name")
+            if self.transport_mode != "injected":
+                raise ValueError("synthetic fixture must use an injected transport")
+            if self.clock_mode != "injected" or self.elapsed_clock_mode != "injected":
+                raise ValueError("synthetic fixture must use injected clocks")
+            if self.mutable_registry is not False:
+                raise ValueError("synthetic fixture cannot claim a mutable registry")
+        elif self.transport_mode == "live_https":
+            if self.name != "ClinicalTrials.gov":
+                raise ValueError(
+                    "live registry snapshot must use the registry source name"
+                )
+            if self.mutable_registry is not True:
+                raise ValueError("live ClinicalTrials.gov must be marked mutable")
+            if self.clock_mode != "system_utc":
+                raise ValueError("live HTTPS retrieval must use the system UTC clock")
+            if self.elapsed_clock_mode != "system_monotonic":
+                raise ValueError(
+                    "live HTTPS retrieval must use the system monotonic clock"
+                )
+        else:
+            if self.name != "ClinicalTrials.gov API-shaped injected transport":
+                raise ValueError("injected transport must use the injected source name")
+            if self.mutable_registry is not None:
+                raise ValueError("injected transport cannot attest registry mutability")
+        return self
+
+
+class ClinicalTrialsGovManifestQuery(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    condition: str = Field(min_length=1, max_length=512)
+    intervention: str = Field(min_length=1, max_length=512)
+    page_size: int = Field(ge=1, le=1000)
+    count_total: _ExactTrue
+    format: Literal["json"]
+    markup_format: Literal["markdown"]
+    fields: list[str] = Field(min_length=1)
+
+
+class ClinicalTrialsGovManifestRetrieval(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    started_at_utc: datetime
+    completed_at_utc: datetime
+    timeout_seconds: float = Field(gt=0, le=300)
+    max_attempts: int = Field(ge=1, le=10)
+    backoff_seconds: float = Field(ge=0, le=60)
+    max_pages: int = Field(ge=1, le=10_000)
+    max_studies: int = Field(ge=0, le=2_000_000)
+    max_candidate_rows: int = Field(ge=0, le=250_000)
+    max_page_bytes: int = Field(ge=1, le=100 * 1024 * 1024)
+    max_total_bytes: int = Field(ge=1, le=10 * 1024 * 1024 * 1024)
+    max_derived_bytes: int = Field(ge=1, le=512 * 1024 * 1024)
+    max_elapsed_seconds: float = Field(gt=0, le=86_400)
+    total_raw_response_bytes: int = Field(ge=0)
+    total_derived_bytes: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def retrieval_bounds_are_consistent(
+        self,
+    ) -> ClinicalTrialsGovManifestRetrieval:
+        for label, timestamp in (
+            ("started_at_utc", self.started_at_utc),
+            ("completed_at_utc", self.completed_at_utc),
+        ):
+            offset = timestamp.utcoffset()
+            if offset is None or offset.total_seconds() != 0:
+                raise ValueError(f"{label} must include the UTC timezone")
+        if self.completed_at_utc < self.started_at_utc:
+            raise ValueError("completed_at_utc cannot precede started_at_utc")
+        elapsed_seconds = (self.completed_at_utc - self.started_at_utc).total_seconds()
+        if elapsed_seconds > self.max_elapsed_seconds:
+            raise ValueError("recorded retrieval duration exceeds max_elapsed_seconds")
+        if self.max_total_bytes < self.max_page_bytes:
+            raise ValueError("max_total_bytes cannot be smaller than max_page_bytes")
+        if self.total_raw_response_bytes > self.max_total_bytes:
+            raise ValueError("total raw bytes exceed the declared retrieval limit")
+        if self.total_derived_bytes > self.max_derived_bytes:
+            raise ValueError("total derived bytes exceed the declared retrieval limit")
+        return self
+
+
+class ClinicalTrialsGovManifestVersionEnvelope(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    stable_before_and_after_pagination: _ExactTrue
+    version_start_retrieved_at_utc: datetime
+    version_end_retrieved_at_utc: datetime
+    snapshot_isolation_claim: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def version_timestamps_are_utc(
+        self,
+    ) -> ClinicalTrialsGovManifestVersionEnvelope:
+        for label, timestamp in (
+            ("version_start_retrieved_at_utc", self.version_start_retrieved_at_utc),
+            ("version_end_retrieved_at_utc", self.version_end_retrieved_at_utc),
+        ):
+            offset = timestamp.utcoffset()
+            if offset is None or offset.total_seconds() != 0:
+                raise ValueError(f"{label} must include the UTC timezone")
+        if self.version_end_retrieved_at_utc < self.version_start_retrieved_at_utc:
+            raise ValueError("version-end retrieval cannot precede version-start")
+        return self
+
+
+class ClinicalTrialsGovManifestPage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    page_index: int = Field(ge=1)
+    filename: str = Field(pattern=r"^pages/page_\d{6}\.json$")
+    request_url: HttpUrl
+    response_url: HttpUrl
+    requested_page_token: str | None = Field(default=None, max_length=4096)
+    next_page_token: str | None = Field(default=None, max_length=4096)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    byte_size: int = Field(ge=0, le=100 * 1024 * 1024)
+    study_count: int = Field(ge=0)
+    study_ids: list[str]
+    study_ids_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    total_count: int | None = Field(default=None, ge=0)
+    response_headers: dict[str, str]
+    attempt_count: int = Field(ge=1, le=10)
+    retrieved_at_utc: datetime
+
+    @model_validator(mode="after")
+    def page_timestamp_is_utc(self) -> ClinicalTrialsGovManifestPage:
+        offset = self.retrieved_at_utc.utcoffset()
+        if offset is None or offset.total_seconds() != 0:
+            raise ValueError("retrieved_at_utc must include the UTC timezone")
+        if self.study_count != len(self.study_ids):
+            raise ValueError("study_count must equal the study ID roster length")
+        if len(self.study_ids) != len(set(self.study_ids)):
+            raise ValueError("page study IDs must be unique")
+        return self
+
+
+class ClinicalTrialsGovManifestOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: str = Field(min_length=1)
+    filename: str = Field(min_length=1)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    byte_size: int = Field(ge=0)
+
+
+class ClinicalTrialsGovManifestSoftware(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    package: Literal["crispr-evidencerank"]
+    package_version: str = Field(min_length=1)
+    build_revision: str | None = None
+
+
+class ClinicalTrialsGovManifestScientificBoundary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    query_match_is_exact_concept_mapping: _ExactFalse
+    curation_queue_review_status: Literal["not_performed"]
+    intervention_condition_rows_are: Literal[
+        "study_level_co_mentions_not_arm_or_cohort_linkage"
+    ]
+    treatment_cancer_linkage_review_status: Literal["not_performed"]
+    curation_queue_eligible_for_clinical_context: _ExactFalse
+    used_for_gene_ranking: _ExactFalse
+    used_for_validation_label: _ExactFalse
+    registry_presence_is_efficacy: _ExactFalse
+    results_posted_is_endpoint_met: _ExactFalse
+    synthetic_fixture: StrictBool
+
+
+class ClinicalTrialsGovSnapshotManifest(BaseModel):
+    """Strict document contract for one complete API pagination traversal."""
+
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    bundle_type: Literal["clinicaltrials_gov_api_snapshot"]
+    bundle_schema_version: _ExactIntegerOne
+    snapshot_id: str = Field(pattern=r"^ctgov-[0-9a-f]{20}$")
+    complete: _ExactTrue
+    source: ClinicalTrialsGovManifestSource
+    query: ClinicalTrialsGovManifestQuery
+    query_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    retrieval: ClinicalTrialsGovManifestRetrieval
+    version_envelope: ClinicalTrialsGovManifestVersionEnvelope
+    pagination_completeness_basis: list[str] = Field(min_length=1)
+    page_count: int = Field(ge=1)
+    total_count: int = Field(ge=0)
+    observed_unique_study_count: int = Field(ge=0)
+    pages: list[ClinicalTrialsGovManifestPage] = Field(min_length=1)
+    outputs: list[ClinicalTrialsGovManifestOutput] = Field(min_length=6)
+    bundle_content_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    software: ClinicalTrialsGovManifestSoftware
+    scientific_boundary: ClinicalTrialsGovManifestScientificBoundary
+    integrity_scope: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def manifest_counts_are_consistent(
+        self,
+    ) -> ClinicalTrialsGovSnapshotManifest:
+        if self.page_count != len(self.pages):
+            raise ValueError("page_count must equal the page roster length")
+        if self.total_count != self.observed_unique_study_count:
+            raise ValueError("observed study count must equal totalCount")
+        if sum(page.study_count for page in self.pages) != self.total_count:
+            raise ValueError("page study counts must sum to totalCount")
+        if len({output.filename for output in self.outputs}) != len(self.outputs):
+            raise ValueError("output filenames must be unique")
+        timeline = [
+            self.retrieval.started_at_utc,
+            self.version_envelope.version_start_retrieved_at_utc,
+            *(page.retrieved_at_utc for page in self.pages),
+            self.version_envelope.version_end_retrieved_at_utc,
+            self.retrieval.completed_at_utc,
+        ]
+        if timeline != sorted(timeline):
+            raise ValueError("snapshot retrieval timestamps must be monotonic")
+        return self
+
+
 class DataAssetRecord(StrictRecord):
     """Versioned pointer to raw or derived data without redistributing it."""
 
@@ -2938,6 +3426,8 @@ CONTRACTS: dict[str, type[StrictRecord]] = {
     "evidence": EvidenceRecord,
     "immune_screen_evidence": ImmuneScreenEvidenceRecord,
     "clinical_trial_evidence": ClinicalTrialEvidenceRecord,
+    "clinicaltrials_gov_study_inventory": ClinicalTrialsGovStudyInventoryRecord,
+    "clinicaltrials_gov_curation_candidate": (ClinicalTrialsGovCurationCandidateRecord),
     "external_screen_map": ExternalScreenMapRecord,
     "screen_intake": ScreenIntakeRecord,
     "curation_queue": CurationQueueRecord,
@@ -2949,6 +3439,10 @@ CONTRACTS: dict[str, type[StrictRecord]] = {
     "eligibility_check": EligibilityCheckRecord,
     "design_provenance": DesignProvenanceRecord,
     "data_asset": DataAssetRecord,
+}
+
+DOCUMENT_CONTRACTS: dict[str, type[BaseModel]] = {
+    "clinicaltrials_gov_snapshot_manifest": ClinicalTrialsGovSnapshotManifest,
 }
 
 

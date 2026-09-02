@@ -16,12 +16,14 @@ or a single database score as experimental validation.
 
 ## Status
 
-Version `0.4.0.dev0` is a reproducible development system, not a released
+Version `0.5.0.dev0` is a reproducible development system, not a released
 pretrained model. It includes one-command MAGeCK/count reporting, an auxiliary
 ICRAFT-inspired immune-context method, and a separate checksum-bound clinical
-treatment-by-cancer registry report on top of the normalized experimental-
-design, provenance, feature-profile, and leakage-control foundation. It
-includes:
+treatment-by-cancer registry report. Post-checkpoint development also adds a
+separate frozen ClinicalTrials.gov API intake; its unreviewed retrieval output
+cannot enter that report. These components sit on top of the normalized
+experimental-design, provenance, feature-profile, and leakage-control
+foundation. The project includes:
 
 - normalized records for studies, screens, contrasts, samples, gene scores,
   validation events, and external evidence;
@@ -36,6 +38,9 @@ includes:
   classification, provenance-aware recurrence, and verified-full-list RRA;
 - a report-only clinical-trial contract and exact concept-ID treatment-by-cancer
   landscape that is source-asset bound and cannot change gene ranking;
+- a bounded ClinicalTrials.gov v2 snapshot intake that retains every raw JSON
+  page, the before/after API version envelope, exact query and field projection,
+  pagination lineage, and SHA-256-bound derived inventories;
 - storage for raw and CNV-corrected scores without silently substituting a
   homemade correction;
 - a two-stage baseline that models both author selection for testing and
@@ -277,6 +282,39 @@ not join the same trial metadata to every gene, calculate efficacy, or modify a
 CRISPR rank. Every normalized row must resolve to a checksum-pinned source asset,
 and only evidence available by the declared cutoff is used.
 
+ClinicalTrials.gov acquisition is a separate operation. The search strings are
+recall-oriented registry queries: a returned study is not an exact treatment or
+cancer concept match. The intake saves exact API response bytes and produces an
+unreviewed study inventory and curation queue. Every intervention/condition row
+in that queue is only a study-level co-mention; it has no reviewed same-arm or
+same-cohort linkage and is ineligible for `summarize-clinical-context`, gene
+ranking, model features, and validation labels.
+
+```bash
+crispr-evidencerank fetch-clinicaltrials-gov \
+  --condition-query "triple-negative breast cancer" \
+  --intervention-query olaparib \
+  --output-dir data/external/ctgov_olaparib_tnbc_snapshot
+
+crispr-evidencerank verify-clinicaltrials-gov \
+  --snapshot-dir data/external/ctgov_olaparib_tnbc_snapshot
+```
+
+The snapshot contains `version_start.json`, every numbered raw page,
+`version_end.json`, `study_inventory.tsv`, `curation_queue.tsv`,
+`data_assets.tsv`, and `manifest.json`. Offline verification reparses every raw
+page, regenerates all three TSV files, and requires exact byte equality.
+The TSV inventory is a deterministic projection: raw JSON, not the TSV, is
+authoritative for distinctions among missing, null, and empty collections.
+Completeness means only that the exact
+recorded query and field projection were traversed through the recorded opaque
+page-token chain, with unique NCT identifiers and an observed count equal to
+the API `totalCount`. Stable API version and data-timestamp values before and
+after pagination are an integrity envelope, not transactional snapshot
+isolation and not proof that a broader or differently phrased query would find
+no additional records. Real snapshots remain outside Git; only explicitly
+synthetic registry fixtures may be checked in.
+
 ```bash
 crispr-evidencerank summarize-clinical-context \
   --evidence examples/synthetic/clinical_context/evidence.tsv \
@@ -298,6 +336,14 @@ non-experimental intervention mentions. A zero count means
 `not observed in the supplied snapshot`, not `no trials exist`. Registry status,
 phase, and the presence of posted aggregate results are descriptive metadata,
 not evidence that an endpoint was met. See `docs/CLINICAL_CONTEXT_METHOD.md`.
+
+Any retained or redistributed ClinicalTrials.gov material must follow the
+[official Terms and Conditions](https://clinicaltrials.gov/about-site/terms-conditions),
+including ClinicalTrials.gov attribution, display of the date the source data
+were processed, and disclosure of project modifications and their date. The
+intake manifest records the registry data timestamp, retrieval times, raw and
+derived checksums, and transformation identity; it does not itself grant
+redistribution rights or imply endorsement.
 
 For a release-pinned BioGRID ORCS archive:
 

@@ -1,18 +1,26 @@
-# Development checkpoint — v0.4.0.dev0
+# Development checkpoint — v0.5.0.dev0
 
-Updated: 2026-08-31
+Updated: 2026-09-01
 
-The v0.4 checkpoint retains the v0.2 design contract described below and adds
+The v0.5 checkpoint retains the v0.2 design contract described below, the
 checksum-bound screen, immune-context, and clinical treatment-by-cancer report
-engines. These are development/reporting components; the real harmonized
-training set, adjudicated benchmark, pretrained model, and calibrated
-validation probability still do not exist.
+engines, and adds a separate frozen ClinicalTrials.gov API intake. These are
+development/reporting components; the real harmonized training set,
+adjudicated benchmark, pretrained model, and calibrated validation probability
+still do not exist.
 
-Release verification on Python 3.11 passes 353 tests at 88.24% statement
+Release verification on Python 3.12 passes 427 tests at 86.56% statement
 coverage, repository and formatting guards, the smoke benchmark, deterministic
 schema/fixture regeneration, and an installed-wheel end-to-end run. The
-synthetic clinical fixture contains five non-patient registry rows and one
-checksum-pinned source asset.
+synthetic clinical-context fixture contains five non-patient registry rows and
+one checksum-pinned source asset; the separate ClinicalTrials.gov fixture
+contains two explicitly synthetic studies and three injected-response assets.
+
+The v0.5 intake retains every exact response byte, pins the query, field
+projection, opaque page-token chain, `totalCount`, and before/after API version
+envelope, and reproduces all derived TSVs offline. Search hits remain unreviewed
+study-level co-mentions: they cannot become exact concept mappings, efficacy
+claims, gene evidence, model features, or validation labels automatically.
 
 ## Executable baseline inherited from v0.1
 

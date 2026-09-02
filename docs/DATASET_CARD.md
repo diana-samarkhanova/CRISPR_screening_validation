@@ -8,12 +8,18 @@ orthogonal experimental reproduction.
 
 ## Current state
 
-Version `0.4.0.dev0` contains schemas, curation rules, an intake manifest,
+Version `0.5.0.dev0` contains schemas, curation rules, an intake manifest,
 synthetic fixtures, a screen-signal report, and independent report-only immune
 and clinical-context engines. It does not contain a completed biological
 training dataset, a pretrained model, or calibrated probabilities. Clinical
 registry context is treatment-by-cancer metadata, not gene-level evidence or a
 validation label.
+
+Post-checkpoint development includes a separate frozen ClinicalTrials.gov API
+snapshot intake. Its search queries are recall-oriented, and its derived rows
+are explicitly unreviewed study-level treatment/condition co-mentions. They do
+not constitute clinical evidence and cannot enter the clinical summarizer,
+features, ranking, validation-success model, or labels.
 
 The first ten ORCS queue records have completed primary and independent second
 full-text review. Eight expose only author-derived score tables, one exposes a
@@ -42,6 +48,11 @@ Primary articles, supplements, and raw-data repositories are used to verify
 design and targeted validation. ORCS hit calls are never treated as
 orthogonal-validation labels.
 
+ClinicalTrials.gov is used only through checksum-bound frozen snapshots and a
+separate curator-reviewed treatment-by-cancer evidence layer. Registry search
+presence, phase, status, and aggregate-results availability do not establish
+efficacy or support a CRISPR gene hit.
+
 ## Known biases
 
 - authors preferentially validate statistically strong or biologically
@@ -63,6 +74,12 @@ unpublished case study remain outside Git history. Every external asset
 requires a version, source locator, rights record, and transformation
 provenance. Retrieved byte assets also require checksum and size; accession-only
 pointers are explicitly marked not retrieved and carry no invented checksum.
+Real ClinicalTrials.gov API pages and complete snapshots remain outside Git;
+only clearly labeled synthetic registry fixtures may be committed. Snapshot
+completeness is scoped to the exact recorded query and token traversal, and a
+stable before/after version envelope is not transactional isolation. Reuse must
+preserve ClinicalTrials.gov attribution, registry processing date, and the
+project's dated modifications under the current source terms.
 
 ## Release gate
 

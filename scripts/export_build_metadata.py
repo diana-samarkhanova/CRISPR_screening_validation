@@ -15,10 +15,19 @@ def main() -> None:
     root = Path(__file__).resolve().parents[1]
     output = root / "src" / "crispr_evidencerank" / "_build_metadata.json"
     payload = {
-        "format_version": 1,
+        "format_version": 2,
         "dependency_lock_sha256": _sha256(root / "uv.lock"),
         "clinical_schema_sha256": _sha256(
             root / "schemas" / "clinical_trial_evidence.schema.json"
+        ),
+        "clinicaltrials_gov_curation_candidate_schema_sha256": _sha256(
+            root / "schemas" / "clinicaltrials_gov_curation_candidate.schema.json"
+        ),
+        "clinicaltrials_gov_snapshot_manifest_schema_sha256": _sha256(
+            root / "schemas" / "clinicaltrials_gov_snapshot_manifest.schema.json"
+        ),
+        "clinicaltrials_gov_study_inventory_schema_sha256": _sha256(
+            root / "schemas" / "clinicaltrials_gov_study_inventory.schema.json"
         ),
     }
     output.write_text(

@@ -4,11 +4,21 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import shutil
+import tempfile
+from datetime import UTC, datetime
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import numpy as np
 import pandas as pd
 
+from crispr_evidencerank.clinicaltrials_gov import (
+    HttpResponse,
+    fetch_clinicaltrials_gov_snapshot,
+    verify_clinicaltrials_gov_snapshot,
+)
 from crispr_evidencerank.features import (
     featurize_count_table,
     featurize_experimental_design,
@@ -17,6 +27,189 @@ from crispr_evidencerank.features import (
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "examples" / "synthetic"
 RNG = np.random.default_rng(20260730)
+
+SYNTHETIC_CTGOV_TIMESTAMP = datetime(2026, 8, 30, tzinfo=UTC)
+SYNTHETIC_CTGOV_VERSION = {
+    "syntheticFixture": True,
+    "apiVersion": "2.0.5-synthetic",
+    "dataTimestamp": "2026-08-30T00:00:00Z",
+}
+SYNTHETIC_CTGOV_STUDIES = {
+    "syntheticFixture": True,
+    "totalCount": 2,
+    "studies": [
+        {
+            "protocolSection": {
+                "identificationModule": {
+                    "nctId": "NCT90000001",
+                    "briefTitle": "SYNTHETIC linked-arm software fixture",
+                    "officialTitle": "SYNTHETIC study; not a real clinical trial",
+                },
+                "statusModule": {
+                    "overallStatus": "COMPLETED",
+                    "studyFirstPostDateStruct": {
+                        "date": "2024-01-01",
+                        "type": "ACTUAL",
+                    },
+                    "lastUpdatePostDateStruct": {
+                        "date": "2026-08-20",
+                        "type": "ACTUAL",
+                    },
+                },
+                "designModule": {
+                    "studyType": "INTERVENTIONAL",
+                    "phases": ["PHASE2"],
+                    "designInfo": {
+                        "allocation": "RANDOMIZED",
+                        "interventionModel": "PARALLEL",
+                        "primaryPurpose": "TREATMENT",
+                    },
+                    "enrollmentInfo": {"count": 24, "type": "ACTUAL"},
+                },
+                "conditionsModule": {
+                    "conditions": ["SYNTHETIC_CONDITION"],
+                    "keywords": ["SYNTHETIC_ONLY"],
+                },
+                "descriptionModule": {
+                    "briefSummary": "SYNTHETIC non-biological registry fixture."
+                },
+                "eligibilityModule": {
+                    "eligibilityCriteria": "SYNTHETIC criteria only",
+                    "sex": "ALL",
+                    "minimumAge": "18 Years",
+                    "maximumAge": "90 Years",
+                    "healthyVolunteers": False,
+                },
+                "armsInterventionsModule": {
+                    "interventions": [
+                        {
+                            "type": "DRUG",
+                            "name": "SYNTHETIC_INTERVENTION",
+                            "description": "SYNTHETIC inert placeholder",
+                            "armGroupLabels": ["SYNTHETIC ARM"],
+                            "otherNames": ["SYNTHETIC_ALIAS"],
+                        }
+                    ],
+                    "armGroups": [
+                        {
+                            "label": "SYNTHETIC ARM",
+                            "type": "EXPERIMENTAL",
+                            "description": "SYNTHETIC arm",
+                            "interventionNames": ["Drug: SYNTHETIC_INTERVENTION"],
+                        }
+                    ],
+                },
+            },
+            "derivedSection": {"miscInfoModule": {"versionHolder": "2026-08-30"}},
+            "hasResults": False,
+        },
+        {
+            "protocolSection": {
+                "identificationModule": {
+                    "nctId": "NCT90000002",
+                    "briefTitle": "SYNTHETIC condition-only software fixture",
+                },
+                "statusModule": {
+                    "overallStatus": "RECRUITING",
+                    "studyFirstPostDateStruct": {
+                        "date": "2025-02",
+                        "type": "ACTUAL",
+                    },
+                    "lastUpdatePostDateStruct": {
+                        "date": "2026-08",
+                        "type": "ACTUAL",
+                    },
+                },
+                "designModule": {
+                    "studyType": "OBSERVATIONAL",
+                    "enrollmentInfo": {"count": 12, "type": "ESTIMATED"},
+                },
+                "conditionsModule": {"conditions": ["SYNTHETIC_CONDITION"]},
+                "descriptionModule": {
+                    "briefSummary": "SYNTHETIC missing-intervention negative fixture."
+                },
+            },
+            "derivedSection": {"miscInfoModule": {"versionHolder": "2026-08-30"}},
+            "hasResults": False,
+        },
+    ],
+}
+
+
+def _synthetic_ctgov_bytes(value: object) -> bytes:
+    return (
+        json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+
+
+def _synthetic_ctgov_requester(url: str, **_: object) -> HttpResponse:
+    """Return deterministic API-shaped bytes without opening a network socket."""
+
+    path = urlsplit(url).path
+    if path == "/api/v2/version":
+        value = SYNTHETIC_CTGOV_VERSION
+    elif path == "/api/v2/studies":
+        value = SYNTHETIC_CTGOV_STUDIES
+    else:
+        raise AssertionError(f"unexpected synthetic ClinicalTrials.gov URL: {url}")
+    body = _synthetic_ctgov_bytes(value)
+    return HttpResponse(
+        body=body,
+        status_code=200,
+        final_url=url,
+        headers={
+            "content-type": "application/json; charset=utf-8",
+            "content-length": str(len(body)),
+            "content-encoding": "identity",
+            "date": "Sun, 30 Aug 2026 00:00:00 GMT",
+        },
+    )
+
+
+def generate_clinicaltrials_gov_snapshot_fixture() -> None:
+    """Generate a checksum-bound, wholly synthetic frozen API snapshot."""
+
+    fixture_out = OUT / "clinicaltrials_gov_snapshot"
+    build_revision_name = "CRISPR_EVIDENCERANK_BUILD_REVISION"
+    saved_build_revision = os.environ.pop(build_revision_name, None)
+    try:
+        with tempfile.TemporaryDirectory(
+            prefix=".clinicaltrials-gov-synthetic-", dir=OUT
+        ) as temporary_directory:
+            generated = Path(temporary_directory) / "snapshot"
+            fetch_clinicaltrials_gov_snapshot(
+                condition_query="SYNTHETIC_CONDITION",
+                intervention_query="SYNTHETIC_INTERVENTION",
+                output_dir=generated,
+                page_size=2,
+                timeout_seconds=1.0,
+                max_attempts=1,
+                backoff_seconds=0.0,
+                max_pages=1,
+                max_studies=2,
+                max_candidate_rows=4,
+                max_page_bytes=1024 * 1024,
+                max_total_bytes=3 * 1024 * 1024,
+                max_derived_bytes=1024 * 1024,
+                max_elapsed_seconds=1.0,
+                synthetic_fixture=True,
+                requester=_synthetic_ctgov_requester,
+                clock=lambda: SYNTHETIC_CTGOV_TIMESTAMP,
+                monotonic=lambda: 0.0,
+            )
+            verify_clinicaltrials_gov_snapshot(generated)
+            if os.path.lexists(fixture_out):
+                if fixture_out.is_symlink() or not fixture_out.is_dir():
+                    raise RuntimeError(
+                        "synthetic ClinicalTrials.gov fixture path must be a "
+                        "real directory"
+                    )
+                shutil.rmtree(fixture_out)
+            shutil.copytree(generated, fixture_out)
+            verify_clinicaltrials_gov_snapshot(fixture_out)
+    finally:
+        if saved_build_revision is not None:
+            os.environ[build_revision_name] = saved_build_revision
 
 
 def generate_clinical_context_fixture() -> None:
@@ -673,6 +866,7 @@ def main() -> None:
         float_format="%.10g",
     )
     generate_clinical_context_fixture()
+    generate_clinicaltrials_gov_snapshot_fixture()
     print(
         {
             "studies": len(studies_frame),
@@ -681,6 +875,7 @@ def main() -> None:
             "guides": len(combined_counts),
             "gene_rows": len(labeled_features),
             "validation_events": len(validation_frame),
+            "clinicaltrials_gov_snapshot_studies": 2,
         }
     )
 

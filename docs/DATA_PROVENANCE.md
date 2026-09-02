@@ -138,6 +138,45 @@ reconstruct historical status without a historical snapshot. Registry
 presence, phase, completion, and `results_posted` remain context rather than
 efficacy, gene evidence, or validation labels.
 
+The ClinicalTrials.gov API snapshot intake is upstream of, and isolated from,
+that reviewed report. It records the exact recall-oriented condition and
+intervention search strings, scientific field projection, response format,
+opaque page-token chain, first-page `totalCount`, API version, registry data
+timestamp, per-response retrieval time, raw byte size, and SHA-256. Exact bytes
+from the version endpoint before and after pagination and from every studies
+page are retained. Every derived inventory and curation row binds to the raw
+page asset that contained its study.
+The inventory is a deterministic projection and normalizes missing, null, and
+empty source collections to an empty list. The checksum-pinned raw JSON remains
+authoritative for those structural distinctions. Injected transports, injected
+clocks, and wholly synthetic fixtures are named explicitly and cannot claim live
+HTTPS provenance; synthetic assets use project-only namespaces and URLs.
+
+Pagination completeness means only complete traversal of the exact manifest-
+pinned query: the token chain terminated, tokens and NCT identifiers did not
+repeat, and the unique observed count equaled `totalCount`. It is not an exact
+concept-mapping claim, a synonym-recall claim, or a claim that another query
+would return no additional studies. Stable API version and data-timestamp
+values before and after retrieval are an integrity envelope, not transactional
+snapshot isolation.
+
+The generated curation queue is fail-closed. Its treatment and condition values
+are study-level search co-mentions with mapping review, intervention role,
+regimen review, population review, and same-arm/same-cohort linkage marked not
+performed. It is never `clinical_trial_evidence` and cannot enter the clinical
+summarizer, gene ranking, feature tables, validation-success model, or labels.
+
+Real ClinicalTrials.gov raw responses and complete snapshots stay outside Git;
+only explicitly synthetic API fixtures may be checked in. The manifest retains
+the official terms URL, registry data timestamp, project retrieval times,
+checksums, and transformation identity. Any reproduction or redistribution
+must follow the current [ClinicalTrials.gov Terms and
+Conditions](https://clinicaltrials.gov/about-site/terms-conditions), including
+source attribution, clear display of the date the data were processed by
+ClinicalTrials.gov, and disclosure of project modifications and their date.
+Checksums do not establish publisher authenticity or redistribution rights, and
+submitted registry content may carry third-party or international rights.
+
 ## ORCS intake and curation queue
 
 The ORCS 2.0.18 human index contains 1,952 observed screen records. Automated

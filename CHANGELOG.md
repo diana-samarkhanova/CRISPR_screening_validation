@@ -4,6 +4,28 @@ All notable project changes are recorded here. The project follows semantic
 versioning once public releases begin; development checkpoints use a `.devN`
 suffix and are not claims of a trained biological model.
 
+## 0.5.0.dev0 — ClinicalTrials.gov frozen snapshot intake
+
+- Added a separate bounded ClinicalTrials.gov v2 acquisition path that retains
+  the exact version response before and after pagination, every raw studies
+  page, the exact recall-oriented query and field projection, and the opaque
+  page-token lineage.
+- Added a checksum-bound manifest, deterministic study projection, data-asset
+  registry, fail-closed curation queue, and offline snapshot verifier.
+- Scoped completeness to termination of the exact query's token chain, unique
+  NCT identifiers, agreement with first-page `totalCount`, and a stable API
+  version/data-timestamp envelope; explicitly disclaimed transactional snapshot
+  isolation and ontology/synonym recall.
+- Kept all search-derived intervention/condition rows as unreviewed study-level
+  co-mentions without inferred exact concepts, intervention role, regimen,
+  population scope, or same-arm/same-cohort linkage. They cannot enter the
+  clinical summarizer, gene ranking, model features, or validation labels.
+- Required real API pages and snapshots to remain outside Git while permitting
+  clearly labeled synthetic fixtures for offline tests.
+- Documented ClinicalTrials.gov attribution, registry processing date, dated
+  project modifications, and independent rights review requirements for reuse;
+  hashes establish integrity, not redistribution permission or endorsement.
+
 ## 0.4.0.dev0 — clinical treatment-by-cancer context
 
 - Added the strict `clinical_trial_evidence` contract for one frozen source

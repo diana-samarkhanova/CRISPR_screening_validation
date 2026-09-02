@@ -109,6 +109,8 @@ jobs:
             --cancer-mapping-version 2026-08-01 \
             --cutoff-date 2026-08-31 \
             --output-dir /tmp/clinical-context
+          .venv/bin/crispr-evidencerank verify-clinicaltrials-gov \
+            --snapshot-dir examples/synthetic/clinicaltrials_gov_snapshot
           test -s /tmp/screen-report/ranked_candidates.tsv
           test -s /tmp/screen-report/run_manifest.json
           test -s /tmp/immune-context/immune_context.tsv

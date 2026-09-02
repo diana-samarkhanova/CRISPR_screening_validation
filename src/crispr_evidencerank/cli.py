@@ -20,6 +20,21 @@ import pandas as pd
 
 from . import __version__
 from .clinical_context import ClinicalContextResult, summarize_clinical_context
+from .clinicaltrials_gov import (
+    DEFAULT_BACKOFF_SECONDS,
+    DEFAULT_MAX_ATTEMPTS,
+    DEFAULT_MAX_CANDIDATE_ROWS,
+    DEFAULT_MAX_DERIVED_BYTES,
+    DEFAULT_MAX_ELAPSED_SECONDS,
+    DEFAULT_MAX_PAGE_BYTES,
+    DEFAULT_MAX_PAGES,
+    DEFAULT_MAX_STUDIES,
+    DEFAULT_MAX_TOTAL_BYTES,
+    DEFAULT_PAGE_SIZE,
+    DEFAULT_TIMEOUT_SECONDS,
+    fetch_clinicaltrials_gov_snapshot,
+    verify_clinicaltrials_gov_snapshot,
+)
 from .contracts import (
     CONTRACTS,
     ClinicalTrialEvidenceRecord,
@@ -324,7 +339,13 @@ def _clinical_software_provenance() -> dict[str, object]:
         .read_bytes()
     )
     build_metadata = json.loads(metadata_bytes)
-    required_hashes = ("dependency_lock_sha256", "clinical_schema_sha256")
+    required_hashes = (
+        "dependency_lock_sha256",
+        "clinical_schema_sha256",
+        "clinicaltrials_gov_curation_candidate_schema_sha256",
+        "clinicaltrials_gov_snapshot_manifest_schema_sha256",
+        "clinicaltrials_gov_study_inventory_schema_sha256",
+    )
     for name in required_hashes:
         value = build_metadata.get(name)
         if (
@@ -345,6 +366,15 @@ def _clinical_software_provenance() -> dict[str, object]:
         "build_metadata_sha256": hashlib.sha256(metadata_bytes).hexdigest(),
         "dependency_lock_sha256": build_metadata["dependency_lock_sha256"],
         "clinical_schema_sha256": build_metadata["clinical_schema_sha256"],
+        "clinicaltrials_gov_curation_candidate_schema_sha256": build_metadata[
+            "clinicaltrials_gov_curation_candidate_schema_sha256"
+        ],
+        "clinicaltrials_gov_snapshot_manifest_schema_sha256": build_metadata[
+            "clinicaltrials_gov_snapshot_manifest_schema_sha256"
+        ],
+        "clinicaltrials_gov_study_inventory_schema_sha256": build_metadata[
+            "clinicaltrials_gov_study_inventory_schema_sha256"
+        ],
         "runtime_dependencies": runtime_dependencies,
     }
     provenance["build_revision"] = os.environ.get("CRISPR_EVIDENCERANK_BUILD_REVISION")
@@ -392,6 +422,43 @@ def command_summarize_clinical_context(args: argparse.Namespace) -> int:
         input_snapshots=result.metadata["inputs"],
     )
     print(json.dumps(result.metadata, indent=2, sort_keys=True))
+    return 0
+
+
+def command_fetch_clinicaltrials_gov(args: argparse.Namespace) -> int:
+    manifest = fetch_clinicaltrials_gov_snapshot(
+        condition_query=args.condition_query,
+        intervention_query=args.intervention_query,
+        output_dir=args.output_dir,
+        page_size=args.page_size,
+        timeout_seconds=args.timeout_seconds,
+        max_attempts=args.max_attempts,
+        backoff_seconds=args.backoff_seconds,
+        max_pages=args.max_pages,
+        max_studies=args.max_studies,
+        max_candidate_rows=args.max_candidate_rows,
+        max_page_bytes=args.max_page_bytes,
+        max_total_bytes=args.max_total_bytes,
+        max_derived_bytes=args.max_derived_bytes,
+        max_elapsed_seconds=args.max_elapsed_seconds,
+    )
+    report = {
+        "snapshot_id": manifest["snapshot_id"],
+        "output_dir": str(args.output_dir),
+        "api_version": manifest["source"]["api_version"],
+        "data_timestamp": manifest["source"]["data_timestamp"],
+        "page_count": manifest["page_count"],
+        "study_count": manifest["observed_unique_study_count"],
+        "complete": manifest["complete"],
+        "clinical_context_eligible": False,
+    }
+    print(json.dumps(report, indent=2, sort_keys=True))
+    return 0
+
+
+def command_verify_clinicaltrials_gov(args: argparse.Namespace) -> int:
+    report = verify_clinicaltrials_gov_snapshot(args.snapshot_dir)
+    print(json.dumps(report, indent=2, sort_keys=True))
     return 0
 
 
@@ -1028,6 +1095,60 @@ def build_parser() -> argparse.ArgumentParser:
     )
     clinical_context.add_argument("--output-dir", required=True)
     clinical_context.set_defaults(func=command_summarize_clinical_context)
+
+    clinicaltrials_fetch = subparsers.add_parser(
+        "fetch-clinicaltrials-gov",
+        help=(
+            "atomically freeze and verify a complete ClinicalTrials.gov v2 "
+            "treatment/cancer search without creating clinical evidence"
+        ),
+    )
+    clinicaltrials_fetch.add_argument("--condition-query", required=True)
+    clinicaltrials_fetch.add_argument("--intervention-query", required=True)
+    clinicaltrials_fetch.add_argument(
+        "--page-size", type=int, default=DEFAULT_PAGE_SIZE
+    )
+    clinicaltrials_fetch.add_argument(
+        "--timeout-seconds", type=float, default=DEFAULT_TIMEOUT_SECONDS
+    )
+    clinicaltrials_fetch.add_argument(
+        "--max-attempts", type=int, default=DEFAULT_MAX_ATTEMPTS
+    )
+    clinicaltrials_fetch.add_argument(
+        "--backoff-seconds", type=float, default=DEFAULT_BACKOFF_SECONDS
+    )
+    clinicaltrials_fetch.add_argument(
+        "--max-pages", type=int, default=DEFAULT_MAX_PAGES
+    )
+    clinicaltrials_fetch.add_argument(
+        "--max-studies", type=int, default=DEFAULT_MAX_STUDIES
+    )
+    clinicaltrials_fetch.add_argument(
+        "--max-candidate-rows", type=int, default=DEFAULT_MAX_CANDIDATE_ROWS
+    )
+    clinicaltrials_fetch.add_argument(
+        "--max-page-bytes", type=int, default=DEFAULT_MAX_PAGE_BYTES
+    )
+    clinicaltrials_fetch.add_argument(
+        "--max-total-bytes", type=int, default=DEFAULT_MAX_TOTAL_BYTES
+    )
+    clinicaltrials_fetch.add_argument(
+        "--max-derived-bytes", type=int, default=DEFAULT_MAX_DERIVED_BYTES
+    )
+    clinicaltrials_fetch.add_argument(
+        "--max-elapsed-seconds",
+        type=float,
+        default=DEFAULT_MAX_ELAPSED_SECONDS,
+    )
+    clinicaltrials_fetch.add_argument("--output-dir", required=True)
+    clinicaltrials_fetch.set_defaults(func=command_fetch_clinicaltrials_gov)
+
+    clinicaltrials_verify = subparsers.add_parser(
+        "verify-clinicaltrials-gov",
+        help=("offline verification of a ClinicalTrials.gov raw pagination bundle"),
+    )
+    clinicaltrials_verify.add_argument("--snapshot-dir", required=True)
+    clinicaltrials_verify.set_defaults(func=command_verify_clinicaltrials_gov)
 
     benchmark = subparsers.add_parser(
         "benchmark", help="run grouped out-of-fold baseline evaluation"

@@ -1,5 +1,8 @@
 {
   "clinical_schema_sha256": "2dd9f84ed34f9d2ee6bee3e77468f57d018fcb63fc6e4667b3046d14d8433ccd",
-  "dependency_lock_sha256": "9f5ec771635dfc812b3c0f8cb2a67b069e18b6f544708de05c5aceffd61cb7c7",
-  "format_version": 1
+  "clinicaltrials_gov_curation_candidate_schema_sha256": "4246f32b6557bea2d984a76a5f2d6fce3900f5e061cf6fb5d8abcc399db8e577",
+  "clinicaltrials_gov_snapshot_manifest_schema_sha256": "7c4d2b6f30d193e8d6161fd9286dfb5fa102a891dec936ee54505e3854dec373",
+  "clinicaltrials_gov_study_inventory_schema_sha256": "022e2e30b2e6b26cb1fad2883f293bac0819e5bf2097f3c43c2cf0f5b5fd424b",
+  "dependency_lock_sha256": "2f2695dffdb037494910fd3f1ba94207bb6b49a323a3968539b7027f75a75caa",
+  "format_version": 2
 }
