@@ -2,12 +2,21 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date, datetime
 from enum import StrEnum
-from typing import Any, ClassVar, Literal
+from typing import Annotated, Any, ClassVar, Literal
 
 import pandas as pd
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    StrictBool,
+    model_validator,
+)
 
 from .labels import CANDIDATE_KEY, LabelCode, adjudicate_validation_events
 
@@ -28,6 +37,240 @@ class PhenotypeDirection(StrEnum):
     SENSITIZATION = "sensitization"
     NEUTRAL = "neutral"
     DISCORDANT = "discordant"
+    UNKNOWN = "unknown"
+
+
+class PerturbedCompartment(StrEnum):
+    """Cell compartment in which the perturbation was introduced."""
+
+    TUMOR_CELL = "tumor_cell"
+    IMMUNE_CELL = "immune_cell"
+    OTHER = "other"
+    UNKNOWN = "unknown"
+
+
+class ExperimentalSetting(StrEnum):
+    IN_VITRO = "in_vitro"
+    IN_VIVO = "in_vivo"
+    EX_VIVO = "ex_vivo"
+    UNKNOWN = "unknown"
+
+
+class ImmuneScreenCategory(StrEnum):
+    """Phenotype strata adapted from, but not restricted to, ICRAFT."""
+
+    CELL_VIABILITY_PROLIFERATION = "cell_viability_proliferation"
+    MARKER_EXPRESSION = "marker_expression"
+    COCULTURE_IMMUNE_KILLING = "coculture_immune_killing"
+    IMMUNE_CELL_FUNCTION = "immune_cell_function"
+    IN_VIVO_SELECTION = "in_vivo_selection"
+    OTHER = "other"
+
+
+class AssayConsequence(StrEnum):
+    DRUG_RESISTANCE = "drug_resistance"
+    DRUG_SENSITIZATION = "drug_sensitization"
+    TUMOR_IMMUNE_ESCAPE = "tumor_immune_escape"
+    TUMOR_IMMUNE_SENSITIZATION = "tumor_immune_sensitization"
+    IMMUNE_EFFECTOR_GAIN = "immune_effector_gain"
+    IMMUNE_EFFECTOR_LOSS = "immune_effector_loss"
+    IMMUNE_FITNESS_GAIN = "immune_fitness_gain"
+    IMMUNE_FITNESS_LOSS = "immune_fitness_loss"
+    MARKER_INCREASED = "marker_increased"
+    MARKER_DECREASED = "marker_decreased"
+    IN_VIVO_POSITIVE_SELECTION = "in_vivo_positive_selection"
+    IN_VIVO_NEGATIVE_SELECTION = "in_vivo_negative_selection"
+    NEUTRAL = "neutral"
+    AMBIGUOUS = "ambiguous"
+
+
+ALLOWED_CONSEQUENCES_BY_SCREEN_CATEGORY = {
+    ImmuneScreenCategory.CELL_VIABILITY_PROLIFERATION: {
+        AssayConsequence.DRUG_RESISTANCE,
+        AssayConsequence.DRUG_SENSITIZATION,
+        AssayConsequence.IMMUNE_FITNESS_GAIN,
+        AssayConsequence.IMMUNE_FITNESS_LOSS,
+    },
+    ImmuneScreenCategory.MARKER_EXPRESSION: {
+        AssayConsequence.MARKER_INCREASED,
+        AssayConsequence.MARKER_DECREASED,
+    },
+    ImmuneScreenCategory.COCULTURE_IMMUNE_KILLING: {
+        AssayConsequence.TUMOR_IMMUNE_ESCAPE,
+        AssayConsequence.TUMOR_IMMUNE_SENSITIZATION,
+        AssayConsequence.IMMUNE_EFFECTOR_GAIN,
+        AssayConsequence.IMMUNE_EFFECTOR_LOSS,
+    },
+    ImmuneScreenCategory.IMMUNE_CELL_FUNCTION: {
+        AssayConsequence.IMMUNE_EFFECTOR_GAIN,
+        AssayConsequence.IMMUNE_EFFECTOR_LOSS,
+        AssayConsequence.IMMUNE_FITNESS_GAIN,
+        AssayConsequence.IMMUNE_FITNESS_LOSS,
+    },
+    ImmuneScreenCategory.IN_VIVO_SELECTION: {
+        AssayConsequence.IN_VIVO_POSITIVE_SELECTION,
+        AssayConsequence.IN_VIVO_NEGATIVE_SELECTION,
+    },
+    ImmuneScreenCategory.OTHER: set(),
+}
+
+
+class NativeEffectDirection(StrEnum):
+    """Direction in the source's native, non-display-inverted contrast."""
+
+    ENRICHED = "enriched"
+    DEPLETED = "depleted"
+    NEUTRAL = "neutral"
+    UNKNOWN = "unknown"
+
+
+class EndpointPolarity(StrEnum):
+    """Whether enrichment or depletion is favorable for antitumor activity."""
+
+    ENRICHMENT_IS_FAVORABLE = "enrichment_is_favorable"
+    DEPLETION_IS_FAVORABLE = "depletion_is_favorable"
+    UNKNOWN = "unknown"
+
+
+class AntitumorDirection(StrEnum):
+    FAVORABLE = "favorable"
+    UNFAVORABLE = "unfavorable"
+    NEUTRAL = "neutral"
+    DISCORDANT = "discordant"
+    UNKNOWN = "unknown"
+
+
+class DirectionMappingStatus(StrEnum):
+    EXACT = "exact"
+    CONDITIONAL = "conditional"
+    UNRESOLVED = "unresolved"
+
+
+EXACT_DIRECTION_RULE_BY_POLARITY = {
+    EndpointPolarity.ENRICHMENT_IS_FAVORABLE: ("native_enrichment_is_favorable_v1"),
+    EndpointPolarity.DEPLETION_IS_FAVORABLE: ("native_depletion_is_favorable_v1"),
+}
+
+ICRAFT_CRISPRA_DISPLAY_TRANSFORMATION_ID = "icraft_crispra_display_sign_inversion_v1"
+
+
+class SourceEffectSemantics(StrEnum):
+    NATIVE = "native"
+    ICRAFT_KO_EQUIVALENT_DISPLAY = "icraft_ko_equivalent_display"
+    OTHER = "other"
+
+
+class RawEffectSignSemantics(StrEnum):
+    POSITIVE_IS_ENRICHMENT = "positive_is_enrichment"
+    POSITIVE_IS_DEPLETION = "positive_is_depletion"
+    UNSIGNED_OR_NOT_APPLICABLE = "unsigned_or_not_applicable"
+
+
+def _is_lfc_metric_label(value: str) -> bool:
+    normalized = "".join(
+        character for character in value.casefold() if character.isalnum()
+    )
+    return any(
+        token in normalized
+        for token in ("lfc", "logfc", "logfoldchange", "log2foldchange")
+    )
+
+
+class OrthologyMappingStatus(StrEnum):
+    NOT_NEEDED = "not_needed"
+    ONE_TO_ONE = "one_to_one"
+    AMBIGUOUS = "ambiguous"
+    UNMAPPED = "unmapped"
+
+
+class RankListCompleteness(StrEnum):
+    FULL_RANKED_LIST = "full_ranked_list"
+    TOP_HITS_ONLY = "top_hits_only"
+    UNKNOWN = "unknown"
+
+
+class InputDataLevel(StrEnum):
+    FASTQ = "fastq"
+    RAW_COUNTS = "raw_counts"
+    NORMALIZED_COUNTS = "normalized_counts"
+    DERIVED_GENE_SCORES = "derived_gene_scores"
+    UNKNOWN = "unknown"
+
+
+class ClinicalStudyType(StrEnum):
+    """Normalized ClinicalTrials.gov-compatible study type."""
+
+    INTERVENTIONAL = "interventional"
+    OBSERVATIONAL = "observational"
+    EXPANDED_ACCESS = "expanded_access"
+    OTHER = "other"
+    UNKNOWN = "unknown"
+
+
+class ClinicalStatusCategory(StrEnum):
+    """Coarse registry status without any efficacy interpretation."""
+
+    NOT_YET_RECRUITING = "not_yet_recruiting"
+    RECRUITING = "recruiting"
+    ACTIVE_NOT_RECRUITING = "active_not_recruiting"
+    ENROLLING_BY_INVITATION = "enrolling_by_invitation"
+    SUSPENDED = "suspended"
+    TERMINATED = "terminated"
+    COMPLETED = "completed"
+    WITHDRAWN = "withdrawn"
+    UNKNOWN = "unknown"
+
+
+class ClinicalPhaseCategory(StrEnum):
+    """Normalized phase; higher phase is not treated as evidence of efficacy."""
+
+    EARLY_PHASE_1 = "early_phase_1"
+    PHASE_1 = "phase_1"
+    PHASE_1_2 = "phase_1_2"
+    PHASE_2 = "phase_2"
+    PHASE_2_3 = "phase_2_3"
+    PHASE_3 = "phase_3"
+    PHASE_4 = "phase_4"
+    NOT_APPLICABLE = "not_applicable"
+    UNKNOWN = "unknown"
+
+
+class ClinicalInterventionRole(StrEnum):
+    EXPERIMENTAL = "experimental"
+    ACTIVE_COMPARATOR = "active_comparator"
+    PLACEBO_COMPARATOR = "placebo_comparator"
+    SHAM_COMPARATOR = "sham_comparator"
+    NO_INTERVENTION = "no_intervention"
+    OTHER = "other"
+    UNKNOWN = "unknown"
+
+
+class ClinicalRegimenContext(StrEnum):
+    MONOTHERAPY = "monotherapy"
+    COMBINATION = "combination"
+    ADD_ON = "add_on"
+    MAINTENANCE = "maintenance"
+    BACKGROUND = "background"
+    OTHER = "other"
+    UNKNOWN = "unknown"
+
+
+class ClinicalMappingRelation(StrEnum):
+    """Relationship between a source term and its normalized concept."""
+
+    EXACT = "exact"
+    BROADER_THAN_SOURCE = "broader_than_source"
+    NARROWER_THAN_SOURCE = "narrower_than_source"
+    RELATED = "related"
+    UNKNOWN = "unknown"
+
+
+class ClinicalMappingReviewStatus(StrEnum):
+    """Review state of a treatment or cancer concept mapping."""
+
+    CURATOR_REVIEWED = "curator_reviewed"
+    SOURCE_ASSERTED = "source_asserted"
+    AUTOMATED_UNREVIEWED = "automated_unreviewed"
     UNKNOWN = "unknown"
 
 
@@ -1316,7 +1559,7 @@ class GeneScoreRecord(StrictRecord):
                             }
                         },
                     },
-                }
+                },
             ],
             "anyOf": [
                 {
@@ -1783,6 +2026,1263 @@ class EvidenceRecord(StrictRecord):
         return self
 
 
+class ImmuneScreenEvidenceRecord(StrictRecord):
+    """Canonical comparison-by-gene evidence for immune-context reporting.
+
+    This contract deliberately stores the native source direction separately
+    from endpoint desirability. It is auxiliary evidence: it cannot create a
+    validation label or enter the success model as a current-snapshot feature.
+    """
+
+    primary_key = ("evidence_id",)
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True,
+        allow_inf_nan=False,
+        json_schema_extra={
+            "anyOf": [
+                {
+                    "required": ["raw_effect"],
+                    "properties": {"raw_effect": {"type": "number"}},
+                },
+                {
+                    "required": ["source_score"],
+                    "properties": {"source_score": {"type": "number"}},
+                },
+                {
+                    "required": ["source_fdr"],
+                    "properties": {"source_fdr": {"type": "number"}},
+                },
+                {
+                    "required": ["source_rank"],
+                    "properties": {"source_rank": {"type": "integer"}},
+                },
+            ],
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "rank_list_completeness": {"const": "full_ranked_list"}
+                        },
+                        "required": ["rank_list_completeness"],
+                    },
+                    "then": {
+                        "required": [
+                            "rank_list_id",
+                            "rank_list_sha256",
+                            "source_rank",
+                            "gene_universe_size",
+                            "analysis_tail",
+                            "rank_metric_type",
+                            "rank_ordering",
+                            "rank_tie_policy",
+                        ],
+                        "properties": {
+                            "rank_list_id": {"type": "string", "minLength": 1},
+                            "rank_list_sha256": {
+                                "type": "string",
+                                "pattern": "^[0-9a-f]{64}$",
+                            },
+                            "source_rank": {"type": "integer", "minimum": 1},
+                            "gene_universe_size": {
+                                "type": "integer",
+                                "minimum": 1,
+                            },
+                            "analysis_tail": {
+                                "type": "string",
+                                "minLength": 1,
+                            },
+                            "rank_metric_type": {
+                                "type": "string",
+                                "minLength": 1,
+                            },
+                            "rank_ordering": {"enum": ["ascending", "descending"]},
+                            "rank_tie_policy": {
+                                "type": "string",
+                                "minLength": 1,
+                            },
+                        },
+                    },
+                },
+                {
+                    "if": {
+                        "required": ["raw_effect"],
+                        "properties": {"raw_effect": {"type": "number"}},
+                    },
+                    "then": {
+                        "required": [
+                            "raw_effect_type",
+                            "raw_effect_sign_semantics",
+                        ],
+                        "properties": {
+                            "raw_effect_type": {
+                                "type": "string",
+                                "minLength": 1,
+                            },
+                            "raw_effect_sign_semantics": {
+                                "enum": [
+                                    "positive_is_enrichment",
+                                    "positive_is_depletion",
+                                    "unsigned_or_not_applicable",
+                                ]
+                            },
+                        },
+                    },
+                },
+                {
+                    "if": {
+                        "required": ["raw_effect_type"],
+                        "properties": {"raw_effect_type": {"type": "string"}},
+                    },
+                    "then": {
+                        "required": [
+                            "raw_effect",
+                            "raw_effect_sign_semantics",
+                        ],
+                        "properties": {
+                            "raw_effect": {"type": "number"},
+                            "raw_effect_sign_semantics": {
+                                "enum": [
+                                    "positive_is_enrichment",
+                                    "positive_is_depletion",
+                                    "unsigned_or_not_applicable",
+                                ]
+                            },
+                        },
+                    },
+                },
+                {
+                    "if": {
+                        "required": ["raw_effect_sign_semantics"],
+                        "properties": {
+                            "raw_effect_sign_semantics": {
+                                "enum": [
+                                    "positive_is_enrichment",
+                                    "positive_is_depletion",
+                                    "unsigned_or_not_applicable",
+                                ]
+                            }
+                        },
+                    },
+                    "then": {
+                        "required": ["raw_effect", "raw_effect_type"],
+                        "properties": {
+                            "raw_effect": {"type": "number"},
+                            "raw_effect_type": {
+                                "type": "string",
+                                "minLength": 1,
+                            },
+                        },
+                    },
+                },
+                {
+                    "if": {
+                        "required": ["source_score"],
+                        "properties": {"source_score": {"type": "number"}},
+                    },
+                    "then": {
+                        "required": ["source_score_type"],
+                        "properties": {
+                            "source_score_type": {
+                                "type": "string",
+                                "minLength": 1,
+                            }
+                        },
+                    },
+                },
+                {
+                    "if": {
+                        "required": ["source_score_type"],
+                        "properties": {"source_score_type": {"type": "string"}},
+                    },
+                    "then": {
+                        "required": ["source_score"],
+                        "properties": {"source_score": {"type": "number"}},
+                    },
+                },
+                {
+                    "if": {
+                        "required": ["dual_action_group_id"],
+                        "properties": {"dual_action_group_id": {"type": "string"}},
+                    },
+                    "then": {
+                        "required": ["dual_action_group_version"],
+                        "properties": {
+                            "dual_action_group_version": {
+                                "type": "string",
+                                "minLength": 1,
+                            }
+                        },
+                    },
+                },
+                {
+                    "if": {
+                        "required": ["dual_action_group_version"],
+                        "properties": {"dual_action_group_version": {"type": "string"}},
+                    },
+                    "then": {
+                        "required": ["dual_action_group_id"],
+                        "properties": {
+                            "dual_action_group_id": {
+                                "type": "string",
+                                "minLength": 1,
+                            }
+                        },
+                    },
+                },
+            ],
+            "x-semantic-rules": [
+                "raw_effect is always native and is never overwritten by an "
+                "ICRAFT CRISPRa display inversion",
+                "a full_ranked_list row requires checksum-bound rank-list ID, "
+                "source rank, universe, tail, metric, ordering, and tie policy",
+                "full-list completeness is verified across the complete input "
+                "table before RRA; the row declaration alone is insufficient",
+                "used_for_label is always false",
+                "ambiguous or unmapped orthology remains annotation-only",
+                "raw effect sign is interpreted only through the controlled "
+                "raw_effect_sign_semantics field",
+            ],
+        },
+    )
+
+    evidence_id: str = Field(min_length=1)
+    source_name: str = Field(min_length=1)
+    source_version: str = Field(min_length=1)
+    source_snapshot_date: date
+    external_study_id: str = Field(min_length=1)
+    external_screen_id: str = Field(min_length=1)
+    external_comparison_id: str = Field(min_length=1)
+    source_family_id: str = Field(min_length=1)
+    raw_data_family_id: str = Field(min_length=1)
+    gene_symbol: str = Field(min_length=1)
+    source_organism: str = Field(min_length=1)
+    mapped_human_gene_symbol: str | None = None
+    orthology_mapping_status: OrthologyMappingStatus
+    orthology_source: str | None = None
+    orthology_version: str | None = None
+    perturbation_modality: PerturbationModality
+    perturbed_compartment: PerturbedCompartment
+    experimental_setting: ExperimentalSetting
+    screen_category: ImmuneScreenCategory
+    cell_model: str | None = None
+    immune_cell_type: str | None = None
+    cancer_type: str | None = None
+    treatment: str = Field(min_length=1)
+    comparator: str = Field(min_length=1)
+    contrast_definition: str = Field(min_length=1)
+    phenotype_endpoint: str = Field(min_length=1)
+    assay_consequence: AssayConsequence
+    timepoint: str = Field(min_length=1)
+    recurrence_stratum_id: str = Field(min_length=1)
+    dual_action_group_id: str | None = Field(default=None, min_length=1)
+    dual_action_group_version: str | None = Field(default=None, min_length=1)
+    native_effect_direction: NativeEffectDirection
+    endpoint_polarity: EndpointPolarity
+    direction_mapping_status: DirectionMappingStatus
+    direction_mapping_rule: str | None = Field(default=None, min_length=1)
+    raw_effect: float | None = None
+    raw_effect_type: str | None = Field(default=None, min_length=1)
+    raw_effect_sign_semantics: RawEffectSignSemantics | None = None
+    source_score: float | None = None
+    source_score_type: str | None = Field(default=None, min_length=1)
+    source_fdr: float | None = Field(default=None, ge=0.0, le=1.0)
+    source_rank: int | None = Field(default=None, ge=1)
+    rank_list_id: str | None = Field(default=None, min_length=1)
+    rank_list_sha256: str | None = Field(
+        default=None,
+        pattern=r"^[0-9a-f]{64}$",
+        description=(
+            "SHA-256 of the canonical UTF-8 roster sorted by source rank as "
+            "gene_symbol<TAB>source_rank<LF>"
+        ),
+    )
+    gene_universe_size: int | None = Field(default=None, ge=1)
+    analysis_tail: str | None = Field(default=None, min_length=1)
+    rank_metric_type: str | None = Field(default=None, min_length=1)
+    rank_ordering: Literal["ascending", "descending"] | None = Field(
+        default=None,
+        description=(
+            "Ordering of the source metric used to derive the ordinal rank; "
+            "source_rank=1 must always denote the best-ranked gene"
+        ),
+    )
+    rank_tie_policy: str | None = Field(default=None, min_length=1)
+    rank_list_completeness: RankListCompleteness
+    source_effect_semantics: SourceEffectSemantics = SourceEffectSemantics.NATIVE
+    published_sign_inverted: bool = False
+    input_data_level: InputDataLevel = InputDataLevel.UNKNOWN
+    source_url: HttpUrl
+    source_locator: str = Field(min_length=1)
+    available_date: date
+    transformation_available_date: date
+    retrieved_date: date
+    transformation_id: str | None = None
+    used_for_label: Literal[False] = False
+    notes: str | None = None
+
+    @model_validator(mode="after")
+    def immune_evidence_is_fail_closed(self) -> ImmuneScreenEvidenceRecord:
+        if self.retrieved_date < self.available_date:
+            raise ValueError("retrieved_date cannot precede available_date")
+        if self.source_snapshot_date > self.retrieved_date:
+            raise ValueError("source_snapshot_date cannot follow retrieved_date")
+        if self.transformation_available_date > self.retrieved_date:
+            raise ValueError(
+                "transformation_available_date cannot follow retrieved_date"
+            )
+        if all(
+            value is None
+            for value in (
+                self.raw_effect,
+                self.source_score,
+                self.source_fdr,
+                self.source_rank,
+            )
+        ):
+            raise ValueError("immune evidence requires an effect, score, FDR, or rank")
+        if (self.raw_effect is None) != (self.raw_effect_type is None):
+            raise ValueError("raw_effect and raw_effect_type must be supplied together")
+        if (self.raw_effect is None) != (self.raw_effect_sign_semantics is None):
+            raise ValueError(
+                "raw_effect and raw_effect_sign_semantics must be supplied together"
+            )
+        if (self.source_score is None) != (self.source_score_type is None):
+            raise ValueError(
+                "source_score and source_score_type must be supplied together"
+            )
+        if self.raw_effect is not None and self.raw_effect_sign_semantics in {
+            RawEffectSignSemantics.POSITIVE_IS_ENRICHMENT,
+            RawEffectSignSemantics.POSITIVE_IS_DEPLETION,
+        }:
+            positive_direction = (
+                NativeEffectDirection.ENRICHED
+                if self.raw_effect_sign_semantics
+                == RawEffectSignSemantics.POSITIVE_IS_ENRICHMENT
+                else NativeEffectDirection.DEPLETED
+            )
+            negative_direction = (
+                NativeEffectDirection.DEPLETED
+                if positive_direction == NativeEffectDirection.ENRICHED
+                else NativeEffectDirection.ENRICHED
+            )
+            expected_native_direction = (
+                positive_direction
+                if self.raw_effect > 0
+                else negative_direction
+                if self.raw_effect < 0
+                else NativeEffectDirection.NEUTRAL
+            )
+            if self.native_effect_direction != expected_native_direction:
+                raise ValueError(
+                    "raw effect sign conflicts with native_effect_direction under "
+                    "the declared sign semantics"
+                )
+        if (self.dual_action_group_id is None) != (
+            self.dual_action_group_version is None
+        ):
+            raise ValueError(
+                "dual_action_group_id and dual_action_group_version must be "
+                "supplied together"
+            )
+
+        is_human = self.source_organism.casefold() in {
+            "human",
+            "homo sapiens",
+            "9606",
+        }
+        if is_human and self.orthology_mapping_status != (
+            OrthologyMappingStatus.NOT_NEEDED
+        ):
+            raise ValueError("human evidence must use not_needed orthology")
+        if (
+            is_human
+            and self.mapped_human_gene_symbol
+            and self.mapped_human_gene_symbol.casefold() != self.gene_symbol.casefold()
+        ):
+            raise ValueError(
+                "human evidence cannot be renamed through an orthology field"
+            )
+        if (
+            not is_human
+            and self.orthology_mapping_status == OrthologyMappingStatus.ONE_TO_ONE
+        ):
+            if not all(
+                (
+                    self.mapped_human_gene_symbol,
+                    self.orthology_source,
+                    self.orthology_version,
+                )
+            ):
+                raise ValueError(
+                    "one-to-one non-human mapping requires a human symbol and "
+                    "versioned orthology source"
+                )
+        if not is_human and self.orthology_mapping_status == (
+            OrthologyMappingStatus.NOT_NEEDED
+        ):
+            raise ValueError("non-human evidence requires an orthology decision")
+        if (
+            self.orthology_mapping_status
+            in {
+                OrthologyMappingStatus.AMBIGUOUS,
+                OrthologyMappingStatus.UNMAPPED,
+            }
+            and self.mapped_human_gene_symbol
+        ):
+            raise ValueError("ambiguous/unmapped orthology cannot claim one human gene")
+
+        if self.rank_list_completeness == RankListCompleteness.FULL_RANKED_LIST:
+            required = {
+                "rank_list_id": self.rank_list_id,
+                "rank_list_sha256": self.rank_list_sha256,
+                "source_rank": self.source_rank,
+                "gene_universe_size": self.gene_universe_size,
+                "analysis_tail": self.analysis_tail,
+                "rank_metric_type": self.rank_metric_type,
+                "rank_ordering": self.rank_ordering,
+                "rank_tie_policy": self.rank_tie_policy,
+            }
+            missing = sorted(name for name, value in required.items() if value is None)
+            if missing:
+                raise ValueError(
+                    "full_ranked_list rows require fields: " + ", ".join(missing)
+                )
+            if self.source_rank is not None and self.gene_universe_size is not None:
+                if self.source_rank > self.gene_universe_size:
+                    raise ValueError("source_rank cannot exceed gene_universe_size")
+
+        if self.source_effect_semantics == SourceEffectSemantics.NATIVE:
+            if self.published_sign_inverted:
+                raise ValueError("native source semantics cannot be sign-inverted")
+        elif not self.transformation_id:
+            raise ValueError("non-native source semantics require transformation_id")
+
+        if (
+            self.source_effect_semantics
+            == SourceEffectSemantics.ICRAFT_KO_EQUIVALENT_DISPLAY
+        ):
+            if self.perturbation_modality != PerturbationModality.CRISPRA:
+                raise ValueError(
+                    "ICRAFT KO-equivalent display semantics apply only to CRISPRa"
+                )
+            if not self.published_sign_inverted:
+                raise ValueError(
+                    "ICRAFT KO-equivalent display semantics require the inversion flag"
+                )
+            if self.transformation_id != ICRAFT_CRISPRA_DISPLAY_TRANSFORMATION_ID:
+                raise ValueError(
+                    "ICRAFT CRISPRa display semantics require the registered "
+                    f"transformation {ICRAFT_CRISPRA_DISPLAY_TRANSFORMATION_ID!r}"
+                )
+            if self.raw_effect is None or self.source_score is None:
+                raise ValueError(
+                    "ICRAFT CRISPRa display semantics require paired native and "
+                    "display effects"
+                )
+            if self.raw_effect_sign_semantics != (
+                RawEffectSignSemantics.POSITIVE_IS_ENRICHMENT
+            ):
+                raise ValueError(
+                    "ICRAFT native CRISPRa LFC requires positive_is_enrichment "
+                    "sign semantics"
+                )
+            effect_types = (
+                self.raw_effect_type or "",
+                self.source_score_type or "",
+            )
+            if not all(_is_lfc_metric_label(value) for value in effect_types):
+                raise ValueError(
+                    "ICRAFT CRISPRa display inversion is defined only for paired "
+                    "LFC values"
+                )
+            if abs(self.source_score + self.raw_effect) > 1e-12:
+                raise ValueError(
+                    "ICRAFT CRISPRa display LFC must be the negative native LFC"
+                )
+            expected_direction = (
+                NativeEffectDirection.ENRICHED
+                if self.raw_effect > 0
+                else NativeEffectDirection.DEPLETED
+                if self.raw_effect < 0
+                else NativeEffectDirection.NEUTRAL
+            )
+            if self.native_effect_direction != expected_direction:
+                raise ValueError(
+                    "native CRISPRa direction conflicts with the native LFC sign"
+                )
+
+        if self.endpoint_polarity == EndpointPolarity.UNKNOWN:
+            if self.direction_mapping_status != DirectionMappingStatus.UNRESOLVED:
+                raise ValueError("unknown endpoint polarity must remain unresolved")
+        elif self.direction_mapping_status == DirectionMappingStatus.UNRESOLVED:
+            raise ValueError("known endpoint polarity cannot be marked unresolved")
+        if (
+            self.direction_mapping_status == DirectionMappingStatus.CONDITIONAL
+            and not self.direction_mapping_rule
+        ):
+            raise ValueError("conditional direction mapping requires an explicit rule")
+
+        if self.direction_mapping_status == DirectionMappingStatus.EXACT:
+            expected_rule = EXACT_DIRECTION_RULE_BY_POLARITY.get(self.endpoint_polarity)
+            if self.direction_mapping_rule != expected_rule:
+                raise ValueError(
+                    "exact direction mapping requires the registered rule "
+                    f"{expected_rule!r}"
+                )
+
+        if (
+            self.assay_consequence
+            in {
+                AssayConsequence.AMBIGUOUS,
+                AssayConsequence.NEUTRAL,
+            }
+            and self.direction_mapping_status != DirectionMappingStatus.UNRESOLVED
+        ):
+            raise ValueError(
+                "ambiguous/neutral assay consequences must remain unresolved"
+            )
+
+        immune_consequences = {
+            AssayConsequence.IMMUNE_EFFECTOR_GAIN,
+            AssayConsequence.IMMUNE_EFFECTOR_LOSS,
+            AssayConsequence.IMMUNE_FITNESS_GAIN,
+            AssayConsequence.IMMUNE_FITNESS_LOSS,
+        }
+        tumor_consequences = {
+            AssayConsequence.TUMOR_IMMUNE_ESCAPE,
+            AssayConsequence.TUMOR_IMMUNE_SENSITIZATION,
+        }
+        non_directional_consequences = {
+            AssayConsequence.AMBIGUOUS,
+            AssayConsequence.NEUTRAL,
+        }
+        allowed_consequences = (
+            ALLOWED_CONSEQUENCES_BY_SCREEN_CATEGORY[self.screen_category]
+            | non_directional_consequences
+        )
+        if self.assay_consequence not in allowed_consequences:
+            raise ValueError(
+                "assay consequence is incompatible with the screen category"
+            )
+        if (
+            self.assay_consequence in immune_consequences
+            and self.perturbed_compartment != PerturbedCompartment.IMMUNE_CELL
+        ):
+            raise ValueError(
+                "immune-cell consequences require immune-cell perturbation"
+            )
+        if (
+            self.assay_consequence in tumor_consequences
+            and self.perturbed_compartment != PerturbedCompartment.TUMOR_CELL
+        ):
+            raise ValueError(
+                "tumor-immune consequences require tumor-cell perturbation"
+            )
+
+        favorable_consequences = {
+            AssayConsequence.DRUG_SENSITIZATION,
+            AssayConsequence.TUMOR_IMMUNE_SENSITIZATION,
+            AssayConsequence.IMMUNE_EFFECTOR_GAIN,
+            AssayConsequence.IMMUNE_FITNESS_GAIN,
+        }
+        unfavorable_consequences = {
+            AssayConsequence.DRUG_RESISTANCE,
+            AssayConsequence.TUMOR_IMMUNE_ESCAPE,
+            AssayConsequence.IMMUNE_EFFECTOR_LOSS,
+            AssayConsequence.IMMUNE_FITNESS_LOSS,
+        }
+        if (
+            self.direction_mapping_status == DirectionMappingStatus.EXACT
+            and self.native_effect_direction
+            in {NativeEffectDirection.ENRICHED, NativeEffectDirection.DEPLETED}
+        ):
+            mapped_favorable = (
+                self.native_effect_direction == NativeEffectDirection.ENRICHED
+                and self.endpoint_polarity == EndpointPolarity.ENRICHMENT_IS_FAVORABLE
+            ) or (
+                self.native_effect_direction == NativeEffectDirection.DEPLETED
+                and self.endpoint_polarity == EndpointPolarity.DEPLETION_IS_FAVORABLE
+            )
+            if self.assay_consequence in favorable_consequences and not (
+                mapped_favorable
+            ):
+                raise ValueError(
+                    "assay consequence conflicts with the exact direction mapping"
+                )
+            if self.assay_consequence in unfavorable_consequences and (
+                mapped_favorable
+            ):
+                raise ValueError(
+                    "assay consequence conflicts with the exact direction mapping"
+                )
+        return self
+
+
+class ClinicalTrialEvidenceRecord(StrictRecord):
+    """Frozen study-level treatment-by-cancer registry evidence.
+
+    One row represents one source study, one normalized treatment concept, and
+    one normalized cancer concept.  It records registry presence and metadata;
+    it never represents efficacy, patient-level data, or validation of a CRISPR
+    hit.
+    """
+
+    primary_key = ("evidence_id",)
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True,
+        allow_inf_nan=False,
+        json_schema_extra={
+            "allOf": [
+                {
+                    "if": {
+                        "required": ["results_posted"],
+                        "properties": {"results_posted": {"const": True}},
+                    },
+                    "then": {"required": ["results_first_posted_date"]},
+                },
+                {
+                    "if": {
+                        "required": ["study_type"],
+                        "properties": {
+                            "study_type": {
+                                "enum": [
+                                    "observational",
+                                    "expanded_access",
+                                    "other",
+                                    "unknown",
+                                ]
+                            }
+                        },
+                    },
+                    "then": {
+                        "properties": {
+                            "phase_category": {"enum": ["not_applicable", "unknown"]}
+                        }
+                    },
+                },
+            ],
+            "x-semantic-rules": [
+                "available_date <= source_snapshot_date <= retrieved_date",
+                "record_last_update_date cannot follow source_snapshot_date",
+                "transformation_available_date cannot follow retrieved_date",
+                "results_posted is paired with results_first_posted_date and "
+                "the results date cannot follow the source snapshot",
+                "source_asset_id and source_asset_sha256 must resolve to a "
+                "checksum-pinned DataAssetRecord at report runtime",
+                "report eligibility requires exact curator-reviewed treatment "
+                "and cancer mappings",
+                "curator-reviewed mappings require a review event identifier and "
+                "review date no later than transformation availability",
+                "report eligibility requires an interventional study with the "
+                "treatment in the experimental role",
+                "used_for_label is always false",
+            ],
+        },
+    )
+
+    _SAFE_TEXT_PATTERN = (
+        r"^[^\s\x00-\x1f\x7f](?:[^\x00-\x1f\x7f]*"
+        r"[^\s\x00-\x1f\x7f])?$"
+    )
+
+    evidence_id: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    source_asset_id: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    source_asset_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_name: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    source_version: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    source_api_version: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    source_snapshot_date: date
+    source_study_id: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    source_family_id: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    source_record_version: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    record_last_update_date: date
+    study_type: ClinicalStudyType
+    source_overall_status: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    status_category: ClinicalStatusCategory
+    source_phase: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    phase_category: ClinicalPhaseCategory
+    source_treatment_text: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    treatment_concept_id: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    treatment_preferred_name: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    treatment_mapping_source: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    treatment_mapping_version: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    treatment_mapping_relation: ClinicalMappingRelation
+    treatment_mapping_review_status: ClinicalMappingReviewStatus
+    treatment_mapping_review_id: str | None = Field(
+        default=None,
+        min_length=1,
+        pattern=_SAFE_TEXT_PATTERN,
+    )
+    treatment_mapping_review_date: date | None = None
+    source_condition_text: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    cancer_concept_id: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    cancer_preferred_name: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    cancer_mapping_source: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    cancer_mapping_version: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    cancer_mapping_relation: ClinicalMappingRelation
+    cancer_mapping_review_status: ClinicalMappingReviewStatus
+    cancer_mapping_review_id: str | None = Field(
+        default=None,
+        min_length=1,
+        pattern=_SAFE_TEXT_PATTERN,
+    )
+    cancer_mapping_review_date: date | None = None
+    intervention_role: ClinicalInterventionRole
+    regimen_context: ClinicalRegimenContext
+    source_subtype_definition: str | None = Field(
+        default=None,
+        min_length=1,
+        pattern=_SAFE_TEXT_PATTERN,
+    )
+    results_posted: bool
+    results_first_posted_date: date | None = None
+    source_url: HttpUrl
+    source_locator: str = Field(min_length=1, pattern=_SAFE_TEXT_PATTERN)
+    available_date: date
+    transformation_available_date: date
+    retrieved_date: date
+    used_for_label: Literal[False] = False
+    notes: str | None = None
+
+    @model_validator(mode="after")
+    def clinical_evidence_is_fail_closed(self) -> ClinicalTrialEvidenceRecord:
+        if self.available_date > self.source_snapshot_date:
+            raise ValueError("available_date cannot follow source_snapshot_date")
+        if self.source_snapshot_date > self.retrieved_date:
+            raise ValueError("source_snapshot_date cannot follow retrieved_date")
+        if self.record_last_update_date > self.source_snapshot_date:
+            raise ValueError(
+                "record_last_update_date cannot follow source_snapshot_date"
+            )
+        if self.transformation_available_date > self.retrieved_date:
+            raise ValueError(
+                "transformation_available_date cannot follow retrieved_date"
+            )
+        if self.results_posted != (self.results_first_posted_date is not None):
+            raise ValueError(
+                "results_posted and results_first_posted_date must be supplied together"
+            )
+        if (
+            self.results_first_posted_date is not None
+            and self.results_first_posted_date > self.source_snapshot_date
+        ):
+            raise ValueError(
+                "results_first_posted_date cannot follow source_snapshot_date"
+            )
+        if (
+            self.study_type != ClinicalStudyType.INTERVENTIONAL
+            and self.phase_category
+            not in {
+                ClinicalPhaseCategory.NOT_APPLICABLE,
+                ClinicalPhaseCategory.UNKNOWN,
+            }
+        ):
+            raise ValueError(
+                "non-interventional clinical evidence requires a not_applicable "
+                "or unknown phase"
+            )
+        for axis in ("treatment", "cancer"):
+            review_status = getattr(self, f"{axis}_mapping_review_status")
+            review_id = getattr(self, f"{axis}_mapping_review_id")
+            review_date = getattr(self, f"{axis}_mapping_review_date")
+            if review_status == ClinicalMappingReviewStatus.CURATOR_REVIEWED:
+                if review_id is None or review_date is None:
+                    raise ValueError(
+                        f"curator-reviewed {axis} mapping requires review ID and date"
+                    )
+                if review_date > self.transformation_available_date:
+                    raise ValueError(
+                        f"{axis} mapping review date cannot follow transformation "
+                        "availability"
+                    )
+            elif review_id is not None or review_date is not None:
+                raise ValueError(
+                    f"{axis} mapping review ID/date require curator_reviewed status"
+                )
+        return self
+
+
+class ClinicalTrialsGovStudyInventoryRecord(StrictRecord):
+    """Deterministic study projection from one frozen API page.
+
+    The inventory is an intake artifact, not normalized clinical evidence.  It
+    preserves projected source strings, while exact null-versus-missing structure
+    remains authoritative only in the retained raw JSON.  It cannot be used as a
+    validation label or a success-model feature.
+    """
+
+    primary_key = ("snapshot_id", "source_study_id")
+
+    snapshot_id: str = Field(min_length=1)
+    source_study_id: str = Field(pattern=r"^NCT\d{8}$")
+    source_family_id: str = Field(min_length=1)
+    source_asset_id: str = Field(min_length=1)
+    source_asset_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_page_index: int = Field(ge=1)
+    source_study_index: int = Field(ge=0)
+    source_version_holder: str | None = Field(
+        default=None,
+        pattern=r"^\d{4}(?:-\d{2}(?:-\d{2})?)?$",
+    )
+    record_last_update_date: str | None = Field(
+        default=None,
+        pattern=r"^\d{4}(?:-\d{2}(?:-\d{2})?)?$",
+    )
+    study_first_post_date: str | None = Field(
+        default=None,
+        pattern=r"^\d{4}(?:-\d{2}(?:-\d{2})?)?$",
+    )
+    results_first_post_date: str | None = Field(
+        default=None,
+        pattern=r"^\d{4}(?:-\d{2}(?:-\d{2})?)?$",
+    )
+    source_study_type: str | None = Field(default=None, min_length=1)
+    source_overall_status: str | None = Field(default=None, min_length=1)
+    source_brief_title: str | None = Field(default=None, min_length=1)
+    source_official_title: str | None = Field(default=None, min_length=1)
+    source_phases_json: str
+    source_conditions_json: str
+    source_keywords_json: str
+    source_design_json: str
+    source_interventions_json: str
+    source_arm_groups_json: str
+    population_scope_locator_candidates_json: str
+    population_scope_text_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_has_results: bool | None = None
+    source_url: HttpUrl
+    retrieved_at_utc: datetime
+    tsv_formula_escape_applied: bool
+    normalization_status: Literal["raw_registry_inventory_only"] = (
+        "raw_registry_inventory_only"
+    )
+    used_for_label: Literal[False] = False
+
+    @model_validator(mode="after")
+    def inventory_is_source_faithful(
+        self,
+    ) -> ClinicalTrialsGovStudyInventoryRecord:
+        offset = self.retrieved_at_utc.utcoffset()
+        if offset is None or offset.total_seconds() != 0:
+            raise ValueError("retrieved_at_utc must include the UTC timezone")
+        for field_name in (
+            "source_phases_json",
+            "source_conditions_json",
+            "source_keywords_json",
+            "source_interventions_json",
+            "source_arm_groups_json",
+            "population_scope_locator_candidates_json",
+        ):
+            try:
+                value = json.loads(getattr(self, field_name))
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"{field_name} must contain valid JSON") from exc
+            if not isinstance(value, list):
+                raise ValueError(f"{field_name} must encode a JSON list")
+        try:
+            design_value = json.loads(self.source_design_json)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("source_design_json must contain valid JSON") from exc
+        if not isinstance(design_value, dict):
+            raise ValueError("source_design_json must encode a JSON object")
+        return self
+
+
+class ClinicalTrialsGovCurationCandidateRecord(StrictRecord):
+    """Unreviewed study-level intervention/condition co-mention for curation."""
+
+    primary_key = ("snapshot_id", "candidate_id")
+
+    candidate_id: str = Field(min_length=1)
+    snapshot_id: str = Field(min_length=1)
+    source_study_id: str = Field(pattern=r"^NCT\d{8}$")
+    source_family_id: str = Field(min_length=1)
+    source_asset_id: str = Field(min_length=1)
+    source_asset_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_page_index: int = Field(ge=1)
+    source_study_index: int = Field(ge=0)
+    source_intervention_index: int | None = Field(default=None, ge=0)
+    source_condition_index: int | None = Field(default=None, ge=0)
+    source_treatment_locator: str | None = Field(default=None, min_length=1)
+    source_condition_locator: str | None = Field(default=None, min_length=1)
+    source_treatment_text: str | None = Field(default=None, min_length=1)
+    source_intervention_type: str | None = Field(default=None, min_length=1)
+    source_arm_group_labels_json: str
+    source_other_names_json: str
+    source_linked_arm_groups_json: str
+    source_unmatched_arm_group_labels_json: str
+    source_linked_arm_locators_json: str
+    population_scope_locator_candidates_json: str
+    population_scope_text_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_condition_text: str | None = Field(default=None, min_length=1)
+    query_intervention_text: str = Field(min_length=1)
+    query_condition_text: str = Field(min_length=1)
+    treatment_concept_id: None = None
+    treatment_mapping_relation: Literal["unknown"] = "unknown"
+    treatment_mapping_review_status: Literal["not_performed"] = "not_performed"
+    cancer_concept_id: None = None
+    cancer_mapping_relation: Literal["unknown"] = "unknown"
+    cancer_mapping_review_status: Literal["not_performed"] = "not_performed"
+    intervention_role: Literal["unknown"] = "unknown"
+    regimen_context: Literal["unknown"] = "unknown"
+    population_scope_review_status: Literal["not_performed"] = "not_performed"
+    treatment_cancer_linkage_status: Literal["not_performed"] = "not_performed"
+    treatment_cancer_linkage_locator: None = None
+    co_mention_only: Literal[True] = True
+    blocker_codes_json: str
+    normalization_status: Literal[
+        "requires_curator_review",
+        "missing_source_intervention",
+        "missing_source_condition",
+        "missing_source_intervention_and_condition",
+    ]
+    exclusion_reason: Literal[
+        "unreviewed_study_level_co_mention",
+        "missing_source_intervention",
+        "missing_source_condition",
+        "missing_source_intervention_and_condition",
+    ]
+    tsv_formula_escape_applied: bool
+    eligible_for_clinical_context: Literal[False] = False
+    used_for_label: Literal[False] = False
+
+    @model_validator(mode="after")
+    def candidate_stays_fail_closed(
+        self,
+    ) -> ClinicalTrialsGovCurationCandidateRecord:
+        if not self.candidate_id.startswith(f"{self.snapshot_id}:"):
+            raise ValueError("candidate_id must be namespaced by snapshot_id")
+        for field_name in (
+            "source_arm_group_labels_json",
+            "source_other_names_json",
+            "source_linked_arm_groups_json",
+            "source_unmatched_arm_group_labels_json",
+            "source_linked_arm_locators_json",
+            "population_scope_locator_candidates_json",
+            "blocker_codes_json",
+        ):
+            try:
+                value = json.loads(getattr(self, field_name))
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"{field_name} must contain valid JSON") from exc
+            if not isinstance(value, list):
+                raise ValueError(f"{field_name} must encode a JSON list")
+
+        intervention_present = self.source_intervention_index is not None
+        if intervention_present != (self.source_treatment_text is not None):
+            raise ValueError(
+                "source intervention index and treatment text must be supplied together"
+            )
+        if intervention_present != (self.source_treatment_locator is not None):
+            raise ValueError(
+                "source intervention index and locator must be supplied together"
+            )
+        if not intervention_present and self.source_intervention_type is not None:
+            raise ValueError("source intervention type requires a source intervention")
+        condition_present = self.source_condition_index is not None
+        if condition_present != (self.source_condition_text is not None):
+            raise ValueError(
+                "source condition index and condition text must be supplied together"
+            )
+        if condition_present != (self.source_condition_locator is not None):
+            raise ValueError(
+                "source condition index and locator must be supplied together"
+            )
+
+        if intervention_present and condition_present:
+            expected = "requires_curator_review"
+            expected_reason = "unreviewed_study_level_co_mention"
+        elif intervention_present:
+            expected = "missing_source_condition"
+            expected_reason = expected
+        elif condition_present:
+            expected = "missing_source_intervention"
+            expected_reason = expected
+        else:
+            expected = "missing_source_intervention_and_condition"
+            expected_reason = expected
+        if self.normalization_status != expected:
+            raise ValueError(
+                "normalization_status is inconsistent with source term presence"
+            )
+        if self.exclusion_reason != expected_reason:
+            raise ValueError(
+                "exclusion_reason is inconsistent with source term presence"
+            )
+        return self
+
+
+def _require_exact_true(value: object) -> bool:
+    if value is not True:
+        raise ValueError("value must be the JSON boolean true")
+    return True
+
+
+def _require_exact_false(value: object) -> bool:
+    if value is not False:
+        raise ValueError("value must be the JSON boolean false")
+    return False
+
+
+def _require_exact_integer_one(value: object) -> int:
+    if type(value) is not int or value != 1:
+        raise ValueError("value must be the JSON integer 1")
+    return 1
+
+
+_ExactTrue = Annotated[Literal[True], BeforeValidator(_require_exact_true)]
+_ExactFalse = Annotated[Literal[False], BeforeValidator(_require_exact_false)]
+_ExactIntegerOne = Annotated[Literal[1], BeforeValidator(_require_exact_integer_one)]
+
+
+class ClinicalTrialsGovManifestSource(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    name: Literal[
+        "ClinicalTrials.gov",
+        "ClinicalTrials.gov synthetic fixture",
+        "ClinicalTrials.gov API-shaped injected transport",
+    ]
+    synthetic_fixture: StrictBool
+    transport_mode: Literal["live_https", "injected"]
+    clock_mode: Literal["system_utc", "injected"]
+    elapsed_clock_mode: Literal["system_monotonic", "injected"]
+    api_base_url: HttpUrl
+    studies_endpoint: HttpUrl
+    version_endpoint: HttpUrl
+    api_documentation_url: HttpUrl
+    terms_url: HttpUrl
+    api_version: str = Field(min_length=1)
+    data_timestamp: str = Field(min_length=1)
+    data_timestamp_timezone_interpretation: str = Field(min_length=1)
+    mutable_registry: StrictBool | None
+
+    @model_validator(mode="after")
+    def source_mode_is_explicit(self) -> ClinicalTrialsGovManifestSource:
+        if self.synthetic_fixture:
+            if self.name != "ClinicalTrials.gov synthetic fixture":
+                raise ValueError("synthetic fixture must use the synthetic source name")
+            if self.transport_mode != "injected":
+                raise ValueError("synthetic fixture must use an injected transport")
+            if self.clock_mode != "injected" or self.elapsed_clock_mode != "injected":
+                raise ValueError("synthetic fixture must use injected clocks")
+            if self.mutable_registry is not False:
+                raise ValueError("synthetic fixture cannot claim a mutable registry")
+        elif self.transport_mode == "live_https":
+            if self.name != "ClinicalTrials.gov":
+                raise ValueError(
+                    "live registry snapshot must use the registry source name"
+                )
+            if self.mutable_registry is not True:
+                raise ValueError("live ClinicalTrials.gov must be marked mutable")
+            if self.clock_mode != "system_utc":
+                raise ValueError("live HTTPS retrieval must use the system UTC clock")
+            if self.elapsed_clock_mode != "system_monotonic":
+                raise ValueError(
+                    "live HTTPS retrieval must use the system monotonic clock"
+                )
+        else:
+            if self.name != "ClinicalTrials.gov API-shaped injected transport":
+                raise ValueError("injected transport must use the injected source name")
+            if self.mutable_registry is not None:
+                raise ValueError("injected transport cannot attest registry mutability")
+        return self
+
+
+class ClinicalTrialsGovManifestQuery(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    condition: str = Field(min_length=1, max_length=512)
+    intervention: str = Field(min_length=1, max_length=512)
+    page_size: int = Field(ge=1, le=1000)
+    count_total: _ExactTrue
+    format: Literal["json"]
+    markup_format: Literal["markdown"]
+    fields: list[str] = Field(min_length=1)
+
+
+class ClinicalTrialsGovManifestRetrieval(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    started_at_utc: datetime
+    completed_at_utc: datetime
+    timeout_seconds: float = Field(gt=0, le=300)
+    max_attempts: int = Field(ge=1, le=10)
+    backoff_seconds: float = Field(ge=0, le=60)
+    max_pages: int = Field(ge=1, le=10_000)
+    max_studies: int = Field(ge=0, le=2_000_000)
+    max_candidate_rows: int = Field(ge=0, le=250_000)
+    max_page_bytes: int = Field(ge=1, le=100 * 1024 * 1024)
+    max_total_bytes: int = Field(ge=1, le=10 * 1024 * 1024 * 1024)
+    max_derived_bytes: int = Field(ge=1, le=512 * 1024 * 1024)
+    max_elapsed_seconds: float = Field(gt=0, le=86_400)
+    total_raw_response_bytes: int = Field(ge=0)
+    total_derived_bytes: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def retrieval_bounds_are_consistent(
+        self,
+    ) -> ClinicalTrialsGovManifestRetrieval:
+        for label, timestamp in (
+            ("started_at_utc", self.started_at_utc),
+            ("completed_at_utc", self.completed_at_utc),
+        ):
+            offset = timestamp.utcoffset()
+            if offset is None or offset.total_seconds() != 0:
+                raise ValueError(f"{label} must include the UTC timezone")
+        if self.completed_at_utc < self.started_at_utc:
+            raise ValueError("completed_at_utc cannot precede started_at_utc")
+        elapsed_seconds = (self.completed_at_utc - self.started_at_utc).total_seconds()
+        if elapsed_seconds > self.max_elapsed_seconds:
+            raise ValueError("recorded retrieval duration exceeds max_elapsed_seconds")
+        if self.max_total_bytes < self.max_page_bytes:
+            raise ValueError("max_total_bytes cannot be smaller than max_page_bytes")
+        if self.total_raw_response_bytes > self.max_total_bytes:
+            raise ValueError("total raw bytes exceed the declared retrieval limit")
+        if self.total_derived_bytes > self.max_derived_bytes:
+            raise ValueError("total derived bytes exceed the declared retrieval limit")
+        return self
+
+
+class ClinicalTrialsGovManifestVersionEnvelope(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    stable_before_and_after_pagination: _ExactTrue
+    version_start_retrieved_at_utc: datetime
+    version_end_retrieved_at_utc: datetime
+    snapshot_isolation_claim: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def version_timestamps_are_utc(
+        self,
+    ) -> ClinicalTrialsGovManifestVersionEnvelope:
+        for label, timestamp in (
+            ("version_start_retrieved_at_utc", self.version_start_retrieved_at_utc),
+            ("version_end_retrieved_at_utc", self.version_end_retrieved_at_utc),
+        ):
+            offset = timestamp.utcoffset()
+            if offset is None or offset.total_seconds() != 0:
+                raise ValueError(f"{label} must include the UTC timezone")
+        if self.version_end_retrieved_at_utc < self.version_start_retrieved_at_utc:
+            raise ValueError("version-end retrieval cannot precede version-start")
+        return self
+
+
+class ClinicalTrialsGovManifestPage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    page_index: int = Field(ge=1)
+    filename: str = Field(pattern=r"^pages/page_\d{6}\.json$")
+    request_url: HttpUrl
+    response_url: HttpUrl
+    requested_page_token: str | None = Field(default=None, max_length=4096)
+    next_page_token: str | None = Field(default=None, max_length=4096)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    byte_size: int = Field(ge=0, le=100 * 1024 * 1024)
+    study_count: int = Field(ge=0)
+    study_ids: list[str]
+    study_ids_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    total_count: int | None = Field(default=None, ge=0)
+    response_headers: dict[str, str]
+    attempt_count: int = Field(ge=1, le=10)
+    retrieved_at_utc: datetime
+
+    @model_validator(mode="after")
+    def page_timestamp_is_utc(self) -> ClinicalTrialsGovManifestPage:
+        offset = self.retrieved_at_utc.utcoffset()
+        if offset is None or offset.total_seconds() != 0:
+            raise ValueError("retrieved_at_utc must include the UTC timezone")
+        if self.study_count != len(self.study_ids):
+            raise ValueError("study_count must equal the study ID roster length")
+        if len(self.study_ids) != len(set(self.study_ids)):
+            raise ValueError("page study IDs must be unique")
+        return self
+
+
+class ClinicalTrialsGovManifestOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: str = Field(min_length=1)
+    filename: str = Field(min_length=1)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    byte_size: int = Field(ge=0)
+
+
+class ClinicalTrialsGovManifestSoftware(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    package: Literal["crispr-evidencerank"]
+    package_version: str = Field(min_length=1)
+    build_revision: str | None = None
+
+
+class ClinicalTrialsGovManifestScientificBoundary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    query_match_is_exact_concept_mapping: _ExactFalse
+    curation_queue_review_status: Literal["not_performed"]
+    intervention_condition_rows_are: Literal[
+        "study_level_co_mentions_not_arm_or_cohort_linkage"
+    ]
+    treatment_cancer_linkage_review_status: Literal["not_performed"]
+    curation_queue_eligible_for_clinical_context: _ExactFalse
+    used_for_gene_ranking: _ExactFalse
+    used_for_validation_label: _ExactFalse
+    registry_presence_is_efficacy: _ExactFalse
+    results_posted_is_endpoint_met: _ExactFalse
+    synthetic_fixture: StrictBool
+
+
+class ClinicalTrialsGovSnapshotManifest(BaseModel):
+    """Strict document contract for one complete API pagination traversal."""
+
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    bundle_type: Literal["clinicaltrials_gov_api_snapshot"]
+    bundle_schema_version: _ExactIntegerOne
+    snapshot_id: str = Field(pattern=r"^ctgov-[0-9a-f]{20}$")
+    complete: _ExactTrue
+    source: ClinicalTrialsGovManifestSource
+    query: ClinicalTrialsGovManifestQuery
+    query_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    retrieval: ClinicalTrialsGovManifestRetrieval
+    version_envelope: ClinicalTrialsGovManifestVersionEnvelope
+    pagination_completeness_basis: list[str] = Field(min_length=1)
+    page_count: int = Field(ge=1)
+    total_count: int = Field(ge=0)
+    observed_unique_study_count: int = Field(ge=0)
+    pages: list[ClinicalTrialsGovManifestPage] = Field(min_length=1)
+    outputs: list[ClinicalTrialsGovManifestOutput] = Field(min_length=6)
+    bundle_content_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    software: ClinicalTrialsGovManifestSoftware
+    scientific_boundary: ClinicalTrialsGovManifestScientificBoundary
+    integrity_scope: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def manifest_counts_are_consistent(
+        self,
+    ) -> ClinicalTrialsGovSnapshotManifest:
+        if self.page_count != len(self.pages):
+            raise ValueError("page_count must equal the page roster length")
+        if self.total_count != self.observed_unique_study_count:
+            raise ValueError("observed study count must equal totalCount")
+        if sum(page.study_count for page in self.pages) != self.total_count:
+            raise ValueError("page study counts must sum to totalCount")
+        if len({output.filename for output in self.outputs}) != len(self.outputs):
+            raise ValueError("output filenames must be unique")
+        timeline = [
+            self.retrieval.started_at_utc,
+            self.version_envelope.version_start_retrieved_at_utc,
+            *(page.retrieved_at_utc for page in self.pages),
+            self.version_envelope.version_end_retrieved_at_utc,
+            self.retrieval.completed_at_utc,
+        ]
+        if timeline != sorted(timeline):
+            raise ValueError("snapshot retrieval timestamps must be monotonic")
+        return self
+
+
 class DataAssetRecord(StrictRecord):
     """Versioned pointer to raw or derived data without redistributing it."""
 
@@ -1924,6 +3424,10 @@ CONTRACTS: dict[str, type[StrictRecord]] = {
     "validation_event": ValidationEventRecord,
     "candidate": CandidateRecord,
     "evidence": EvidenceRecord,
+    "immune_screen_evidence": ImmuneScreenEvidenceRecord,
+    "clinical_trial_evidence": ClinicalTrialEvidenceRecord,
+    "clinicaltrials_gov_study_inventory": ClinicalTrialsGovStudyInventoryRecord,
+    "clinicaltrials_gov_curation_candidate": (ClinicalTrialsGovCurationCandidateRecord),
     "external_screen_map": ExternalScreenMapRecord,
     "screen_intake": ScreenIntakeRecord,
     "curation_queue": CurationQueueRecord,
@@ -1935,6 +3439,10 @@ CONTRACTS: dict[str, type[StrictRecord]] = {
     "eligibility_check": EligibilityCheckRecord,
     "design_provenance": DesignProvenanceRecord,
     "data_asset": DataAssetRecord,
+}
+
+DOCUMENT_CONTRACTS: dict[str, type[BaseModel]] = {
+    "clinicaltrials_gov_snapshot_manifest": ClinicalTrialsGovSnapshotManifest,
 }
 
 

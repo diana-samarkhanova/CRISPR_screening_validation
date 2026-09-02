@@ -16,11 +16,14 @@ or a single database score as experimental validation.
 
 ## Status
 
-Version `0.2.0.dev0` is a reproducible development foundation, not a released
-pretrained model. It retains the executable v0.1 screen-signal baseline and
-defines the v0.2 normalized experimental-design, provenance, feature-profile,
-and leakage-control contract required before training on real studies. It
-includes:
+Version `0.5.0.dev0` is a reproducible development system, not a released
+pretrained model. It includes one-command MAGeCK/count reporting, an auxiliary
+ICRAFT-inspired immune-context method, and a separate checksum-bound clinical
+treatment-by-cancer registry report. Post-checkpoint development also adds a
+separate frozen ClinicalTrials.gov API intake; its unreviewed retrieval output
+cannot enter that report. These components sit on top of the normalized
+experimental-design, provenance, feature-profile, and leakage-control
+foundation. The project includes:
 
 - normalized records for studies, screens, contrasts, samples, gene scores,
   validation events, and external evidence;
@@ -28,7 +31,16 @@ includes:
   `T`, `U`);
 - raw-count validation, robust median-ratio normalization, and guide-to-gene
   feature extraction;
-- MAGeCK gene-summary normalization;
+- a self-contained `rank-screen` bundle for MAGeCK summaries, count tables, or
+  both, including QC, input checksums, declared direction semantics, and a
+  human-readable report;
+- a report-only immune-screen evidence contract, tumor/immune dual-action
+  classification, provenance-aware recurrence, and verified-full-list RRA;
+- a report-only clinical-trial contract and exact concept-ID treatment-by-cancer
+  landscape that is source-asset bound and cannot change gene ranking;
+- a bounded ClinicalTrials.gov v2 snapshot intake that retains every raw JSON
+  page, the before/after API version envelope, exact query and field projection,
+  pagination lineage, and SHA-256-bound derived inventories;
 - storage for raw and CNV-corrected scores without silently substituting a
   homemade correction;
 - a two-stage baseline that models both author selection for testing and
@@ -39,8 +51,10 @@ includes:
 - deterministic synthetic data and automated tests.
 
 Training on a harmonized public compendium and prospective validation are the
-next scientific milestones. Until those are complete, output is a
-**relative reproducibility score**, not a calibrated probability.
+next scientific milestones. Until those are complete, `rank-screen` returns a
+**screen-signal priority**, not a reproducibility score or calibrated
+probability. The existing grouped model code remains a benchmark harness for
+properly labeled data and synthetic tests.
 
 The current ORCS intake milestone pins the human screen archive to BioGRID
 ORCS `2.0.18`, compiled on `2025-09-09` and publicly available on
@@ -112,7 +126,7 @@ silently collapsed into one contrast.
 | Mode | Input | Current status |
 |---|---|---|
 | Standard | sgRNA count table + guide annotations + sample sheet | Implemented |
-| Lite | MAGeCK gene summary + screen metadata | Implemented adapter |
+| Lite | MAGeCK gene summary + declared tail semantics | Implemented end-to-end report |
 | Full | FASTQ + library + sample sheet | Contract defined; workflow pending |
 
 The Standard mode is the primary modeling input because it preserves
@@ -163,6 +177,10 @@ treatment, duration, or comparator fields remain missing.
    off-target/multi-target flags.
 4. `evidence layer`: add recurrence and context features using versioned
    sources.
+   The ICRAFT-inspired immune-context layer remains a separate report-only layer;
+   it cannot enter the success model from a mutable current snapshot.
+   Clinical trial-registry context is a separate treatment-by-cancer report and
+   is never repeated as gene-level support.
 5. `deduplication`: group publications, reanalyses, repositories, and ORCS
    records derived from the same experimental material into a source/raw family.
 6. `selection model`: estimate which hits authors chose to test.
@@ -189,6 +207,11 @@ crispr-evidencerank featurize-design \
   --contrasts examples/synthetic/contrasts.csv \
   --samples examples/synthetic/sample_sheet.csv \
   --output data/processed/synthetic_design_features.csv
+crispr-evidencerank rank-screen \
+  --counts examples/synthetic/guide_counts_screen_01.csv \
+  --samples examples/synthetic/sample_sheet_screen_01.csv \
+  --positive-lfc-means resistance \
+  --output-dir data/processed/synthetic_screen_report
 pytest
 ```
 
@@ -201,6 +224,126 @@ are excluded from size-factor estimation. This avoids the compositional
 artifacts that total-count CPM can create when a small number of guides expand
 strongly. Use `--normalization-method cpm` only as a declared sensitivity
 analysis.
+
+For a MAGeCK `gene_summary` file, direction semantics are mandatory rather than
+guessed:
+
+```bash
+crispr-evidencerank rank-screen \
+  --mageck-summary gene_summary.txt \
+  --screen-id mda_mb_468_olaparib \
+  --contrast-id olaparib_vs_vehicle \
+  --positive-tail-means resistance \
+  --output-dir results/olaparib_screen
+```
+
+The bundle contains `ranked_candidates.tsv`, `qc_summary.json`,
+`run_manifest.json`, and `report.md`; the manifest checksum-binds the three
+non-manifest outputs. If counts and a sample sheet are supplied
+with the MAGeCK file, native MAGeCK rank remains primary and guide agreement,
+low-count fractions, zero-count fractions, and replicate correlations are
+added as QC evidence. The command preserves all observed positive and negative
+tail rows; it does not silently apply an FDR or top-*N* candidate filter.
+
+## Auxiliary immune-context analysis
+
+The ICRAFT-inspired module asks a separate translational question after the
+primary screen-signal ranking: does the same perturbation appear favorable or
+harmful in tumor and immune cells? It preserves the native CRISPRa sign, keeps
+modalities separate, collapses correlated source/raw families, enforces a
+temporal cutoff, and abstains from RRA unless complete ranked-list rosters are
+verified.
+
+```bash
+crispr-evidencerank summarize-immuno-context \
+  --evidence immune_screen_evidence.tsv \
+  --candidates results/olaparib_screen/ranked_candidates.tsv \
+  --cutoff-date 2026-08-24 \
+  --target-modality CRISPR_KO \
+  --exclude-raw-data-family TARGET_SCREEN_RAW_FAMILY \
+  --dual-action-group-id ko_antitumor_function \
+  --dual-action-group-version reviewed-2026-08-24 \
+  --output-dir results/olaparib_screen/immune_context
+```
+
+The repository implements the contract and analysis engine but does not bundle
+an ICRAFT database export. A real import requires a frozen checksum-pinned
+export, row-level original-source provenance, source/raw-family mapping, and
+reuse-rights review. The immune bundle contains `immune_context.tsv`,
+`immune_context_exclusions.tsv`, `immune_context_used_evidence.tsv`,
+`rank_list_audit.tsv`, and `summary.json`; primary screen axes are retained in
+the joined report. See `docs/IMMUNE_CONTEXT_METHOD.md`.
+
+## Clinical treatment-by-cancer context
+
+The clinical module describes the interventional-study landscape for one exact
+normalized treatment concept and one exact normalized cancer concept. It does
+not join the same trial metadata to every gene, calculate efficacy, or modify a
+CRISPR rank. Every normalized row must resolve to a checksum-pinned source asset,
+and only evidence available by the declared cutoff is used.
+
+ClinicalTrials.gov acquisition is a separate operation. The search strings are
+recall-oriented registry queries: a returned study is not an exact treatment or
+cancer concept match. The intake saves exact API response bytes and produces an
+unreviewed study inventory and curation queue. Every intervention/condition row
+in that queue is only a study-level co-mention; it has no reviewed same-arm or
+same-cohort linkage and is ineligible for `summarize-clinical-context`, gene
+ranking, model features, and validation labels.
+
+```bash
+crispr-evidencerank fetch-clinicaltrials-gov \
+  --condition-query "triple-negative breast cancer" \
+  --intervention-query olaparib \
+  --output-dir data/external/ctgov_olaparib_tnbc_snapshot
+
+crispr-evidencerank verify-clinicaltrials-gov \
+  --snapshot-dir data/external/ctgov_olaparib_tnbc_snapshot
+```
+
+The snapshot contains `version_start.json`, every numbered raw page,
+`version_end.json`, `study_inventory.tsv`, `curation_queue.tsv`,
+`data_assets.tsv`, and `manifest.json`. Offline verification reparses every raw
+page, regenerates all three TSV files, and requires exact byte equality.
+The TSV inventory is a deterministic projection: raw JSON, not the TSV, is
+authoritative for distinctions among missing, null, and empty collections.
+Completeness means only that the exact
+recorded query and field projection were traversed through the recorded opaque
+page-token chain, with unique NCT identifiers and an observed count equal to
+the API `totalCount`. Stable API version and data-timestamp values before and
+after pagination are an integrity envelope, not transactional snapshot
+isolation and not proof that a broader or differently phrased query would find
+no additional records. Real snapshots remain outside Git; only explicitly
+synthetic registry fixtures may be checked in.
+
+```bash
+crispr-evidencerank summarize-clinical-context \
+  --evidence examples/synthetic/clinical_context/evidence.tsv \
+  --assets examples/synthetic/clinical_context/assets.tsv \
+  --treatment-concept-id NCIT:C71721 \
+  --treatment-mapping-source NCIt \
+  --treatment-mapping-version 2026-08-01 \
+  --cancer-concept-id NCIT:C71732 \
+  --cancer-mapping-source NCIt \
+  --cancer-mapping-version 2026-08-01 \
+  --cutoff-date 2026-08-31 \
+  --output-dir data/processed/synthetic_clinical_context
+```
+
+The example represents olaparib and triple-negative breast carcinoma with
+synthetic registry rows only. Curator-reviewed exact concept matching excludes
+broad breast cancer, other PARP inhibitors, observational records, and
+non-experimental intervention mentions. A zero count means
+`not observed in the supplied snapshot`, not `no trials exist`. Registry status,
+phase, and the presence of posted aggregate results are descriptive metadata,
+not evidence that an endpoint was met. See `docs/CLINICAL_CONTEXT_METHOD.md`.
+
+Any retained or redistributed ClinicalTrials.gov material must follow the
+[official Terms and Conditions](https://clinicaltrials.gov/about-site/terms-conditions),
+including ClinicalTrials.gov attribution, display of the date the source data
+were processed, and disclosure of project modifications and their date. The
+intake manifest records the registry data timestamp, retrieval times, raw and
+derived checksums, and transformation identity; it does not itself grant
+redistribution rights or imply endorsement.
 
 For a release-pinned BioGRID ORCS archive:
 

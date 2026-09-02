@@ -1,0 +1,701 @@
+{
+  "$defs": {
+    "ClinicalTrialsGovManifestOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "minLength": 1,
+          "title": "Role",
+          "type": "string"
+        },
+        "filename": {
+          "minLength": 1,
+          "title": "Filename",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "byte_size": {
+          "minimum": 0,
+          "title": "Byte Size",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "role",
+        "filename",
+        "sha256",
+        "byte_size"
+      ],
+      "title": "ClinicalTrialsGovManifestOutput",
+      "type": "object"
+    },
+    "ClinicalTrialsGovManifestPage": {
+      "additionalProperties": false,
+      "properties": {
+        "page_index": {
+          "minimum": 1,
+          "title": "Page Index",
+          "type": "integer"
+        },
+        "filename": {
+          "pattern": "^pages/page_\\d{6}\\.json$",
+          "title": "Filename",
+          "type": "string"
+        },
+        "request_url": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Request Url",
+          "type": "string"
+        },
+        "response_url": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Response Url",
+          "type": "string"
+        },
+        "requested_page_token": {
+          "anyOf": [
+            {
+              "maxLength": 4096,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Requested Page Token"
+        },
+        "next_page_token": {
+          "anyOf": [
+            {
+              "maxLength": 4096,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Page Token"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "byte_size": {
+          "maximum": 104857600,
+          "minimum": 0,
+          "title": "Byte Size",
+          "type": "integer"
+        },
+        "study_count": {
+          "minimum": 0,
+          "title": "Study Count",
+          "type": "integer"
+        },
+        "study_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Study Ids",
+          "type": "array"
+        },
+        "study_ids_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Study Ids Sha256",
+          "type": "string"
+        },
+        "total_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Total Count"
+        },
+        "response_headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Response Headers",
+          "type": "object"
+        },
+        "attempt_count": {
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Attempt Count",
+          "type": "integer"
+        },
+        "retrieved_at_utc": {
+          "format": "date-time",
+          "title": "Retrieved At Utc",
+          "type": "string"
+        }
+      },
+      "required": [
+        "page_index",
+        "filename",
+        "request_url",
+        "response_url",
+        "sha256",
+        "byte_size",
+        "study_count",
+        "study_ids",
+        "study_ids_sha256",
+        "response_headers",
+        "attempt_count",
+        "retrieved_at_utc"
+      ],
+      "title": "ClinicalTrialsGovManifestPage",
+      "type": "object"
+    },
+    "ClinicalTrialsGovManifestQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "condition": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Condition",
+          "type": "string"
+        },
+        "intervention": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Intervention",
+          "type": "string"
+        },
+        "page_size": {
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Page Size",
+          "type": "integer"
+        },
+        "count_total": {
+          "const": true,
+          "title": "Count Total",
+          "type": "boolean"
+        },
+        "format": {
+          "const": "json",
+          "title": "Format",
+          "type": "string"
+        },
+        "markup_format": {
+          "const": "markdown",
+          "title": "Markup Format",
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Fields",
+          "type": "array"
+        }
+      },
+      "required": [
+        "condition",
+        "intervention",
+        "page_size",
+        "count_total",
+        "format",
+        "markup_format",
+        "fields"
+      ],
+      "title": "ClinicalTrialsGovManifestQuery",
+      "type": "object"
+    },
+    "ClinicalTrialsGovManifestRetrieval": {
+      "additionalProperties": false,
+      "properties": {
+        "started_at_utc": {
+          "format": "date-time",
+          "title": "Started At Utc",
+          "type": "string"
+        },
+        "completed_at_utc": {
+          "format": "date-time",
+          "title": "Completed At Utc",
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "exclusiveMinimum": 0,
+          "maximum": 300,
+          "title": "Timeout Seconds",
+          "type": "number"
+        },
+        "max_attempts": {
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Max Attempts",
+          "type": "integer"
+        },
+        "backoff_seconds": {
+          "maximum": 60,
+          "minimum": 0,
+          "title": "Backoff Seconds",
+          "type": "number"
+        },
+        "max_pages": {
+          "maximum": 10000,
+          "minimum": 1,
+          "title": "Max Pages",
+          "type": "integer"
+        },
+        "max_studies": {
+          "maximum": 2000000,
+          "minimum": 0,
+          "title": "Max Studies",
+          "type": "integer"
+        },
+        "max_candidate_rows": {
+          "maximum": 250000,
+          "minimum": 0,
+          "title": "Max Candidate Rows",
+          "type": "integer"
+        },
+        "max_page_bytes": {
+          "maximum": 104857600,
+          "minimum": 1,
+          "title": "Max Page Bytes",
+          "type": "integer"
+        },
+        "max_total_bytes": {
+          "maximum": 10737418240,
+          "minimum": 1,
+          "title": "Max Total Bytes",
+          "type": "integer"
+        },
+        "max_derived_bytes": {
+          "maximum": 536870912,
+          "minimum": 1,
+          "title": "Max Derived Bytes",
+          "type": "integer"
+        },
+        "max_elapsed_seconds": {
+          "exclusiveMinimum": 0,
+          "maximum": 86400,
+          "title": "Max Elapsed Seconds",
+          "type": "number"
+        },
+        "total_raw_response_bytes": {
+          "minimum": 0,
+          "title": "Total Raw Response Bytes",
+          "type": "integer"
+        },
+        "total_derived_bytes": {
+          "minimum": 0,
+          "title": "Total Derived Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "started_at_utc",
+        "completed_at_utc",
+        "timeout_seconds",
+        "max_attempts",
+        "backoff_seconds",
+        "max_pages",
+        "max_studies",
+        "max_candidate_rows",
+        "max_page_bytes",
+        "max_total_bytes",
+        "max_derived_bytes",
+        "max_elapsed_seconds",
+        "total_raw_response_bytes",
+        "total_derived_bytes"
+      ],
+      "title": "ClinicalTrialsGovManifestRetrieval",
+      "type": "object"
+    },
+    "ClinicalTrialsGovManifestScientificBoundary": {
+      "additionalProperties": false,
+      "properties": {
+        "query_match_is_exact_concept_mapping": {
+          "const": false,
+          "title": "Query Match Is Exact Concept Mapping",
+          "type": "boolean"
+        },
+        "curation_queue_review_status": {
+          "const": "not_performed",
+          "title": "Curation Queue Review Status",
+          "type": "string"
+        },
+        "intervention_condition_rows_are": {
+          "const": "study_level_co_mentions_not_arm_or_cohort_linkage",
+          "title": "Intervention Condition Rows Are",
+          "type": "string"
+        },
+        "treatment_cancer_linkage_review_status": {
+          "const": "not_performed",
+          "title": "Treatment Cancer Linkage Review Status",
+          "type": "string"
+        },
+        "curation_queue_eligible_for_clinical_context": {
+          "const": false,
+          "title": "Curation Queue Eligible For Clinical Context",
+          "type": "boolean"
+        },
+        "used_for_gene_ranking": {
+          "const": false,
+          "title": "Used For Gene Ranking",
+          "type": "boolean"
+        },
+        "used_for_validation_label": {
+          "const": false,
+          "title": "Used For Validation Label",
+          "type": "boolean"
+        },
+        "registry_presence_is_efficacy": {
+          "const": false,
+          "title": "Registry Presence Is Efficacy",
+          "type": "boolean"
+        },
+        "results_posted_is_endpoint_met": {
+          "const": false,
+          "title": "Results Posted Is Endpoint Met",
+          "type": "boolean"
+        },
+        "synthetic_fixture": {
+          "title": "Synthetic Fixture",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "query_match_is_exact_concept_mapping",
+        "curation_queue_review_status",
+        "intervention_condition_rows_are",
+        "treatment_cancer_linkage_review_status",
+        "curation_queue_eligible_for_clinical_context",
+        "used_for_gene_ranking",
+        "used_for_validation_label",
+        "registry_presence_is_efficacy",
+        "results_posted_is_endpoint_met",
+        "synthetic_fixture"
+      ],
+      "title": "ClinicalTrialsGovManifestScientificBoundary",
+      "type": "object"
+    },
+    "ClinicalTrialsGovManifestSoftware": {
+      "additionalProperties": false,
+      "properties": {
+        "package": {
+          "const": "crispr-evidencerank",
+          "title": "Package",
+          "type": "string"
+        },
+        "package_version": {
+          "minLength": 1,
+          "title": "Package Version",
+          "type": "string"
+        },
+        "build_revision": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Build Revision"
+        }
+      },
+      "required": [
+        "package",
+        "package_version"
+      ],
+      "title": "ClinicalTrialsGovManifestSoftware",
+      "type": "object"
+    },
+    "ClinicalTrialsGovManifestSource": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "enum": [
+            "ClinicalTrials.gov",
+            "ClinicalTrials.gov synthetic fixture",
+            "ClinicalTrials.gov API-shaped injected transport"
+          ],
+          "title": "Name",
+          "type": "string"
+        },
+        "synthetic_fixture": {
+          "title": "Synthetic Fixture",
+          "type": "boolean"
+        },
+        "transport_mode": {
+          "enum": [
+            "live_https",
+            "injected"
+          ],
+          "title": "Transport Mode",
+          "type": "string"
+        },
+        "clock_mode": {
+          "enum": [
+            "system_utc",
+            "injected"
+          ],
+          "title": "Clock Mode",
+          "type": "string"
+        },
+        "elapsed_clock_mode": {
+          "enum": [
+            "system_monotonic",
+            "injected"
+          ],
+          "title": "Elapsed Clock Mode",
+          "type": "string"
+        },
+        "api_base_url": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Api Base Url",
+          "type": "string"
+        },
+        "studies_endpoint": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Studies Endpoint",
+          "type": "string"
+        },
+        "version_endpoint": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Version Endpoint",
+          "type": "string"
+        },
+        "api_documentation_url": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Api Documentation Url",
+          "type": "string"
+        },
+        "terms_url": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Terms Url",
+          "type": "string"
+        },
+        "api_version": {
+          "minLength": 1,
+          "title": "Api Version",
+          "type": "string"
+        },
+        "data_timestamp": {
+          "minLength": 1,
+          "title": "Data Timestamp",
+          "type": "string"
+        },
+        "data_timestamp_timezone_interpretation": {
+          "minLength": 1,
+          "title": "Data Timestamp Timezone Interpretation",
+          "type": "string"
+        },
+        "mutable_registry": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Mutable Registry"
+        }
+      },
+      "required": [
+        "name",
+        "synthetic_fixture",
+        "transport_mode",
+        "clock_mode",
+        "elapsed_clock_mode",
+        "api_base_url",
+        "studies_endpoint",
+        "version_endpoint",
+        "api_documentation_url",
+        "terms_url",
+        "api_version",
+        "data_timestamp",
+        "data_timestamp_timezone_interpretation",
+        "mutable_registry"
+      ],
+      "title": "ClinicalTrialsGovManifestSource",
+      "type": "object"
+    },
+    "ClinicalTrialsGovManifestVersionEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "stable_before_and_after_pagination": {
+          "const": true,
+          "title": "Stable Before And After Pagination",
+          "type": "boolean"
+        },
+        "version_start_retrieved_at_utc": {
+          "format": "date-time",
+          "title": "Version Start Retrieved At Utc",
+          "type": "string"
+        },
+        "version_end_retrieved_at_utc": {
+          "format": "date-time",
+          "title": "Version End Retrieved At Utc",
+          "type": "string"
+        },
+        "snapshot_isolation_claim": {
+          "minLength": 1,
+          "title": "Snapshot Isolation Claim",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stable_before_and_after_pagination",
+        "version_start_retrieved_at_utc",
+        "version_end_retrieved_at_utc",
+        "snapshot_isolation_claim"
+      ],
+      "title": "ClinicalTrialsGovManifestVersionEnvelope",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Strict document contract for one complete API pagination traversal.",
+  "properties": {
+    "bundle_type": {
+      "const": "clinicaltrials_gov_api_snapshot",
+      "title": "Bundle Type",
+      "type": "string"
+    },
+    "bundle_schema_version": {
+      "const": 1,
+      "title": "Bundle Schema Version",
+      "type": "integer"
+    },
+    "snapshot_id": {
+      "pattern": "^ctgov-[0-9a-f]{20}$",
+      "title": "Snapshot Id",
+      "type": "string"
+    },
+    "complete": {
+      "const": true,
+      "title": "Complete",
+      "type": "boolean"
+    },
+    "source": {
+      "$ref": "#/$defs/ClinicalTrialsGovManifestSource"
+    },
+    "query": {
+      "$ref": "#/$defs/ClinicalTrialsGovManifestQuery"
+    },
+    "query_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Query Sha256",
+      "type": "string"
+    },
+    "retrieval": {
+      "$ref": "#/$defs/ClinicalTrialsGovManifestRetrieval"
+    },
+    "version_envelope": {
+      "$ref": "#/$defs/ClinicalTrialsGovManifestVersionEnvelope"
+    },
+    "pagination_completeness_basis": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Pagination Completeness Basis",
+      "type": "array"
+    },
+    "page_count": {
+      "minimum": 1,
+      "title": "Page Count",
+      "type": "integer"
+    },
+    "total_count": {
+      "minimum": 0,
+      "title": "Total Count",
+      "type": "integer"
+    },
+    "observed_unique_study_count": {
+      "minimum": 0,
+      "title": "Observed Unique Study Count",
+      "type": "integer"
+    },
+    "pages": {
+      "items": {
+        "$ref": "#/$defs/ClinicalTrialsGovManifestPage"
+      },
+      "minItems": 1,
+      "title": "Pages",
+      "type": "array"
+    },
+    "outputs": {
+      "items": {
+        "$ref": "#/$defs/ClinicalTrialsGovManifestOutput"
+      },
+      "minItems": 6,
+      "title": "Outputs",
+      "type": "array"
+    },
+    "bundle_content_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Bundle Content Sha256",
+      "type": "string"
+    },
+    "software": {
+      "$ref": "#/$defs/ClinicalTrialsGovManifestSoftware"
+    },
+    "scientific_boundary": {
+      "$ref": "#/$defs/ClinicalTrialsGovManifestScientificBoundary"
+    },
+    "integrity_scope": {
+      "minLength": 1,
+      "title": "Integrity Scope",
+      "type": "string"
+    }
+  },
+  "required": [
+    "bundle_type",
+    "bundle_schema_version",
+    "snapshot_id",
+    "complete",
+    "source",
+    "query",
+    "query_sha256",
+    "retrieval",
+    "version_envelope",
+    "pagination_completeness_basis",
+    "page_count",
+    "total_count",
+    "observed_unique_study_count",
+    "pages",
+    "outputs",
+    "bundle_content_sha256",
+    "software",
+    "scientific_boundary",
+    "integrity_scope"
+  ],
+  "title": "ClinicalTrialsGovSnapshotManifest",
+  "type": "object"
+}

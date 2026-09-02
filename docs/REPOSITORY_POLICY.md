@@ -50,6 +50,40 @@ downstream review. Its candidate validation grades are single-curator states,
 not released labels. All ten records remain `metadata_only`, and the repository
 still contains no biological benchmark corpus.
 
+## ClinicalTrials.gov frozen snapshots
+
+The ClinicalTrials.gov intake may make a current live API request, but the
+result is published only as a frozen local snapshot. It preserves the exact
+version-envelope and page response bytes, query and field projection, opaque
+pagination-token lineage, retrieval times, source URLs, NCT rosters, sizes, and
+SHA-256 values. The intake manifest's completeness claim is limited to full
+token traversal for that exact query; stable before/after API version and data
+timestamp values do not assert transactional snapshot isolation.
+
+Git may contain the intake code, schema, documentation, empty directory
+placeholders, and clearly labeled synthetic API fixtures. Real raw response
+pages, real complete snapshots, and real derived inventories or curation queues
+remain outside Git by default, regardless of repository visibility or file
+size. They may enter a governed release only after a row- and field-aware rights
+review plus the public-release approval gates.
+
+Search hits are recall-oriented text matches, not exact treatment or cancer
+concept mappings. The generated queue contains unreviewed study-level
+intervention/condition co-mentions without demonstrated same-arm or same-cohort
+linkage. It is categorically ineligible for the clinical summarizer, gene
+ranking, model features, validation probabilities, and labels. Only a separate
+curator-reviewed, source-located normalization may produce candidate clinical
+evidence.
+
+Any reproduction or redistribution of ClinicalTrials.gov content must follow
+the current [ClinicalTrials.gov Terms and
+Conditions](https://clinicaltrials.gov/about-site/terms-conditions). Preserve
+ClinicalTrials.gov attribution, clearly display the date the data were
+processed by the registry, and disclose project modifications and their date.
+Also preserve the project's distinct retrieval and transformation dates. A
+government-hosted record or local SHA-256 does not eliminate possible third-
+party or international rights and does not imply NLM endorsement.
+
 ## Stage 2 — pilot data checkpoint
 
 Create the next development tag only after at least six public human

@@ -1,0 +1,130 @@
+{
+  "studies": [
+    {
+      "derivedSection": {
+        "miscInfoModule": {
+          "versionHolder": "2026-08-30"
+        }
+      },
+      "hasResults": false,
+      "protocolSection": {
+        "armsInterventionsModule": {
+          "armGroups": [
+            {
+              "description": "SYNTHETIC arm",
+              "interventionNames": [
+                "Drug: SYNTHETIC_INTERVENTION"
+              ],
+              "label": "SYNTHETIC ARM",
+              "type": "EXPERIMENTAL"
+            }
+          ],
+          "interventions": [
+            {
+              "armGroupLabels": [
+                "SYNTHETIC ARM"
+              ],
+              "description": "SYNTHETIC inert placeholder",
+              "name": "SYNTHETIC_INTERVENTION",
+              "otherNames": [
+                "SYNTHETIC_ALIAS"
+              ],
+              "type": "DRUG"
+            }
+          ]
+        },
+        "conditionsModule": {
+          "conditions": [
+            "SYNTHETIC_CONDITION"
+          ],
+          "keywords": [
+            "SYNTHETIC_ONLY"
+          ]
+        },
+        "descriptionModule": {
+          "briefSummary": "SYNTHETIC non-biological registry fixture."
+        },
+        "designModule": {
+          "designInfo": {
+            "allocation": "RANDOMIZED",
+            "interventionModel": "PARALLEL",
+            "primaryPurpose": "TREATMENT"
+          },
+          "enrollmentInfo": {
+            "count": 24,
+            "type": "ACTUAL"
+          },
+          "phases": [
+            "PHASE2"
+          ],
+          "studyType": "INTERVENTIONAL"
+        },
+        "eligibilityModule": {
+          "eligibilityCriteria": "SYNTHETIC criteria only",
+          "healthyVolunteers": false,
+          "maximumAge": "90 Years",
+          "minimumAge": "18 Years",
+          "sex": "ALL"
+        },
+        "identificationModule": {
+          "briefTitle": "SYNTHETIC linked-arm software fixture",
+          "nctId": "NCT90000001",
+          "officialTitle": "SYNTHETIC study; not a real clinical trial"
+        },
+        "statusModule": {
+          "lastUpdatePostDateStruct": {
+            "date": "2026-08-20",
+            "type": "ACTUAL"
+          },
+          "overallStatus": "COMPLETED",
+          "studyFirstPostDateStruct": {
+            "date": "2024-01-01",
+            "type": "ACTUAL"
+          }
+        }
+      }
+    },
+    {
+      "derivedSection": {
+        "miscInfoModule": {
+          "versionHolder": "2026-08-30"
+        }
+      },
+      "hasResults": false,
+      "protocolSection": {
+        "conditionsModule": {
+          "conditions": [
+            "SYNTHETIC_CONDITION"
+          ]
+        },
+        "descriptionModule": {
+          "briefSummary": "SYNTHETIC missing-intervention negative fixture."
+        },
+        "designModule": {
+          "enrollmentInfo": {
+            "count": 12,
+            "type": "ESTIMATED"
+          },
+          "studyType": "OBSERVATIONAL"
+        },
+        "identificationModule": {
+          "briefTitle": "SYNTHETIC condition-only software fixture",
+          "nctId": "NCT90000002"
+        },
+        "statusModule": {
+          "lastUpdatePostDateStruct": {
+            "date": "2026-08",
+            "type": "ACTUAL"
+          },
+          "overallStatus": "RECRUITING",
+          "studyFirstPostDateStruct": {
+            "date": "2025-02",
+            "type": "ACTUAL"
+          }
+        }
+      }
+    }
+  ],
+  "syntheticFixture": true,
+  "totalCount": 2
+}

@@ -4,6 +4,86 @@ All notable project changes are recorded here. The project follows semantic
 versioning once public releases begin; development checkpoints use a `.devN`
 suffix and are not claims of a trained biological model.
 
+## 0.5.0.dev0 — ClinicalTrials.gov frozen snapshot intake
+
+- Added a separate bounded ClinicalTrials.gov v2 acquisition path that retains
+  the exact version response before and after pagination, every raw studies
+  page, the exact recall-oriented query and field projection, and the opaque
+  page-token lineage.
+- Added a checksum-bound manifest, deterministic study projection, data-asset
+  registry, fail-closed curation queue, and offline snapshot verifier.
+- Scoped completeness to termination of the exact query's token chain, unique
+  NCT identifiers, agreement with first-page `totalCount`, and a stable API
+  version/data-timestamp envelope; explicitly disclaimed transactional snapshot
+  isolation and ontology/synonym recall.
+- Kept all search-derived intervention/condition rows as unreviewed study-level
+  co-mentions without inferred exact concepts, intervention role, regimen,
+  population scope, or same-arm/same-cohort linkage. They cannot enter the
+  clinical summarizer, gene ranking, model features, or validation labels.
+- Required real API pages and snapshots to remain outside Git while permitting
+  clearly labeled synthetic fixtures for offline tests.
+- Documented ClinicalTrials.gov attribution, registry processing date, dated
+  project modifications, and independent rights review requirements for reuse;
+  hashes establish integrity, not redistribution permission or endorsement.
+
+## 0.4.0.dev0 — clinical treatment-by-cancer context
+
+- Added the strict `clinical_trial_evidence` contract for one frozen source
+  study × treatment concept × cancer concept row, with controlled study type,
+  status, phase, intervention role, and regimen fields.
+- Bound every normalized clinical row to a checksum-pinned `DataAssetRecord`
+  and enforced source/version/date consistency before reporting.
+- Added `summarize-clinical-context`, a mapping-release-pinned,
+  curator-reviewed exact concept-ID, temporal-cutoff, source-family-aware report
+  of observed experimental-role interventional registry studies.
+- Kept clinical output on the treatment × cancer axis rather than repeating it
+  per gene; all derived summary fields are `report_only_clinical_*` and cannot
+  change a CRISPR rank or create a validation label.
+- Distinguished registry presence, study status, phase, regimen, and aggregate
+  results availability from efficacy; zero matches means only not observed in
+  the supplied snapshot.
+- Replaced blacklist-only success-model protection with a reviewed feature
+  allowlist so arbitrarily named clinical or post-cutoff fields fail closed.
+- Added packaged schema/lock provenance, installed-wheel CI coverage, and a
+  second input-hash check immediately before atomic bundle publication.
+- Added a synthetic olaparib–TNBC example and documented why TNBC, HER2-negative
+  disease, HRD, somatic BRCA, and germline BRCA are not interchangeable.
+
+## 0.3.0.dev0 — screen report and immune-context engine
+
+- Added `rank-screen`, a one-command bundle for MAGeCK gene summaries, raw
+  count tables, or both. It writes ranked candidates, QC, input checksums, run
+  parameters, and a human-readable report.
+- Required explicit semantics for the MAGeCK positive tail and positive count
+  LFC. The software does not guess whether a sign means resistance or
+  sensitization.
+- Kept the new-screen output explicitly named `screen_signal_baseline`; zero
+  released real-data labels means it is not a validation probability.
+- Added the `immune_screen_evidence` contract and generated JSON Schema with
+  exact modality, compartment, setting, phenotype, contrast, native direction,
+  orthology, rank-list, provenance, cutoff, and transformation fields.
+- Added `summarize-immuno-context` as a report-only post-ranking method with
+  tumor, immune, and in-vivo evidence lanes; dual-action/liability categories;
+  source/raw-family collapse; temporal and self-family exclusion; and explicit
+  missingness.
+- Preserved native CRISPRa effects independently of ICRAFT's KO-equivalent
+  display inversion, required a registered numeric LFC sign-pair for that
+  display transform, added controlled raw-effect sign semantics, and kept KO,
+  CRISPRi, and CRISPRa in separate queries.
+- Restricted de novo RRA to checksum-identified rank lists whose complete
+  `1..N` roster is observed, and required at least two independent provenance
+  components. Ineligible lists produce a null p-value and reason-coded
+  abstention.
+- Blocked every `report_only_*` immune column from the validation-success model
+  and prohibited ICRAFT recurrence, dual-action classes, and expression or
+  clinical associations from supplying validation labels.
+- Made both report bundles input- and output-checksum-bound and atomic, preserved identifier
+  strings and all primary screen axes, required versioned dual-action grouping,
+  and added explicit replicate/guide-coverage warnings.
+- Documented the ICRAFT comparison, adopted methods, scientific boundaries,
+  current lack of a redistributable frozen ICRAFT export, and remaining
+  limitations.
+
 ## Unreleased — ORCS 2.0.18 intake checkpoint
 
 - Pinned the human-screen intake to BioGRID ORCS `2.0.18`, compiled on

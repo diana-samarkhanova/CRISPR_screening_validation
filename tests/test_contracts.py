@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 
@@ -6,6 +7,7 @@ import pytest
 
 from crispr_evidencerank.contracts import (
     CONTRACTS,
+    DOCUMENT_CONTRACTS,
     INTAKE_POLICY_V2_BENCHMARK_RULE_IDS,
     INTAKE_POLICY_V2_SCOPE_RULE_IDS,
     CandidateRecord,
@@ -20,6 +22,14 @@ from crispr_evidencerank.contracts import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _assert_exported_schema_matches_runtime(name, model):
+    schema_path = ROOT / "schemas" / f"{name}.schema.json"
+    exported_text = schema_path.read_text(encoding="utf-8")
+    expected_text = json.dumps(model.model_json_schema(), indent=2)
+    assert exported_text == expected_text
+    assert json.loads(exported_text) == model.model_json_schema()
 
 
 def base_event():
@@ -57,10 +67,26 @@ def base_event():
 
 def test_exported_contract_schemas_match_runtime_models():
     for name, model in CONTRACTS.items():
-        exported = json.loads(
-            (ROOT / "schemas" / f"{name}.schema.json").read_text(encoding="utf-8")
+        _assert_exported_schema_matches_runtime(name, model)
+
+
+def test_exported_document_schemas_match_runtime_models():
+    assert "clinicaltrials_gov_snapshot_manifest" in DOCUMENT_CONTRACTS
+    for name, model in DOCUMENT_CONTRACTS.items():
+        _assert_exported_schema_matches_runtime(name, model)
+
+
+def test_snapshot_manifest_schema_hash_matches_packaged_build_metadata():
+    schema_path = ROOT / "schemas/clinicaltrials_gov_snapshot_manifest.schema.json"
+    build_metadata = json.loads(
+        (ROOT / "src/crispr_evidencerank/_build_metadata.json").read_text(
+            encoding="utf-8"
         )
-        assert exported == model.model_json_schema()
+    )
+    assert (
+        build_metadata["clinicaltrials_gov_snapshot_manifest_schema_sha256"]
+        == hashlib.sha256(schema_path.read_bytes()).hexdigest()
+    )
 
 
 def test_valid_v2_event():

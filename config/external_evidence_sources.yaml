@@ -1,0 +1,124 @@
+version: 1
+
+sources:
+  icraft:
+    name: Immune-related CRISPR screen Analyzer of Functional Targets
+    status: adapter_contract_and_report_engine_only
+    article:
+      doi: https://doi.org/10.1016/j.immuni.2025.02.007
+      journal: Immunity
+      year: 2025
+    portal: https://icraft.pku-genomics.org/
+    public_code: https://github.com/zenglab-pku/ICRAFT_A20_paper
+    paper_reported_coverage:
+      studies: 90
+      comparisons: 558
+      cancer_cell_comparisons: 397
+      immune_cell_comparisons: 161
+      in_vivo_comparisons: 168
+      in_vitro_comparisons: 390
+    permitted_project_roles:
+      - report_only_cross_screen_recurrence
+      - tumor_immune_dual_action_hypothesis
+      - immune_liability_context
+    prohibited_project_roles:
+      - validation_label
+      - validation_probability
+      - direct_success_model_feature_from_current_snapshot
+    transformation_registry:
+      crispra_display_sign_inversion:
+        id: icraft_crispra_display_sign_inversion_v1
+        input: native_crispra_lfc
+        input_sign_semantics: positive_is_enrichment
+        output: ko_equivalent_display_lfc
+        rule: output_equals_negative_input
+        interpretation_use: prohibited
+    dual_action_group_policy:
+      version_required: true
+      review_required: true
+      allowed_tumor_consequences:
+        - tumor_immune_escape
+        - tumor_immune_sensitization
+      allowed_immune_consequences:
+        - immune_effector_gain
+        - immune_effector_loss
+        - immune_fitness_gain
+        - immune_fitness_loss
+      prohibited_as_functional_support:
+        - drug_response_only
+        - marker_only
+        - generic_selection
+        - ambiguous
+    import_policy:
+      frozen_export_required: true
+      export_checksum_required: true
+      row_level_source_provenance_required: true
+      source_and_raw_family_mapping_required: true
+      redistribution_rights_review_required: true
+      note: >-
+        The repository does not redistribute an ICRAFT database export. The
+        cited public repository exposes crawler/parser code, not a guaranteed
+        frozen copy of the complete portal or analysis backend. Only a
+        separately obtained, rights-reviewed, checksum-pinned export may be
+        imported into the canonical immune_screen_evidence contract.
+
+  clinicaltrials_gov:
+    name: ClinicalTrials.gov
+    status: frozen_snapshot_intake_and_separate_report_engine
+    api_documentation: https://clinicaltrials.gov/data-api/about-api
+    terms: https://clinicaltrials.gov/about-site/terms-conditions
+    api_version_policy: discover_and_record_at_retrieval_never_hardcode
+    permitted_project_roles:
+      - report_only_treatment_cancer_registry_landscape
+      - trial_status_and_phase_stratification
+      - aggregate_results_presence
+    prohibited_project_roles:
+      - validation_label
+      - validation_probability
+      - efficacy_claim_from_registry_presence
+      - patient_level_or_omics_claim_from_aggregate_registry_data
+      - direct_success_model_feature
+      - gene_level_support
+    matching_policy:
+      api_search_is_recall_oriented_not_exact_mapping: true
+      exact_versioned_concept_ids_only: true
+      mapping_relation_recorded: true
+      curator_review_required_for_eligible_rows: true
+      curator_review_event_id_and_date_required: true
+      query_mapping_source_and_version_required: true
+      names_are_display_only: true
+      class_only_match_is_direct: false
+      broad_disease_parent_is_exact_subtype: false
+      comparator_or_prior_exposure_is_investigational_treatment: false
+      experimental_intervention_role_required: true
+    import_policy:
+      fixed_official_https_endpoints_only: true
+      frozen_raw_pages_required: true
+      raw_page_checksums_required: true
+      exact_query_and_field_projection_required: true
+      opaque_page_token_lineage_required: true
+      complete_pagination_manifest_required_for_completeness_claim: true
+      completeness_scoped_to_exact_query_traversal: true
+      source_record_last_update_required: true
+      api_version_and_data_timestamp_required: true
+      version_envelope_before_and_after_pagination_required: true
+      stable_version_envelope_is_transactional_isolation: false
+      row_to_data_asset_binding_required: true
+      retrospective_current_snapshot_reconstruction_prohibited: true
+      redistribution_rights_review_required: true
+      real_raw_snapshots_allowed_in_git: false
+      synthetic_api_fixtures_allowed_in_git: true
+    intake_output_policy:
+      mapping_review_status: not_performed
+      study_level_co_mentions_only: true
+      same_arm_or_cohort_linkage_established: false
+      eligible_for_clinical_context: false
+      eligible_for_gene_ranking: false
+      eligible_for_model_features: false
+      eligible_for_validation_labels: false
+    reuse_policy:
+      clinicaltrials_gov_attribution_required: true
+      registry_processed_date_display_required: true
+      project_modifications_and_date_disclosure_required: true
+      project_retrieval_date_recorded_separately: true
+      checksum_implies_redistribution_rights: false

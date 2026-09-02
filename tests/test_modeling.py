@@ -5,6 +5,7 @@ import pytest
 
 from crispr_evidencerank.evaluation import _composite_query_keys
 from crispr_evidencerank.modeling import (
+    ReproducibilityModel,
     WeightedMedianStandardizer,
     _cross_fitted_propensity,
     _study_family_groups,
@@ -104,6 +105,17 @@ def test_missing_indicator_is_stable_for_transform_only_missingness():
 def test_success_model_rejects_validation_leakage_features(forbidden):
     with pytest.raises(ValueError, match="leakage fields"):
         validate_success_feature_columns(["guide_n", forbidden])
+
+
+def test_direct_model_fit_rejects_report_only_features() -> None:
+    model = ReproducibilityModel(["report_only_immuno_dual_action_class"])
+    with pytest.raises(ValueError, match="leakage fields"):
+        model.fit(pd.DataFrame())
+
+
+def test_success_model_rejects_unregistered_clinical_feature() -> None:
+    with pytest.raises(ValueError, match="reviewed allowlist"):
+        validate_success_feature_columns(["guide_n", "clinical_trial_phase_max"])
 
 
 def test_shared_raw_data_family_stays_in_one_oof_fold():

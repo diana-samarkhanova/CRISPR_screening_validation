@@ -58,6 +58,23 @@ Do not commit by default:
 DepMap/Project Score, tumor multi-omics, pathway resources, and literature are
 features or contextual evidence, not ground-truth validation labels.
 
+ICRAFT and related immune-screen resources are versioned external context
+providers. A canonical immune comparison records its original study, screen,
+comparison, source family, raw-data family, modality, perturbed compartment,
+native contrast direction, endpoint polarity, source snapshot, evidence
+availability date, transformation availability date, and retrieval date. The
+ICRAFT CRISPRa sign inversion is source-display metadata; a restored native
+effect is stored separately and never overwritten. Every numeric raw effect
+declares controlled sign semantics rather than relying on a free-text metric
+name.
+
+The mutable ICRAFT portal is not a reproducible snapshot. Import requires a
+frozen export checksum, row-level links to original sources, source/raw-family
+mapping, and an independent rights decision. The public crawler/parser
+software license must not be inherited by collected papers, counts, FASTQ,
+clinical cohorts, or portal database content. This repository currently ships
+the contract and report engine, not an ICRAFT export.
+
 [BioGRID ORCS](https://orcs.thebiogrid.org/) is used for screen discovery,
 structured metadata, and author-method gene scores. Record its release,
 retrieval date, ORCS screen ID, original publication, scoring method, and
@@ -98,6 +115,67 @@ Cross-screen recurrence and other source-derived features are reconstructed
 inside each outer training fold after source/raw-family deduplication. The
 held-out family and any evidence first available after the test cutoff are
 excluded.
+
+The v0.3 immune-context output is report-only. It applies the cutoff to the
+latest of source evidence, provider snapshot, and transformation availability;
+supports explicit target source/raw-family exclusion; and blocks all
+`report_only_*` columns from the current validation-success model. A declared
+full rank list is accepted for RRA only after the complete row roster, exact
+`1..N` ranks, declared ranking semantics, and canonical roster SHA-256 are
+verified against its gene count. CLI bundles are computed from exact byte
+snapshots, re-hash inputs before atomic publication, and refuse to overwrite an
+existing output directory.
+
+The v0.4 clinical-trial registry layer is a separate treatment-by-cancer
+report. Matching pins exact concept IDs plus their mapping sources and releases;
+display names and free text are never implicit join keys. Eligible mappings
+must be marked exact, curator-reviewed, and linked to a review event ID/date.
+Each normalized row carries `source_asset_id` and the exact asset SHA-256, which
+must resolve to a validated `DataAssetRecord`. The report excludes snapshots or
+transformations first available after the cutoff and reports every other
+exclusion. A mutable current ClinicalTrials.gov record cannot be used to
+reconstruct historical status without a historical snapshot. Registry
+presence, phase, completion, and `results_posted` remain context rather than
+efficacy, gene evidence, or validation labels.
+
+The ClinicalTrials.gov API snapshot intake is upstream of, and isolated from,
+that reviewed report. It records the exact recall-oriented condition and
+intervention search strings, scientific field projection, response format,
+opaque page-token chain, first-page `totalCount`, API version, registry data
+timestamp, per-response retrieval time, raw byte size, and SHA-256. Exact bytes
+from the version endpoint before and after pagination and from every studies
+page are retained. Every derived inventory and curation row binds to the raw
+page asset that contained its study.
+The inventory is a deterministic projection and normalizes missing, null, and
+empty source collections to an empty list. The checksum-pinned raw JSON remains
+authoritative for those structural distinctions. Injected transports, injected
+clocks, and wholly synthetic fixtures are named explicitly and cannot claim live
+HTTPS provenance; synthetic assets use project-only namespaces and URLs.
+
+Pagination completeness means only complete traversal of the exact manifest-
+pinned query: the token chain terminated, tokens and NCT identifiers did not
+repeat, and the unique observed count equaled `totalCount`. It is not an exact
+concept-mapping claim, a synonym-recall claim, or a claim that another query
+would return no additional studies. Stable API version and data-timestamp
+values before and after retrieval are an integrity envelope, not transactional
+snapshot isolation.
+
+The generated curation queue is fail-closed. Its treatment and condition values
+are study-level search co-mentions with mapping review, intervention role,
+regimen review, population review, and same-arm/same-cohort linkage marked not
+performed. It is never `clinical_trial_evidence` and cannot enter the clinical
+summarizer, gene ranking, feature tables, validation-success model, or labels.
+
+Real ClinicalTrials.gov raw responses and complete snapshots stay outside Git;
+only explicitly synthetic API fixtures may be checked in. The manifest retains
+the official terms URL, registry data timestamp, project retrieval times,
+checksums, and transformation identity. Any reproduction or redistribution
+must follow the current [ClinicalTrials.gov Terms and
+Conditions](https://clinicaltrials.gov/about-site/terms-conditions), including
+source attribution, clear display of the date the data were processed by
+ClinicalTrials.gov, and disclosure of project modifications and their date.
+Checksums do not establish publisher authenticity or redistribution rights, and
+submitted registry content may carry third-party or international rights.
 
 ## ORCS intake and curation queue
 
