@@ -19,6 +19,11 @@ from typing import get_args
 import pandas as pd
 
 from . import __version__
+from .baselines import (
+    adapt_direction_aligned_drugz_baseline,
+    adapt_repo_native_mageck_baseline,
+    evaluate_fixed_score_baselines,
+)
 from .clinical_context import ClinicalContextResult, summarize_clinical_context
 from .clinicaltrials_gov import (
     DEFAULT_BACKOFF_SECONDS,
@@ -48,6 +53,12 @@ from .curation import (
     write_curation_batch,
     write_dual_review_bundle,
 )
+from .evaluation import (
+    paired_cluster_bootstrap_difference,
+    reliability_table,
+    study_cluster_bootstrap_intervals,
+    within_query_feature_invariance,
+)
 from .event_adjudication import (
     write_event_review_comparison_bundle,
     write_event_review_packet,
@@ -57,6 +68,7 @@ from .features import featurize_count_table, featurize_experimental_design
 from .immuno_context import ImmunoContextResult, summarize_immuno_context
 from .intake import SUPPORTED_POLICY_VERSIONS, triage_orcs_index
 from .io import read_table
+from .model_artifact import MANIFEST_FILENAME, freeze_model_bundle, verify_model_bundle
 from .modeling import (
     DEFAULT_FEATURE_COLUMNS,
     FEATURE_PROFILES,
@@ -95,7 +107,7 @@ def _read_table_snapshot(
     path: str | Path,
     *,
     dtype: dict[str, object] | None = None,
-) -> tuple[pd.DataFrame, dict[str, str]]:
+) -> tuple[pd.DataFrame, dict[str, object]]:
     path = Path(path)
     content = path.read_bytes()
     if path.suffix.lower() == ".csv":
@@ -108,16 +120,17 @@ def _read_table_snapshot(
         "path": str(path),
         "filename": path.name,
         "sha256": hashlib.sha256(content).hexdigest(),
+        "byte_size": len(content),
     }
 
 
 def _assert_input_snapshots_unchanged(
-    snapshots: dict[str, dict[str, str]],
+    snapshots: dict[str, dict[str, object]],
 ) -> None:
     changed = sorted(
         role
         for role, snapshot in snapshots.items()
-        if _file_sha256(snapshot["path"]) != snapshot["sha256"]
+        if _file_sha256(str(snapshot["path"])) != snapshot["sha256"]
     )
     if changed:
         raise ValueError(f"input files changed during the run: {changed}")
@@ -143,6 +156,7 @@ def command_featurize(args: argparse.Namespace) -> int:
     features = featurize_count_table(
         counts,
         samples,
+        positive_lfc_means=args.positive_lfc_means,
         pseudocount=args.pseudocount,
         low_count_threshold=args.low_count_threshold,
         normalization_method=args.normalization_method,
@@ -281,7 +295,7 @@ def _write_clinical_context_bundle(
     output_dir: str | Path,
     *,
     input_paths: tuple[str | Path, ...],
-    input_snapshots: dict[str, dict[str, str]],
+    input_snapshots: dict[str, dict[str, object]],
 ) -> None:
     output_dir = Path(output_dir)
     output_names = (
@@ -384,6 +398,96 @@ def _clinical_software_provenance() -> dict[str, object]:
     }
     provenance["build_revision"] = os.environ.get("CRISPR_EVIDENCERANK_BUILD_REVISION")
     return provenance
+
+
+def _benchmark_software_provenance() -> dict[str, object]:
+    packaged = _clinical_software_provenance()
+    return {
+        "package_version": packaged["package_version"],
+        "python_version": packaged["python_version"],
+        "runtime_dependencies": packaged["runtime_dependencies"],
+        "build_metadata_sha256": packaged["build_metadata_sha256"],
+        "dependency_lock_sha256": packaged["dependency_lock_sha256"],
+        "build_revision": packaged["build_revision"],
+    }
+
+
+def _write_benchmark_artifacts(
+    predictions: pd.DataFrame,
+    report: dict[str, object],
+    *,
+    prediction_path: Path,
+    metrics_path: Path | None,
+    input_snapshot: dict[str, object],
+) -> str:
+    """Stage and no-clobber publish benchmark artifacts after input recheck."""
+
+    targets = [prediction_path] + ([metrics_path] if metrics_path is not None else [])
+    staged: list[tuple[Path, Path]] = []
+    published: list[Path] = []
+    try:
+        for target in targets:
+            target.parent.mkdir(parents=True, exist_ok=True)
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{prediction_path.stem}.staging-",
+            suffix=prediction_path.suffix,
+            dir=prediction_path.parent,
+        )
+        os.close(descriptor)
+        staged_predictions = Path(temporary_name)
+        _write_frame(predictions, staged_predictions)
+        staged.append((staged_predictions, prediction_path))
+
+        report["inputs"] = {
+            "training_table": {
+                "filename": input_snapshot["filename"],
+                "sha256": input_snapshot["sha256"],
+                "byte_size": input_snapshot["byte_size"],
+            }
+        }
+        report["software_provenance"] = _benchmark_software_provenance()
+        report["outputs"] = {
+            "predictions": {
+                "filename": prediction_path.name,
+                "sha256": _file_sha256(staged_predictions),
+                "byte_size": staged_predictions.stat().st_size,
+                "row_count": len(predictions),
+            },
+            "metrics": (
+                {"filename": metrics_path.name, "self_hash_embedded": False}
+                if metrics_path is not None
+                else {"destination": "stdout", "self_hash_embedded": False}
+            ),
+        }
+        encoded = json.dumps(
+            _replace_nonfinite_with_none(report),
+            allow_nan=False,
+            indent=2,
+            sort_keys=True,
+        )
+        if metrics_path is not None:
+            descriptor, temporary_name = tempfile.mkstemp(
+                prefix=f".{metrics_path.stem}.staging-",
+                suffix=metrics_path.suffix,
+                dir=metrics_path.parent,
+            )
+            os.close(descriptor)
+            staged_metrics = Path(temporary_name)
+            staged_metrics.write_text(encoded + "\n", encoding="utf-8")
+            staged.append((staged_metrics, metrics_path))
+
+        _assert_input_snapshots_unchanged({"training_table": input_snapshot})
+        for source, target in staged:
+            os.link(source, target)
+            published.append(target)
+        return encoded
+    except Exception:
+        for target in published:
+            target.unlink(missing_ok=True)
+        raise
+    finally:
+        for source, _ in staged:
+            source.unlink(missing_ok=True)
 
 
 def command_summarize_clinical_context(args: argparse.Namespace) -> int:
@@ -533,7 +637,7 @@ def _write_screen_report_bundle(
 
 
 def command_rank_screen(args: argparse.Namespace) -> int:
-    snapshots: dict[str, dict[str, str]] = {}
+    snapshots: dict[str, dict[str, object]] = {}
     mageck = None
     counts = None
     samples = None
@@ -854,7 +958,25 @@ def command_ingest_orcs_screen(args: argparse.Namespace) -> int:
 
 
 def command_benchmark(args: argparse.Namespace) -> int:
-    frame = read_table(args.table)
+    table_path = Path(args.table).resolve()
+    prediction_path = Path(args.output).resolve()
+    metrics_path = Path(args.metrics_output).resolve() if args.metrics_output else None
+    output_paths = [prediction_path]
+    if metrics_path is not None:
+        output_paths.append(metrics_path)
+    if len(set(output_paths)) != len(output_paths):
+        raise ValueError("--output and --metrics-output must be different paths")
+    if table_path in output_paths:
+        raise ValueError("benchmark outputs cannot overwrite --table")
+    existing = [str(path) for path in output_paths if path.exists()]
+    if existing:
+        raise FileExistsError(f"benchmark output paths already exist: {existing}")
+    if prediction_path.suffix.lower() not in {".csv", ".tsv", ".txt"}:
+        raise ValueError("--output must be CSV or TSV")
+    if metrics_path is not None and metrics_path.suffix.lower() != ".json":
+        raise ValueError("--metrics-output must use a .json extension")
+
+    frame, table_snapshot = _read_table_snapshot(args.table)
     if args.features and args.feature_profile:
         raise ValueError("--features and --feature-profile are mutually exclusive")
     if args.features:
@@ -869,13 +991,366 @@ def command_benchmark(args: argparse.Namespace) -> int:
         frame,
         feature_columns=feature_columns,
         group_column=args.group_column,
+        metric_study_column=args.metric_study_column,
         screen_column=args.screen_column,
         n_splits=args.folds,
         model_kind=args.model_kind,
+        random_state=args.random_state,
+        propensity_clip=(
+            args.propensity_clip_lower,
+            args.propensity_clip_upper,
+        ),
     )
-    _write_frame(predictions, args.output)
-    print(json.dumps(metrics, indent=2, sort_keys=True))
+    query_columns = [args.screen_column]
+    for column in ("contrast_id", "phenotype_direction"):
+        if column in predictions and column not in query_columns:
+            query_columns.append(column)
+
+    seed_values = _parse_integer_list(args.seed_sweep, argument="--seed-sweep")
+    if args.random_state not in seed_values:
+        seed_values.insert(0, args.random_state)
+    seed_metric_names = args.seed_metric or ["study_macro_normalized_average_precision"]
+    unknown_seed_metrics = sorted(set(seed_metric_names) - set(metrics))
+    if unknown_seed_metrics:
+        raise ValueError(f"unknown --seed-metric: {unknown_seed_metrics}")
+    seed_metric_values: dict[str, list[float]] = {
+        metric_name: [] for metric_name in seed_metric_names
+    }
+    seed_runs: list[dict[str, object]] = []
+    for seed in seed_values:
+        if seed == args.random_state:
+            seed_metrics = metrics
+        else:
+            try:
+                _, seed_metrics = grouped_oof_predictions(
+                    frame,
+                    feature_columns=feature_columns,
+                    group_column=args.group_column,
+                    metric_study_column=args.metric_study_column,
+                    screen_column=args.screen_column,
+                    n_splits=args.folds,
+                    model_kind=args.model_kind,
+                    random_state=seed,
+                    propensity_clip=(
+                        args.propensity_clip_lower,
+                        args.propensity_clip_upper,
+                    ),
+                )
+            except ValueError as exc:
+                seed_runs.append(
+                    {
+                        "seed": seed,
+                        "status": "unavailable",
+                        "reason": str(exc),
+                    }
+                )
+                continue
+        run_values: dict[str, float | None] = {}
+        for metric_name in seed_metric_names:
+            value = float(seed_metrics[metric_name])
+            if pd.notna(value):
+                seed_metric_values[metric_name].append(value)
+                run_values[metric_name] = value
+            else:
+                run_values[metric_name] = None
+        seed_runs.append({"seed": seed, "status": "evaluated", "metrics": run_values})
+
+    seed_sensitivity = {}
+    for metric_name, values in seed_metric_values.items():
+        series = pd.Series(values, dtype=float)
+        seed_sensitivity[metric_name] = {
+            "effective_seeds": int(series.notna().sum()),
+            "mean": float(series.mean()) if not series.empty else None,
+            "sample_sd": (float(series.std(ddof=1)) if len(series) > 1 else None),
+            "minimum": float(series.min()) if not series.empty else None,
+            "maximum": float(series.max()) if not series.empty else None,
+            "range": (float(series.max() - series.min()) if not series.empty else None),
+        }
+
+    if args.random_baseline_seed_count < 1:
+        raise ValueError("--random-baseline-seed-count must be at least 1")
+    baseline_predictions = predictions
+    mageck_attestation = {
+        "positive_tail_means": args.mageck_positive_tail_means,
+        "mageck_version": args.mageck_version,
+        "source_locator": args.mageck_source_locator,
+        "source_sha256": args.mageck_source_sha256,
+    }
+    if any(value is not None for value in mageck_attestation.values()):
+        missing = [name for name, value in mageck_attestation.items() if value is None]
+        if missing:
+            raise ValueError(
+                f"MAGeCK baseline attestation requires all fields; missing {missing}"
+            )
+        baseline_predictions = adapt_repo_native_mageck_baseline(
+            baseline_predictions,
+            **mageck_attestation,
+        )
+    drugz_attestation = {
+        "positive_normz_means": args.drugz_positive_normz_means,
+        "drugz_version": args.drugz_version,
+        "source_locator": args.drugz_source_locator,
+        "source_sha256": args.drugz_source_sha256,
+    }
+    if any(value is not None for value in drugz_attestation.values()):
+        missing = [name for name, value in drugz_attestation.items() if value is None]
+        if missing:
+            raise ValueError(
+                f"drugZ baseline attestation requires all fields; missing {missing}"
+            )
+        baseline_predictions = adapt_direction_aligned_drugz_baseline(
+            baseline_predictions,
+            **drugz_attestation,
+        )
+    baselines = evaluate_fixed_score_baselines(
+        baseline_predictions,
+        screen_column=args.screen_column,
+        target_column="target",
+        study_column=args.metric_study_column,
+        random_seeds=tuple(range(args.random_baseline_seed_count)),
+        candidate_score_column="reproducibility_score",
+        cluster_column=args.bootstrap_cluster_column,
+        paired_metric=args.paired_baseline_metric,
+        paired_bootstrap_repetitions=args.bootstrap_repetitions,
+        paired_bootstrap_confidence=args.bootstrap_confidence,
+        paired_bootstrap_min_effective_fraction=(args.bootstrap_min_effective_fraction),
+        paired_bootstrap_random_state=args.bootstrap_random_state,
+    )
+    if args.model_kind == "logistic":
+        baselines["regularized_logistic"] = {
+            "status": "evaluated_as_candidate_model",
+            "metrics": metrics,
+        }
+
+    else:
+        logistic_predictions, logistic_metrics = grouped_oof_predictions(
+            frame,
+            feature_columns=feature_columns,
+            group_column=args.group_column,
+            metric_study_column=args.metric_study_column,
+            screen_column=args.screen_column,
+            n_splits=args.folds,
+            model_kind="logistic",
+            random_state=args.random_state,
+            propensity_clip=(
+                args.propensity_clip_lower,
+                args.propensity_clip_upper,
+            ),
+        )
+        baselines["regularized_logistic"] = {
+            "status": "evaluated",
+            "metrics": logistic_metrics,
+        }
+        if args.bootstrap_repetitions > 0:
+            comparison = predictions.copy()
+            comparison["_regularized_logistic_score"] = logistic_predictions[
+                "reproducibility_score"
+            ].to_numpy()
+            baselines["regularized_logistic"]["paired_candidate_difference"] = (
+                paired_cluster_bootstrap_difference(
+                    comparison,
+                    cluster_column=args.bootstrap_cluster_column,
+                    metric_study_column=args.metric_study_column,
+                    screen_column=args.screen_column,
+                    target_column="target",
+                    candidate_score_column="reproducibility_score",
+                    comparator_score_column="_regularized_logistic_score",
+                    metric_name=args.paired_baseline_metric,
+                    query_columns=tuple(query_columns),
+                    n_bootstrap=args.bootstrap_repetitions,
+                    confidence=args.bootstrap_confidence,
+                    min_effective_fraction=args.bootstrap_min_effective_fraction,
+                    random_state=args.bootstrap_random_state,
+                )
+            )
+    feature_invariance = within_query_feature_invariance(
+        predictions,
+        feature_columns=feature_columns,
+        query_columns=query_columns,
+    )
+    conditional_calibration = reliability_table(
+        predictions,
+        target_column="target",
+        score_column="reproducibility_score",
+        n_bins=args.calibration_bins,
+    )
+
+    bootstrap = None
+    if args.bootstrap_repetitions > 0:
+        if args.bootstrap_cluster_column not in predictions:
+            raise ValueError(
+                "bootstrap cluster column is missing from predictions: "
+                f"{args.bootstrap_cluster_column}"
+            )
+        bootstrap = study_cluster_bootstrap_intervals(
+            predictions,
+            study_column=args.bootstrap_cluster_column,
+            metric_study_column=args.metric_study_column,
+            screen_column=args.screen_column,
+            target_column="target",
+            score_column="reproducibility_score",
+            n_bootstrap=args.bootstrap_repetitions,
+            confidence=args.bootstrap_confidence,
+            min_effective_fraction=args.bootstrap_min_effective_fraction,
+            random_state=args.bootstrap_random_state,
+        )
+
+    report = {
+        "report_type": "grouped_oof_benchmark",
+        "package_version": __version__,
+        "parameters": {
+            "feature_columns": list(feature_columns),
+            "group_column": args.group_column,
+            "metric_study_column": args.metric_study_column,
+            "screen_column": args.screen_column,
+            "folds": args.folds,
+            "model_kind": args.model_kind,
+            "random_state": args.random_state,
+            "propensity_clip": [
+                args.propensity_clip_lower,
+                args.propensity_clip_upper,
+            ],
+            "seed_sweep": seed_values,
+            "seed_metrics": seed_metric_names,
+            "bootstrap_cluster_column": args.bootstrap_cluster_column,
+            "bootstrap_repetitions": args.bootstrap_repetitions,
+            "bootstrap_confidence": args.bootstrap_confidence,
+            "bootstrap_min_effective_fraction": (args.bootstrap_min_effective_fraction),
+            "paired_baseline_metric": args.paired_baseline_metric,
+            "mageck_attestation_supplied": all(
+                value is not None for value in mageck_attestation.values()
+            ),
+            "drugz_attestation_supplied": all(
+                value is not None for value in drugz_attestation.values()
+            ),
+        },
+        "point_estimates": metrics,
+        "baselines": baselines,
+        "within_query_feature_invariance": feature_invariance,
+        "conditional_calibration_bins": conditional_calibration,
+        "seed_sensitivity": seed_sensitivity,
+        "seed_runs": seed_runs,
+        "cluster_bootstrap_intervals": bootstrap,
+        "interpretation_boundaries": {
+            "relative_score_not_validated_probability": True,
+            "calibration_is_conditional_on_adjudicated_rows": True,
+            "documented_success_metrics_count_missing_outcomes_as_not_documented": (
+                True
+            ),
+            "bootstrap_conditions_on_fitted_oof_scores": True,
+            "seed_sensitivity_is_not_a_confidence_interval": True,
+        },
+    }
+    encoded = _write_benchmark_artifacts(
+        predictions,
+        report,
+        prediction_path=prediction_path,
+        metrics_path=metrics_path,
+        input_snapshot=table_snapshot,
+    )
+    print(encoded)
     return 0
+
+
+def command_freeze_model(args: argparse.Namespace) -> int:
+    frame, snapshot = _read_table_snapshot(args.table)
+    if args.features and args.feature_profile:
+        raise ValueError("--features and --feature-profile are mutually exclusive")
+    if args.features:
+        feature_columns = [
+            value.strip() for value in args.features.split(",") if value.strip()
+        ]
+    elif args.feature_profile:
+        feature_columns = FEATURE_PROFILES[args.feature_profile]
+    else:
+        feature_columns = DEFAULT_FEATURE_COLUMNS
+    manifest = freeze_model_bundle(
+        frame,
+        args.output_dir,
+        feature_columns=list(feature_columns),
+        training_table_sha256=snapshot["sha256"],
+        training_table_name=snapshot["filename"],
+        training_table_path=snapshot["path"],
+        feature_registry_path=args.feature_registry,
+        environment_lock_path=args.environment_lock,
+        code_revision=args.code_revision,
+        created_at_utc=args.created_at_utc,
+        current_checkout_path=args.current_checkout_path,
+        study_column=args.study_column,
+        source_family_column=args.source_family_column,
+        raw_family_column=args.raw_family_column,
+        model_kind=args.model_kind,
+        random_state=args.random_state,
+        propensity_clip=(
+            args.propensity_clip_lower,
+            args.propensity_clip_upper,
+        ),
+    )
+    _assert_input_snapshots_unchanged({"training_table": snapshot})
+    report = {
+        "bundle_dir": str(args.output_dir),
+        "manifest_sha256": _file_sha256(Path(args.output_dir) / MANIFEST_FILENAME),
+        "manifest": manifest,
+    }
+    print(
+        json.dumps(
+            _replace_nonfinite_with_none(report),
+            allow_nan=False,
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+def command_verify_frozen_model(args: argparse.Namespace) -> int:
+    manifest_path = Path(args.bundle_dir) / MANIFEST_FILENAME
+    manifest = verify_model_bundle(
+        args.bundle_dir,
+        expected_manifest_sha256=args.expected_manifest_sha256,
+    )
+    report = {
+        "manifest_sha256": _file_sha256(manifest_path),
+        "external_identity_anchor_checked": bool(args.expected_manifest_sha256),
+        "manifest": manifest,
+    }
+    print(json.dumps(report, allow_nan=False, indent=2, sort_keys=True))
+    return 0
+
+
+def _parse_datetime(value: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("expected an ISO-8601 datetime") from exc
+    if parsed.tzinfo is None:
+        raise argparse.ArgumentTypeError("datetime must include a timezone")
+    return parsed
+
+
+def _parse_integer_list(value: str, *, argument: str) -> list[int]:
+    tokens = [token.strip() for token in value.split(",") if token.strip()]
+    if not tokens:
+        raise ValueError(f"{argument} must contain at least one integer")
+    try:
+        parsed = [int(token) for token in tokens]
+    except ValueError as exc:
+        raise ValueError(f"{argument} must be a comma-separated integer list") from exc
+    return list(dict.fromkeys(parsed))
+
+
+def _replace_nonfinite_with_none(value: object) -> object:
+    if isinstance(value, dict):
+        return {
+            str(key): _replace_nonfinite_with_none(item) for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_replace_nonfinite_with_none(item) for item in value]
+    if isinstance(value, tuple):
+        return [_replace_nonfinite_with_none(item) for item in value]
+    if isinstance(value, float) and not pd.notna(value):
+        return None
+    return value
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -893,6 +1368,12 @@ def build_parser() -> argparse.ArgumentParser:
     featurize.add_argument("--counts", required=True)
     featurize.add_argument("--samples", required=True)
     featurize.add_argument("--output", required=True)
+    featurize.add_argument(
+        "--positive-lfc-means",
+        choices=["resistance", "sensitization"],
+        required=True,
+        help="explicit biological meaning of a positive treatment-minus-control LFC",
+    )
     featurize.add_argument("--pseudocount", type=float, default=1.0)
     featurize.add_argument("--low-count-threshold", type=float, default=30.0)
     featurize.add_argument(
@@ -1282,6 +1763,11 @@ def build_parser() -> argparse.ArgumentParser:
         choices=sorted(FEATURE_PROFILES),
     )
     benchmark.add_argument("--group-column", default="study_id")
+    benchmark.add_argument(
+        "--metric-study-column",
+        default="study_id",
+        help="study identifier used for study-macro metrics, separate from folds",
+    )
     benchmark.add_argument("--screen-column", default="screen_id")
     benchmark.add_argument("--folds", type=int, default=5)
     benchmark.add_argument(
@@ -1289,7 +1775,110 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["logistic", "hist_gradient_boosting"],
         default="logistic",
     )
+    benchmark.add_argument("--random-state", type=int, default=17)
+    benchmark.add_argument("--calibration-bins", type=int, default=10)
+    benchmark.add_argument("--propensity-clip-lower", type=float, default=0.1)
+    benchmark.add_argument("--propensity-clip-upper", type=float, default=0.95)
+    benchmark.add_argument(
+        "--seed-sweep",
+        default="17,29,43,59,71",
+        help="comma-separated split/model seeds for sensitivity diagnostics",
+    )
+    benchmark.add_argument(
+        "--seed-metric",
+        action="append",
+        default=None,
+        help=(
+            "metric for seed sensitivity; repeat to request multiple metrics "
+            "(default: study_macro_normalized_average_precision)"
+        ),
+    )
+    benchmark.add_argument("--bootstrap-repetitions", type=int, default=200)
+    benchmark.add_argument("--random-baseline-seed-count", type=int, default=100)
+    benchmark.add_argument(
+        "--paired-baseline-metric",
+        default="study_macro_normalized_average_precision",
+    )
+    benchmark.add_argument(
+        "--mageck-positive-tail-means",
+        choices=["resistance", "sensitization"],
+    )
+    benchmark.add_argument("--mageck-version")
+    benchmark.add_argument("--mageck-source-locator")
+    benchmark.add_argument("--mageck-source-sha256")
+    benchmark.add_argument(
+        "--drugz-positive-normz-means",
+        choices=["resistance", "sensitization"],
+    )
+    benchmark.add_argument("--drugz-version")
+    benchmark.add_argument("--drugz-source-locator")
+    benchmark.add_argument("--drugz-source-sha256")
+    benchmark.add_argument("--bootstrap-random-state", type=int, default=17)
+    benchmark.add_argument("--bootstrap-confidence", type=float, default=0.95)
+    benchmark.add_argument(
+        "--bootstrap-min-effective-fraction",
+        type=float,
+        default=0.8,
+    )
+    benchmark.add_argument(
+        "--bootstrap-cluster-column",
+        default="_outer_fold_group",
+    )
+    benchmark.add_argument("--metrics-output")
     benchmark.set_defaults(func=command_benchmark)
+
+    freeze_model = subparsers.add_parser(
+        "freeze-model",
+        help="fit and atomically freeze a checksum-bound prospective model bundle",
+    )
+    freeze_model.add_argument("--table", required=True)
+    freeze_model.add_argument("--output-dir", required=True)
+    freeze_model.add_argument("--features")
+    freeze_model.add_argument(
+        "--feature-profile",
+        choices=sorted(FEATURE_PROFILES),
+    )
+    freeze_model.add_argument("--feature-registry", default="config/features.yaml")
+    freeze_model.add_argument("--environment-lock", default="uv.lock")
+    freeze_model.add_argument("--code-revision", required=True)
+    freeze_model.add_argument(
+        "--current-checkout-path",
+        help=(
+            "optional Git checkout to attest: HEAD must equal --code-revision "
+            "and tracked/untracked status must be clean"
+        ),
+    )
+    freeze_model.add_argument(
+        "--created-at-utc",
+        type=_parse_datetime,
+        required=True,
+    )
+    freeze_model.add_argument("--study-column", default="study_id")
+    freeze_model.add_argument("--source-family-column", default="source_family_id")
+    freeze_model.add_argument("--raw-family-column", default="raw_data_family_id")
+    freeze_model.add_argument(
+        "--model-kind",
+        choices=["logistic", "hist_gradient_boosting"],
+        default="logistic",
+    )
+    freeze_model.add_argument("--random-state", type=int, default=17)
+    freeze_model.add_argument("--propensity-clip-lower", type=float, default=0.1)
+    freeze_model.add_argument("--propensity-clip-upper", type=float, default=0.95)
+    freeze_model.set_defaults(func=command_freeze_model)
+
+    verify_frozen_model = subparsers.add_parser(
+        "verify-frozen-model",
+        help="verify a frozen model bundle without deserializing it",
+    )
+    verify_frozen_model.add_argument("--bundle-dir", required=True)
+    verify_frozen_model.add_argument(
+        "--expected-manifest-sha256",
+        help=(
+            "externally recorded manifest SHA-256; without it verification checks "
+            "internal integrity but not bundle identity"
+        ),
+    )
+    verify_frozen_model.set_defaults(func=command_verify_frozen_model)
     return parser
 
 

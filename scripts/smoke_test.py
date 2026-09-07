@@ -107,7 +107,11 @@ def main() -> None:
         counts["sgrna_id"].str.startswith(first_screen),
         ["sgrna_id", "gene_symbol", *sample_ids],
     ]
-    features = featurize_count_table(screen_counts, design)
+    features = featurize_count_table(
+        screen_counts,
+        design,
+        positive_lfc_means="resistance",
+    )
     assert len(features) == 60
     assert features["guide_n"].eq(4).all()
     design_features = featurize_experimental_design(
@@ -143,6 +147,7 @@ def main() -> None:
     composition_features = featurize_count_table(
         composition_counts,
         composition_samples,
+        positive_lfc_means="resistance",
     ).set_index("gene_symbol")
     assert abs(composition_features.loc["B", "median_guide_lfc"]) < 0.05
     assert composition_features.loc["B", "signal_direction"] == "neutral"
@@ -159,6 +164,7 @@ def main() -> None:
     zero_heavy_features = featurize_count_table(
         zero_heavy_counts,
         composition_samples,
+        positive_lfc_means="resistance",
     ).set_index("gene_symbol")
     assert abs(zero_heavy_features.loc["A", "median_guide_lfc"]) < 0.05
     weighted_preprocessor = WeightedMedianStandardizer().fit(

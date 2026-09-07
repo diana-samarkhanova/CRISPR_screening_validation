@@ -48,6 +48,7 @@ def featurize_count_table(
     counts: pd.DataFrame,
     samples: pd.DataFrame,
     *,
+    positive_lfc_means: str,
     pseudocount: float = 1.0,
     low_count_threshold: float = 30.0,
     normalization_method: str = "median_ratio",
@@ -58,8 +59,12 @@ def featurize_count_table(
     Raw counts use robust median-ratio normalization by default. CPM remains
     available as a declared sensitivity analysis. Guide log-fold change is the
     mean normalized treatment signal minus the mean normalized control signal.
+    Biological direction is never inferred from that sign: callers must state
+    whether a positive LFC means resistance or sensitization for the contrast.
     """
 
+    if positive_lfc_means not in {"resistance", "sensitization"}:
+        raise ValueError("positive_lfc_means must be 'resistance' or 'sensitization'")
     if not np.isfinite(pseudocount) or pseudocount <= 0:
         raise ValueError("pseudocount must be finite and greater than zero")
     if not np.isfinite(low_count_threshold) or low_count_threshold < 0:
@@ -188,14 +193,25 @@ def featurize_count_table(
         ].max(axis=1)
         gene["absolute_median_guide_lfc"] = gene["median_guide_lfc"].abs()
         gene["absolute_mean_guide_lfc"] = gene["mean_guide_lfc"].abs()
-        gene["signal_direction"] = np.select(
+        gene["native_lfc_direction"] = np.select(
             [
                 gene["median_guide_lfc"].abs() <= direction_deadband,
                 gene["median_guide_lfc"] > direction_deadband,
             ],
-            ["neutral", "resistance"],
-            default="sensitization",
+            ["neutral", "positive"],
+            default="negative",
         )
+        negative_lfc_means = (
+            "sensitization" if positive_lfc_means == "resistance" else "resistance"
+        )
+        gene["signal_direction"] = gene["native_lfc_direction"].map(
+            {
+                "positive": positive_lfc_means,
+                "negative": negative_lfc_means,
+                "neutral": "neutral",
+            }
+        )
+        gene["positive_lfc_means"] = positive_lfc_means
         gene["is_sensitization_signal"] = (
             gene["signal_direction"] == "sensitization"
         ).astype(float)

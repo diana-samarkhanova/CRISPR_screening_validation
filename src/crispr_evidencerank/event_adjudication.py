@@ -1141,6 +1141,121 @@ def _comparison_value(value: object) -> object:
     return str(value)
 
 
+def _categorical_agreement_summary(
+    values_a: list[str],
+    values_b: list[str],
+    categories: tuple[str, ...],
+) -> dict[str, object]:
+    """Return transparent multicategory agreement components."""
+
+    n = len(values_a)
+    if n != len(values_b):
+        raise ValueError("categorical agreement inputs must have equal length")
+    unknown = sorted((set(values_a) | set(values_b)) - set(categories))
+    if unknown:
+        raise ValueError(f"categorical agreement contains unknown values: {unknown}")
+    matrix = {category: {other: 0 for other in categories} for category in categories}
+    for value_a, value_b in zip(values_a, values_b, strict=True):
+        matrix[value_a][value_b] += 1
+    if n == 0:
+        return {
+            "record_count": 0,
+            "categories": list(categories),
+            "exact_agreement_count": 0,
+            "exact_agreement_fraction": None,
+            "cohen_kappa": None,
+            "gwet_ac1": None,
+            "marginal_prevalence": {
+                category: {"primary": None, "secondary": None, "pooled": None}
+                for category in categories
+            },
+            "class_specific_agreement": {
+                category: {
+                    "primary_prevalence": None,
+                    "secondary_prevalence": None,
+                    "positive_agreement": None,
+                    "positive_agreement_denominator": 0,
+                    "negative_agreement": None,
+                    "negative_agreement_denominator": 0,
+                }
+                for category in categories
+            },
+            "confusion_matrix": matrix,
+        }
+    observed_count = sum(matrix[value][value] for value in categories)
+    observed = observed_count / n
+    row_totals = {category: sum(matrix[category].values()) for category in categories}
+    column_totals = {
+        category: sum(matrix[row][category] for row in categories)
+        for category in categories
+    }
+    expected_kappa = sum(
+        row_totals[category] * column_totals[category] for category in categories
+    ) / (n * n)
+    kappa_denominator = 1.0 - expected_kappa
+    kappa = (
+        None
+        if abs(kappa_denominator) < 1e-15
+        else (observed - expected_kappa) / kappa_denominator
+    )
+    category_count = len(categories)
+    marginal = {
+        category: (row_totals[category] + column_totals[category]) / (2.0 * n)
+        for category in categories
+    }
+    expected_ac1 = sum(value * (1.0 - value) for value in marginal.values()) / (
+        category_count - 1
+    )
+    ac1_denominator = 1.0 - expected_ac1
+    ac1 = (
+        None
+        if abs(ac1_denominator) < 1e-15
+        else (observed - expected_ac1) / ac1_denominator
+    )
+    class_specific = {}
+    for category in categories:
+        both_positive = matrix[category][category]
+        positive_denominator = row_totals[category] + column_totals[category]
+        both_negative = (
+            n - row_totals[category] - column_totals[category] + (both_positive)
+        )
+        negative_denominator = 2 * n - row_totals[category] - column_totals[category]
+        class_specific[category] = {
+            "primary_prevalence": row_totals[category] / n,
+            "secondary_prevalence": column_totals[category] / n,
+            "positive_agreement": (
+                2.0 * both_positive / positive_denominator
+                if positive_denominator
+                else None
+            ),
+            "positive_agreement_denominator": positive_denominator,
+            "negative_agreement": (
+                2.0 * both_negative / negative_denominator
+                if negative_denominator
+                else None
+            ),
+            "negative_agreement_denominator": negative_denominator,
+        }
+    return {
+        "record_count": n,
+        "categories": list(categories),
+        "exact_agreement_count": observed_count,
+        "exact_agreement_fraction": observed,
+        "cohen_kappa": kappa,
+        "gwet_ac1": ac1,
+        "marginal_prevalence": {
+            category: {
+                "primary": row_totals[category] / n,
+                "secondary": column_totals[category] / n,
+                "pooled": marginal[category],
+            }
+            for category in categories
+        },
+        "class_specific_agreement": class_specific,
+        "confusion_matrix": matrix,
+    }
+
+
 def summarize_event_review_agreement(
     primary_reviews: pd.DataFrame,
     secondary_reviews: pd.DataFrame,
@@ -1165,55 +1280,17 @@ def summarize_event_review_agreement(
     labels_a = first["proposed_label_code"].astype(str).tolist()
     labels_b = second["proposed_label_code"].astype(str).tolist()
     n = len(labels_a)
-    if n == 0:
-        return {
-            "record_count": 0,
-            "label_order": list(LABEL_ORDER),
-            "exact_label_agreement_count": 0,
-            "exact_label_agreement_fraction": None,
-            "cohen_kappa": None,
-            "gwet_ac1": None,
-            "confusion_matrix_axes": {
-                "rows": "primary_reviews.proposed_label_code",
-                "columns": "secondary_reviews.proposed_label_code",
-            },
-            "confusion_matrix": {
-                label: {other: 0 for other in LABEL_ORDER} for label in LABEL_ORDER
-            },
-            "field_agreement": {},
-        }
-
-    matrix = {label: {other: 0 for other in LABEL_ORDER} for label in LABEL_ORDER}
-    for label_a, label_b in zip(labels_a, labels_b, strict=True):
-        matrix[label_a][label_b] += 1
-    observed = sum(matrix[label][label] for label in LABEL_ORDER) / n
-    row_totals = {label: sum(matrix[label].values()) for label in LABEL_ORDER}
-    column_totals = {
-        label: sum(matrix[row][label] for row in LABEL_ORDER) for label in LABEL_ORDER
-    }
-    expected_kappa = sum(
-        row_totals[label] * column_totals[label] for label in LABEL_ORDER
-    ) / (n * n)
-    kappa_denominator = 1.0 - expected_kappa
-    kappa = (
-        None
-        if abs(kappa_denominator) < 1e-15
-        else (observed - expected_kappa) / kappa_denominator
+    label_summary = _categorical_agreement_summary(
+        labels_a,
+        labels_b,
+        LABEL_ORDER,
     )
-
-    category_count = len(LABEL_ORDER)
-    marginal = {
-        label: (row_totals[label] + column_totals[label]) / (2.0 * n)
-        for label in LABEL_ORDER
-    }
-    expected_ac1 = sum(value * (1.0 - value) for value in marginal.values()) / (
-        category_count - 1
-    )
-    ac1_denominator = 1.0 - expected_ac1
-    ac1 = (
-        None
-        if abs(ac1_denominator) < 1e-15
-        else (observed - expected_ac1) / ac1_denominator
+    matrix = label_summary["confusion_matrix"]
+    observed = label_summary["exact_agreement_fraction"]
+    testing_status_summary = _categorical_agreement_summary(
+        first["testing_status"].astype(str).tolist(),
+        second["testing_status"].astype(str).tolist(),
+        ("tested", "not_tested", "unknown"),
     )
 
     field_agreement: dict[str, dict[str, object]] = {}
@@ -1224,15 +1301,18 @@ def summarize_event_review_agreement(
         )
         field_agreement[field_name] = {
             "agreement_count": matches,
-            "agreement_fraction": matches / n,
+            "agreement_fraction": matches / n if n else None,
         }
     return {
         "record_count": n,
         "label_order": list(LABEL_ORDER),
-        "exact_label_agreement_count": int(round(observed * n)),
+        "exact_label_agreement_count": label_summary["exact_agreement_count"],
         "exact_label_agreement_fraction": observed,
-        "cohen_kappa": kappa,
-        "gwet_ac1": ac1,
+        "cohen_kappa": label_summary["cohen_kappa"],
+        "gwet_ac1": label_summary["gwet_ac1"],
+        "label_marginal_prevalence": label_summary["marginal_prevalence"],
+        "label_class_specific_agreement": label_summary["class_specific_agreement"],
+        "testing_status_agreement": testing_status_summary,
         "confusion_matrix_axes": {
             "rows": "primary_reviews.proposed_label_code",
             "columns": "secondary_reviews.proposed_label_code",

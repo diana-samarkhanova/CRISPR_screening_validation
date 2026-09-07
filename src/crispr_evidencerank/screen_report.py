@@ -216,6 +216,7 @@ def _rank_count_features(
     features = featurize_count_table(
         counts,
         samples,
+        positive_lfc_means=positive_lfc_means,
         pseudocount=pseudocount,
         low_count_threshold=low_count_threshold,
         normalization_method=normalization_method,

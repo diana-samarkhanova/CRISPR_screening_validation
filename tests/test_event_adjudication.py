@@ -831,6 +831,13 @@ def test_agreement_statistics_are_pre_adjudication_only():
     assert agreement["exact_label_agreement_fraction"] == pytest.approx(2 / 3)
     assert agreement["cohen_kappa"] == pytest.approx(4 / 7)
     assert agreement["gwet_ac1"] == pytest.approx(71 / 113)
+    assert agreement["label_marginal_prevalence"]["V2"]["primary"] == (
+        pytest.approx(1 / 3)
+    )
+    assert agreement["label_class_specific_agreement"]["V2"]["positive_agreement"] == 1
+    assert agreement["testing_status_agreement"]["exact_agreement_fraction"] == 1
+    assert agreement["testing_status_agreement"]["cohen_kappa"] is None
+    assert agreement["testing_status_agreement"]["gwet_ac1"] == 1
     assert agreement["confusion_matrix_axes"] == {
         "rows": "primary_reviews.proposed_label_code",
         "columns": "secondary_reviews.proposed_label_code",
@@ -838,6 +845,31 @@ def test_agreement_statistics_are_pre_adjudication_only():
     assert agreement["confusion_matrix"]["F0"]["D"] == 1
     assert agreement["calculation_boundary"] == "pre_adjudication_reviews_only"
     assert "final_label" not in json.dumps(agreement).casefold()
+
+
+def test_empty_agreement_has_the_same_stable_schema_without_recursion():
+    packet = _packet(1)
+    primary = _reviews(packet, "reviewer-a").iloc[0:0].copy()
+    secondary = _reviews(packet, "reviewer-b").iloc[0:0].copy()
+
+    agreement = summarize_event_review_agreement(primary, secondary)
+
+    assert agreement["record_count"] == 0
+    assert agreement["exact_label_agreement_fraction"] is None
+    assert agreement["label_marginal_prevalence"]["V3"]["pooled"] is None
+    assert (
+        agreement["label_class_specific_agreement"]["F0"][
+            "positive_agreement_denominator"
+        ]
+        == 0
+    )
+    assert agreement["testing_status_agreement"]["record_count"] == 0
+    assert (
+        agreement["testing_status_agreement"]["confusion_matrix"]["tested"]["tested"]
+        == 0
+    )
+    assert agreement["field_agreement"]["testing_status"]["agreement_fraction"] is None
+    assert agreement["calculation_boundary"] == "pre_adjudication_reviews_only"
 
 
 @pytest.mark.parametrize("duplicate_role", ["primary", "secondary"])

@@ -47,7 +47,8 @@ foundation. The project includes:
 - storage for raw and CNV-corrected scores without silently substituting a
   homemade correction;
 - a two-stage baseline that models both author selection for testing and
-  validation success among tested genes, with unweighted primary results and
+  validation success among tested genes, with independent-provenance-group
+  balancing in the primary non-selection-IPW analysis and clipped
   inverse-propensity weighting reported as a sensitivity analysis;
 - source/raw-family- and study-grouped evaluation specifications and ranking
   metrics;
@@ -243,12 +244,20 @@ files.
 The model is evaluated as nested information profiles rather than pretending
 that every user supplies equivalent data:
 
-| Profile | Evidence used |
-|---|---|
-| `screen_only` | Gene scores/count-derived guide signal and technical QC. |
-| `screen_plus_design` | `screen_only` plus structured study/screen/contrast/sample metadata. |
-| `context_aware` | `screen_plus_design` plus versioned artifact/CNV, cell, drug, pathway, and training-only cross-screen evidence. |
-| `selection_model` | A separate model for which genes authors chose to test; its selection-only fields are forbidden in the success model. |
+| Profile or endpoint | Current status | Evidence used or intended role |
+|---|---|---|
+| `screen_only` | Implemented benchmark profile | Gene scores/count-derived guide signal and technical QC. |
+| `screen_plus_design` | Implemented benchmark profile | `screen_only` plus structured study/screen/contrast/sample metadata. |
+| `context_aware` | Specified; modeling profile not implemented | Intended to add versioned artifact/CNV, cell, drug, pathway, and outer-training-only cross-screen evidence. The report-only immune and clinical modules do not populate this profile. |
+| `selection_model` | Baseline endpoint implemented | A separate model for which genes authors chose to test. It currently receives the same reviewed pre-outcome feature columns as the paired success model; dedicated selection-only covariates are planned, not implemented. |
+
+Only `screen_only` and `screen_plus_design` are currently selectable through
+`benchmark --feature-profile`. The success-model allowlist prevents
+author-selection, validation-outcome, clinical-registry, and other report-only
+fields from entering either implemented success profile. Adding dedicated
+selection-only covariates requires a separate runtime interface and leakage
+review; the configuration declaration alone does not make those covariates an
+implemented model input.
 
 Missing modalities retain explicit availability indicators. Reported zero is
 kept distinct from “not reported,” and a reduced profile or abstention is used
@@ -305,6 +314,7 @@ crispr-evidencerank validate \
 crispr-evidencerank featurize-counts \
   --counts examples/synthetic/guide_counts_screen_01.csv \
   --samples examples/synthetic/sample_sheet_screen_01.csv \
+  --positive-lfc-means resistance \
   --output data/processed/synthetic_gene_features.csv
 crispr-evidencerank featurize-design \
   --screens examples/synthetic/screens.csv \
@@ -323,7 +333,10 @@ pytest
 The synthetic data demonstrate the software contract only and must never be
 used as scientific evidence.
 
-`featurize-counts` expects integer raw read counts. A positive-count
+`featurize-counts` expects integer raw read counts and an explicit declaration
+of whether a positive treatment-minus-control LFC means `resistance` or
+`sensitization`; it never infers this from a comparator name. The native LFC
+sign is retained separately from the biological direction. A positive-count
 median-ratio variant is the default; all-zero and otherwise uninformative rows
 are excluded from size-factor estimation. This avoids the compositional
 artifacts that total-count CPM can create when a small number of guides expand
@@ -599,12 +612,57 @@ The minimum credible paper requires:
 - explicit successful and failed validation events;
 - MAGeCK/drugZ and effect-size baselines;
 - study-, drug-, cell-line-, and gene-cold evaluation;
-- observed success yield@5/10/20, NDCG, PR-AUC, calibration, and bootstrap
-  uncertainty;
+- one human-approved, preregistered primary estimand; prevalence-normalized AP,
+  top-k coverage, direction strata, and documented-success diagnostics;
+- source-family cluster intervals, paired model-minus-baseline intervals, and
+  a prespecified split/model seed sensitivity analysis;
 - ablation of guide, CNV/artifact, recurrence, context, and literature layers;
 - a frozen-model prospective validation study.
 
-See `docs/SCIENTIFIC_PROTOCOL.md` and `docs/MODEL_CARD.md`.
+The current `benchmark` command emits a strict JSON report containing point
+estimates, informative-query denominators, prevalence, calibrated-score
+diagnostics, direction strata, available fixed-score baselines, paired
+candidate-minus-baseline bootstrap differences, seed sensitivity, and an audit
+of features invariant within ranking queries. `documented_success_*` metrics
+count missing outcomes only as *not documented*; they are not biological
+failure rates and are not an eligible primary endpoint without an
+outcome-complete denominator.
+
+Top-k ties that cross a cutoff use equal fractional inclusion rather than row
+order or outcomes. Queries with only one adjudicated class are counted but
+excluded from inferential ranking macros because they have no within-query
+ordering resolution. MAGeCK and drugZ baseline columns are accepted only after
+explicit direction semantics, source version/locator, and source SHA-256 have
+been supplied; a suggestive column name is not treated as evidence of correct
+orientation.
+
+Fold assignment and metric aggregation are separate axes: connected
+source/raw-data families are kept in one outer fold even when a custom split
+group is requested, while `study_macro_*` values remain aggregated by the
+explicit study identifier. Source-family bootstrap draws never silently turn a
+study-macro estimand into a family-macro estimand.
+
+Benchmark input bytes are snapshotted and rechecked before no-clobber
+publication. The JSON records input, prediction, packaged-build, and dependency
+lock hashes. Prediction and metrics paths cannot overwrite the input or each
+other, and a statistical failure produces no partial output.
+
+After the real training roster, primary estimand, features, and model choice are
+approved, `freeze-model` writes an atomic checksum-bound joblib bundle. Its
+manifest pins the full Git SHA, training table, embedded feature registry,
+embedded environment lock, and model bytes. For a repository release, pass
+`--current-checkout-path` so the declared revision is checked against a clean
+Git checkout both before and after fitting. `verify-frozen-model` checks the
+fixed bundle roster without
+deserializing it. The freeze command reports the manifest SHA-256; record that
+hash in an external registration and pass it back as
+`--expected-manifest-sha256` to verify bundle identity as well as internal file
+integrity. Without an external anchor, no self-contained bundle can prove that
+its manifest was not replaced. External timestamped deposition and the wet-lab
+experiment remain separate human-controlled gates.
+
+See `docs/SCIENTIFIC_PROTOCOL.md`, `docs/MODEL_CARD.md`, and
+`docs/REPORTING_STANDARDS.md`.
 
 For the adjacent pre-screen task, [AssayBench](https://github.com/Genentech/AssayBench)
 benchmarks prediction of a screen gene ranking from an assay description. It is

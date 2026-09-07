@@ -341,6 +341,21 @@ during normalization. They include:
 Richer extraction fields support audit and adjudication but cannot override an
 inconsistent core assessment or substitute for a required core field.
 
+## Agreement reporting
+
+The frozen pre-adjudication comparison reports the complete label confusion
+matrix, each curator's marginal prevalence, exact agreement, Cohen's kappa,
+Gwet's AC1, and class-specific positive and negative agreement with their
+denominators. `testing_status` receives its own confusion matrix, exact
+agreement, kappa, AC1, marginals, and class-specific agreement; every remaining
+decision field receives an exact-agreement fraction.
+
+No single kappa threshold creates or removes Gold status. Rare `F0`/`D` classes
+can make kappa unstable even when raw agreement is high, so the manuscript must
+show the full set of statistics and the disagreement log. Source/raw-family
+cluster-bootstrap confidence intervals remain a release requirement and are
+not yet emitted by the event-comparison bundle.
+
 ## Independence, signing, and amendments
 
 Curator B must work independently, must not discuss Gold cases with Curator A

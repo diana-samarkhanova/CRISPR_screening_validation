@@ -110,6 +110,7 @@ _CANDIDATE_PASSTHROUGH_COLUMNS = (
     "mageck_input_sgrna_n",
     "mageck_good_sgrna_n",
     "native_lfc_direction",
+    "positive_lfc_means",
     "signal_direction",
     "guide_n",
     "median_guide_lfc",
@@ -282,6 +283,17 @@ def _candidate_query(candidates: pd.DataFrame, gene_column: str) -> pd.DataFrame
             raise ValueError(
                 "candidate native_lfc_direction must be positive, negative, "
                 f"or neutral: {invalid_native_directions}"
+            )
+    if "positive_lfc_means" in query:
+        allowed_positive_lfc_meanings = {"resistance", "sensitization"}
+        invalid_positive_lfc_meanings = sorted(
+            set(query["positive_lfc_means"].dropna().astype(str))
+            - allowed_positive_lfc_meanings
+        )
+        if invalid_positive_lfc_meanings or query["positive_lfc_means"].isna().any():
+            raise ValueError(
+                "candidate positive_lfc_means must be resistance or "
+                f"sensitization: {invalid_positive_lfc_meanings}"
             )
     if "signal_direction" in query:
         allowed_signal_directions = {"resistance", "sensitization", "neutral"}

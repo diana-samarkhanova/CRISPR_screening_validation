@@ -812,7 +812,13 @@ def main() -> None:
             combined_counts["sgrna_id"].str.startswith(screen_id),
             ["sgrna_id", "gene_symbol", *sample_ids],
         ].copy()
-        feature_blocks.append(featurize_count_table(screen_counts, design))
+        feature_blocks.append(
+            featurize_count_table(
+                screen_counts,
+                design,
+                positive_lfc_means="resistance",
+            )
+        )
     features = pd.concat(feature_blocks, ignore_index=True)
     design_features = featurize_experimental_design(
         screens_frame,

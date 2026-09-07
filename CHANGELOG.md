@@ -86,6 +86,57 @@ suffix and are not claims of a trained biological model.
 
 ## Unreleased
 
+### Publication-readiness corrections
+
+- Required explicit `positive_lfc_means` semantics for count featurization,
+  retained the native LFC sign separately, and removed the low-level assumption
+  that every positive treatment-minus-control LFC denotes resistance.
+- Added prevalence, correctly normalized AP, informative top-k denominators,
+  strict-cutoff NDCG, honest `documented_success_*` diagnostics, conditional
+  calibration slope/intercept and reliability bins, and direction-stratified
+  benchmark metrics.
+- Added repeated-seed diagnostics, source-family cluster intervals in the
+  benchmark CLI, a within-query feature-invariance audit, safe fixed-score
+  baselines, and paired candidate-minus-baseline cluster-bootstrap intervals.
+- Removed duplicate prediction columns and the CSV-unsafe internal tuple query
+  identifier from public benchmark outputs; renamed the surviving propensity
+  output to `selection_propensity`.
+- Added class-specific label agreement and full chance-corrected agreement for
+  `testing_status` to the pre-adjudication Gold report.
+- Added checksum-bound frozen-model bundles that pin the training table,
+  feature registry, environment lock, full Git revision, and serialized model;
+  verification does not deserialize untrusted joblib content. Freeze now rejects
+  an in-memory frame that differs from the pinned table and reports a manifest
+  hash that can be checked against an external identity anchor.
+- Kept source/raw-family fold unioning active for custom split groups and
+  separated the bootstrap resampling cluster from the study-macro aggregation
+  identifier.
+- Made benchmark output paths fail closed against input/output collisions and
+  delayed no-clobber writes until all statistical validation and input snapshot
+  checks have completed; reports now pin input, prediction, build, and lock
+  hashes.
+- Made top-k summaries permutation-invariant under cutoff ties, excluded
+  single-class queries from inferential ranking macros with explicit
+  denominators, made calibration bins tie-preserving, and required one complete
+  finite roster for paired inference.
+- Added direction/provenance-attested MAGeCK and drugZ adapters with strict
+  numeric-domain validation; histogram boosting now receives a paired
+  candidate-minus-logistic interval rather than a point-only comparison.
+- Added reason-coded alternate-seed failures and removed the accidental
+  always-appended default `--seed-metric` when callers select another metric.
+
+### Reporting and documentation
+
+- Added a practical DOME reporting crosswalk and an explicitly adapted,
+  non-primary TRIPOD+AI applicability check for the non-clinical
+  gene-by-screen ranking task.
+- Bound the historical synthetic benchmark table to its four-fold command,
+  checkpoint commit, and lock-file provenance; fixed its Markdown separator and
+  stopped copying inherently stale test totals into the living checkpoint.
+- Corrected the documented model state: `context_aware` and dedicated
+  selection-only covariates are specifications, whereas the current selection
+  endpoint shares the reviewed pre-outcome inputs of the paired success model.
+
 ### Gold validation-event curation
 
 - Added strict contracts and checksum-bound atomic stages for frozen event

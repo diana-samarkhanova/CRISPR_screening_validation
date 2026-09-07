@@ -32,8 +32,9 @@ The repository implements a transparent two-stage baseline:
 
 1. logistic selection model for `tested` versus explicitly `not_tested`;
 2. regularized logistic success model among tested genes;
-3. inverse-study base weights so one publication cannot dominate by reporting
-   more screens or tested genes;
+3. inverse independent-provenance-group base weights so one connected
+   source/raw-data family cannot dominate by reporting more screens or tested
+   genes;
 4. optional clipped selection-IPW, disabled when inner grouped cross-fitting is
    impossible or any inner training fold contains a single testing-status
    class;
@@ -46,14 +47,21 @@ experimental material into one source/raw-data family.
 
 ## Feature profiles
 
-- `screen_only`: gene scores/count-derived guide evidence and technical QC;
-- `screen_plus_design`: `screen_only` plus structured experimental design;
-- `context_aware`: `screen_plus_design` plus versioned artifact/CNV, cell,
-  drug, pathway, and training-only cross-screen evidence;
-- `selection_model`: separate author-testing endpoint; selection-only fields are
-  forbidden in the validation-success model.
+- `screen_only`: implemented benchmark profile using gene scores/count-derived
+  guide evidence and technical QC;
+- `screen_plus_design`: implemented benchmark profile adding structured
+  experimental design;
+- `context_aware`: specified but not implemented as a modeling profile; it is
+  intended to add versioned artifact/CNV, cell, drug, pathway, and
+  outer-training-only cross-screen evidence;
+- `selection_model`: implemented as a separate author-testing endpoint, but it
+  currently uses the same reviewed pre-outcome feature columns as the paired
+  success model. Dedicated selection-only covariates remain planned.
 
-Profiles are evaluated separately. Missing inputs retain explicit availability
+Only `screen_only` and `screen_plus_design` are currently exposed by the
+benchmark runtime. The auxiliary immune and clinical-context outputs remain
+report-only and do not implement or backfill `context_aware`. Implemented
+profiles are evaluated separately. Missing inputs retain explicit availability
 indicators; reported zero is not treated as missing, and unsupported inputs
 route to a reduced profile or abstention.
 
@@ -71,13 +79,24 @@ evaluation.
 ## Outputs
 
 - `reproducibility_score`;
-- `selection_propensity_known_status`;
-- `artifact_risk` component;
-- feature missingness;
-- within-screen rank;
-- uncertainty from study-level resampling;
-- separate mechanistic, therapeutic, and novelty evidence components.
-- profile name, metadata completeness, and outside-training-support flags.
+- `selection_propensity` (estimated for every candidate, including candidates
+  whose testing status is unknown);
+- outer fold and independent-provenance-group identifiers;
+- benchmark metrics, prevalence and informative denominators;
+- direction-stratified metrics, conditional calibration bins, fixed-fold seed
+  sensitivity, and source-family bootstrap intervals;
+- available baseline rows and paired candidate-minus-baseline intervals;
+- a within-query feature-invariance audit.
+
+The benchmark report is checksum-bound to its input and prediction artifact.
+Direction-specific MAGeCK/drugZ baselines require explicit semantics and source
+provenance. Top-k ties are handled fractionally, and single-class queries are
+reported as non-informative rather than contributing constant ranking values.
+
+Artifact-risk components, context-aware modeling, within-screen rank,
+profile-support routing, and mechanistic/therapeutic/novelty components remain
+specified future outputs unless produced by their explicitly separate
+report-only commands. They must not be described as current model outputs.
 
 The auxiliary immune-context command writes only `report_only_*` columns. It
 reports tumor/immune recurrence, conflicts, dual-action hypotheses, and

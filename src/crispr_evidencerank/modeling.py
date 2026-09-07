@@ -360,7 +360,11 @@ def _preflight_candidate_frame(
         raise ValueError("each screen_id must be nested within one study_id")
 
 
-def _logistic_pipeline(*, class_weight: str | None = None) -> Pipeline:
+def _logistic_pipeline(
+    *,
+    class_weight: str | None = None,
+    random_state: int = 17,
+) -> Pipeline:
     return Pipeline(
         steps=[
             ("preprocess", WeightedMedianStandardizer()),
@@ -369,22 +373,22 @@ def _logistic_pipeline(*, class_weight: str | None = None) -> Pipeline:
                 LogisticRegression(
                     max_iter=2_000,
                     class_weight=class_weight,
-                    random_state=17,
+                    random_state=random_state,
                 ),
             ),
         ]
     )
 
 
-def _selection_pipeline() -> Pipeline:
+def _selection_pipeline(*, random_state: int = 17) -> Pipeline:
     """Unweighted classifier whose probabilities retain the observed class prior."""
 
-    return _logistic_pipeline(class_weight=None)
+    return _logistic_pipeline(class_weight=None, random_state=random_state)
 
 
-def _success_pipeline(model_kind: str) -> Pipeline:
+def _success_pipeline(model_kind: str, *, random_state: int = 17) -> Pipeline:
     if model_kind == "logistic":
-        return _logistic_pipeline(class_weight=None)
+        return _logistic_pipeline(class_weight=None, random_state=random_state)
     if model_kind == "hist_gradient_boosting":
         return Pipeline(
             steps=[
@@ -397,7 +401,7 @@ def _success_pipeline(model_kind: str) -> Pipeline:
                         max_leaf_nodes=15,
                         min_samples_leaf=10,
                         l2_regularization=1.0,
-                        random_state=17,
+                        random_state=random_state,
                     ),
                 ),
             ]
@@ -409,6 +413,8 @@ def _cross_fitted_propensity(
     x: pd.DataFrame,
     selection_target: pd.Series,
     groups: pd.Series | None,
+    *,
+    random_state: int = 17,
 ) -> np.ndarray:
     """Estimate propensities while excluding unknown testing statuses."""
 
@@ -437,13 +443,17 @@ def _cross_fitted_propensity(
     for train_idx, test_idx in splits:
         y_train = y_known.iloc[train_idx]
         original_test_positions = known_positions[test_idx]
-        model = _selection_pipeline().fit(x_known.iloc[train_idx], y_train)
+        model = _selection_pipeline(random_state=random_state).fit(
+            x_known.iloc[train_idx], y_train
+        )
         propensity[original_test_positions] = model.predict_proba(
             x_known.iloc[test_idx]
         )[:, 1]
     unknown_positions = np.flatnonzero(~known.to_numpy())
     if len(unknown_positions):
-        final_model = _selection_pipeline().fit(x_known, y_known)
+        final_model = _selection_pipeline(random_state=random_state).fit(
+            x_known, y_known
+        )
         propensity[unknown_positions] = final_model.predict_proba(
             x.iloc[unknown_positions]
         )[:, 1]
@@ -476,6 +486,7 @@ class ReproducibilityModel:
     success_model: Pipeline | None = None
     propensity_clip: tuple[float, float] = (0.1, 0.95)
     model_kind: str = "logistic"
+    random_state: int = 17
     fit_diagnostics: dict[str, float] | None = None
 
     def fit(
@@ -488,6 +499,9 @@ class ReproducibilityModel:
         selection_groups: pd.Series | None = None,
     ) -> ReproducibilityModel:
         validate_success_feature_columns(self.feature_columns)
+        lower, upper = self.propensity_clip
+        if not 0 < lower < upper <= 1:
+            raise ValueError("propensity_clip must satisfy 0 < lower < upper <= 1")
         frame = _prepare_direction_features(frame)
         missing = set(self.feature_columns) - set(frame.columns)
         if missing:
@@ -505,7 +519,9 @@ class ReproducibilityModel:
         selection_known = selection_target.notna()
         known_target = selection_target.loc[selection_known].astype(int)
         if known_target.nunique() == 2:
-            self.selection_model = _selection_pipeline().fit(
+            self.selection_model = _selection_pipeline(
+                random_state=self.random_state
+            ).fit(
                 x.loc[selection_known],
                 known_target,
             )
@@ -514,6 +530,7 @@ class ReproducibilityModel:
                     x,
                     selection_target,
                     selection_groups,
+                    random_state=self.random_state,
                 )
             else:
                 propensity = self.selection_model.predict_proba(x)[:, 1]
@@ -543,7 +560,6 @@ class ReproducibilityModel:
                 lambda group: 1.0 / group_counts[group]
             ).to_numpy(dtype=float)
             study_balancing_applied = True
-        lower, upper = self.propensity_clip
         labeled_propensity = propensity[labeled.to_numpy()]
         clipped = np.clip(labeled_propensity, lower, upper)
         if selection_weighting:
@@ -564,10 +580,12 @@ class ReproducibilityModel:
             "clip_upper_fraction": float(np.mean(labeled_propensity > upper)),
             "effective_sample_size": effective_sample_size,
             "study_balancing_applied": float(study_balancing_applied),
-            "outcome_observation_weighting_applied": 0.0,
         }
 
-        self.success_model = _success_pipeline(self.model_kind)
+        self.success_model = _success_pipeline(
+            self.model_kind,
+            random_state=self.random_state,
+        )
         self.success_model.fit(
             x.loc[labeled],
             y,
@@ -590,7 +608,6 @@ class ReproducibilityModel:
             {
                 "reproducibility_score": score,
                 "selection_propensity": propensity,
-                "selection_propensity_known_status": propensity,
             },
             index=frame.index,
         )
@@ -601,17 +618,23 @@ def grouped_oof_predictions(
     *,
     feature_columns: list[str] | None = None,
     group_column: str = "study_id",
+    metric_study_column: str = "study_id",
     screen_column: str = "screen_id",
     label_column: str = "label_code",
     tested_column: str = "testing_status",
     n_splits: int = 5,
     model_kind: str = "logistic",
+    random_state: int = 17,
+    propensity_clip: tuple[float, float] = (0.1, 0.95),
     source_family_column: str = "source_family_id",
     raw_family_column: str = "raw_data_family_id",
 ) -> tuple[pd.DataFrame, dict[str, float]]:
     """Generate study-grouped OOF predictions and ranking metrics."""
 
     frame = _prepare_direction_features(frame)
+    lower_clip, upper_clip = propensity_clip
+    if not 0 < lower_clip < upper_clip <= 1:
+        raise ValueError("propensity_clip must satisfy 0 < lower < upper <= 1")
     feature_columns = feature_columns or DEFAULT_FEATURE_COLUMNS
     validate_success_feature_columns(list(feature_columns))
     _preflight_candidate_frame(
@@ -624,7 +647,11 @@ def grouped_oof_predictions(
         for column in (source_family_column, raw_family_column)
         if column in frame and frame[column].notna().any()
     )
-    if group_column == "study_id" and family_columns:
+    if group_column not in frame:
+        raise ValueError(f"group column is missing: {group_column}")
+    if metric_study_column not in frame:
+        raise ValueError(f"metric study column is missing: {metric_study_column}")
+    if family_columns:
         groups = _study_family_groups(
             frame,
             study_column=group_column,
@@ -645,7 +672,7 @@ def grouped_oof_predictions(
     splitter = StratifiedGroupKFold(
         n_splits=actual_splits,
         shuffle=True,
-        random_state=17,
+        random_state=random_state,
     )
     splits = list(
         splitter.split(
@@ -672,20 +699,25 @@ def grouped_oof_predictions(
     propensities = pd.Series(np.nan, index=frame.index, dtype=float)
     fold_ids = pd.Series(pd.NA, index=frame.index, dtype="Int64")
     fold_groups = groups.astype(str)
-    base = ReproducibilityModel(list(feature_columns), model_kind=model_kind)
+    base = ReproducibilityModel(
+        list(feature_columns),
+        model_kind=model_kind,
+        random_state=random_state,
+        propensity_clip=propensity_clip,
+    )
     fold_diagnostics: list[dict[str, float]] = []
     ipw_available = True
 
     for fold, (train_idx, test_idx) in enumerate(splits, start=1):
-        unweighted_model = clone_model(base)
-        unweighted_model.fit(
+        primary_model = clone_model(base)
+        primary_model.fit(
             frame.iloc[train_idx],
             label_column=label_column,
             tested_column=tested_column,
             selection_weighting=False,
             selection_groups=groups.iloc[train_idx],
         )
-        predicted = unweighted_model.predict(frame.iloc[test_idx])
+        predicted = primary_model.predict(frame.iloc[test_idx])
         predictions.iloc[test_idx] = predicted["reproducibility_score"].to_numpy()
         propensities.iloc[test_idx] = predicted["selection_propensity"].to_numpy()
         fold_ids.iloc[test_idx] = fold
@@ -717,10 +749,8 @@ def grouped_oof_predictions(
     output = frame.copy()
     output["target"] = targets
     output["reproducibility_score"] = predictions
-    output["reproducibility_score_unweighted"] = predictions
     output["reproducibility_score_ipw"] = predictions_ipw
     output["selection_propensity"] = propensities
-    output["selection_propensity_known_status"] = propensities
     output["fold"] = fold_ids
     output["_outer_fold_group"] = fold_groups
     query_columns = [screen_column]
@@ -736,17 +766,18 @@ def grouped_oof_predictions(
         group_column="_ranking_query_id",
         target_column="target",
         score_column="reproducibility_score",
-        study_column=group_column,
+        study_column=metric_study_column,
     )
     metrics["ipw_available"] = float(ipw_available and predictions_ipw.notna().all())
     metrics["ipw_scope_selection_only"] = 1.0
+    metrics["random_state"] = float(random_state)
     if metrics["ipw_available"]:
         ipw_metrics = grouped_ranking_metrics(
             output,
             group_column="_ranking_query_id",
             target_column="target",
             score_column="reproducibility_score_ipw",
-            study_column=group_column,
+            study_column=metric_study_column,
         )
         metrics.update({f"ipw_{name}": value for name, value in ipw_metrics.items()})
     if metrics["ipw_available"] and fold_diagnostics:
@@ -754,7 +785,39 @@ def grouped_oof_predictions(
             metrics[f"ipw_mean_{name}"] = float(
                 np.mean([diagnostic[name] for diagnostic in fold_diagnostics])
             )
-    return output, metrics
+    if "phenotype_direction" in output:
+        for direction, direction_frame in output.groupby(
+            "phenotype_direction",
+            sort=True,
+        ):
+            direction_target = pd.to_numeric(
+                direction_frame["target"], errors="coerce"
+            ).dropna()
+            target_classes = set(direction_target.unique())
+            metrics[f"direction_{direction}_n_adjudicated"] = float(
+                len(direction_target)
+            )
+            metrics[f"direction_{direction}_n_target_classes"] = float(
+                len(target_classes)
+            )
+            if target_classes != {0, 1}:
+                metrics[f"direction_{direction}_ranking_available"] = 0.0
+                continue
+            direction_metrics = grouped_ranking_metrics(
+                direction_frame,
+                group_column="_ranking_query_id",
+                target_column="target",
+                score_column="reproducibility_score",
+                study_column=metric_study_column,
+            )
+            metrics.update(
+                {
+                    f"direction_{direction}_{name}": value
+                    for name, value in direction_metrics.items()
+                }
+            )
+            metrics[f"direction_{direction}_ranking_available"] = 1.0
+    return output.drop(columns=["_ranking_query_id"]), metrics
 
 
 def clone_model(model: ReproducibilityModel) -> ReproducibilityModel:
@@ -764,4 +827,5 @@ def clone_model(model: ReproducibilityModel) -> ReproducibilityModel:
         feature_columns=list(model.feature_columns),
         propensity_clip=model.propensity_clip,
         model_kind=model.model_kind,
+        random_state=model.random_state,
     )
