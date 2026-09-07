@@ -1,0 +1,288 @@
+{
+  "$defs": {
+    "AdjudicationResolutionMethod": {
+      "enum": [
+        "third_expert",
+        "two_reviewer_consensus",
+        "agreement_confirmed",
+        "insufficient_evidence"
+      ],
+      "title": "AdjudicationResolutionMethod",
+      "type": "string"
+    },
+    "CriterionAssessment": {
+      "description": "Explicit assessment of one label-driving validation criterion.",
+      "enum": [
+        "yes",
+        "no",
+        "unclear",
+        "not_reported",
+        "not_applicable"
+      ],
+      "title": "CriterionAssessment",
+      "type": "string"
+    },
+    "LabelCode": {
+      "description": "Evidence labels for an individual validation event.",
+      "enum": [
+        "V3",
+        "V2",
+        "V1",
+        "F0",
+        "D",
+        "A",
+        "T",
+        "U"
+      ],
+      "title": "LabelCode",
+      "type": "string"
+    },
+    "ReviewConfidence": {
+      "enum": [
+        "high",
+        "moderate",
+        "low"
+      ],
+      "title": "ReviewConfidence",
+      "type": "string"
+    },
+    "TestingStatus": {
+      "enum": [
+        "tested",
+        "not_tested",
+        "unknown"
+      ],
+      "title": "TestingStatus",
+      "type": "string"
+    },
+    "ValidationContextMatch": {
+      "description": "Relationship of the validation context to the linked screen contrast.",
+      "enum": [
+        "exact",
+        "close",
+        "external",
+        "unclear"
+      ],
+      "title": "ValidationContextMatch",
+      "type": "string"
+    },
+    "ValidationEventScope": {
+      "description": "Whether a card describes an eligible targeted validation event.",
+      "enum": [
+        "qualifying_validation",
+        "external_support",
+        "not_validation",
+        "unclear"
+      ],
+      "title": "ValidationEventScope",
+      "type": "string"
+    },
+    "ValidationOutcomeRelation": {
+      "description": "Observed validation outcome relative to the screen-predicted direction.",
+      "enum": [
+        "concordant",
+        "opposite",
+        "no_effect",
+        "mixed",
+        "not_interpretable",
+        "not_reported"
+      ],
+      "title": "ValidationOutcomeRelation",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Named human adjudication of a complete two-review comparison.",
+  "properties": {
+    "adjudication_id": {
+      "minLength": 1,
+      "title": "Adjudication Id",
+      "type": "string"
+    },
+    "comparison_id": {
+      "minLength": 1,
+      "title": "Comparison Id",
+      "type": "string"
+    },
+    "packet_id": {
+      "minLength": 1,
+      "title": "Packet Id",
+      "type": "string"
+    },
+    "packet_version": {
+      "minimum": 1,
+      "title": "Packet Version",
+      "type": "integer"
+    },
+    "packet_event_id": {
+      "minLength": 1,
+      "title": "Packet Event Id",
+      "type": "string"
+    },
+    "packet_payload_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Packet Payload Sha256",
+      "type": "string"
+    },
+    "primary_review_id": {
+      "minLength": 1,
+      "title": "Primary Review Id",
+      "type": "string"
+    },
+    "secondary_review_id": {
+      "minLength": 1,
+      "title": "Secondary Review Id",
+      "type": "string"
+    },
+    "primary_reviewer_id": {
+      "minLength": 1,
+      "title": "Primary Reviewer Id",
+      "type": "string"
+    },
+    "secondary_reviewer_id": {
+      "minLength": 1,
+      "title": "Secondary Reviewer Id",
+      "type": "string"
+    },
+    "rubric_version": {
+      "minLength": 1,
+      "title": "Rubric Version",
+      "type": "string"
+    },
+    "resolution_method": {
+      "$ref": "#/$defs/AdjudicationResolutionMethod"
+    },
+    "adjudicator_id": {
+      "minLength": 1,
+      "title": "Adjudicator Id",
+      "type": "string"
+    },
+    "co_signer_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Co Signer Id"
+    },
+    "adjudicated_at_utc": {
+      "format": "date-time",
+      "title": "Adjudicated At Utc",
+      "type": "string"
+    },
+    "model_score_blinded": {
+      "title": "Model Score Blinded",
+      "type": "boolean"
+    },
+    "final_event_scope": {
+      "$ref": "#/$defs/ValidationEventScope"
+    },
+    "final_context_match": {
+      "$ref": "#/$defs/ValidationContextMatch"
+    },
+    "final_testing_status": {
+      "$ref": "#/$defs/TestingStatus"
+    },
+    "final_perturbation_confirmed": {
+      "$ref": "#/$defs/CriterionAssessment"
+    },
+    "final_independent_reagent_count": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Final Independent Reagent Count"
+    },
+    "final_orthogonal_perturbation": {
+      "$ref": "#/$defs/CriterionAssessment"
+    },
+    "final_appropriate_control": {
+      "$ref": "#/$defs/CriterionAssessment"
+    },
+    "final_assay_adequate": {
+      "$ref": "#/$defs/CriterionAssessment"
+    },
+    "final_outcome_relation": {
+      "$ref": "#/$defs/ValidationOutcomeRelation"
+    },
+    "final_null_result_evaluable": {
+      "$ref": "#/$defs/CriterionAssessment"
+    },
+    "final_rescue_or_causal_reversal": {
+      "$ref": "#/$defs/CriterionAssessment"
+    },
+    "final_label_code": {
+      "$ref": "#/$defs/LabelCode"
+    },
+    "final_confidence": {
+      "$ref": "#/$defs/ReviewConfidence"
+    },
+    "final_source_locator": {
+      "minLength": 1,
+      "title": "Final Source Locator",
+      "type": "string"
+    },
+    "adjudication_reason_codes": {
+      "minLength": 1,
+      "pattern": "^[a-z0-9_.-]+(?:\\|[a-z0-9_.-]+)*$",
+      "title": "Adjudication Reason Codes",
+      "type": "string"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "adjudication_id",
+    "comparison_id",
+    "packet_id",
+    "packet_version",
+    "packet_event_id",
+    "packet_payload_sha256",
+    "primary_review_id",
+    "secondary_review_id",
+    "primary_reviewer_id",
+    "secondary_reviewer_id",
+    "rubric_version",
+    "resolution_method",
+    "adjudicator_id",
+    "adjudicated_at_utc",
+    "model_score_blinded",
+    "final_event_scope",
+    "final_context_match",
+    "final_testing_status",
+    "final_perturbation_confirmed",
+    "final_orthogonal_perturbation",
+    "final_appropriate_control",
+    "final_assay_adequate",
+    "final_outcome_relation",
+    "final_null_result_evaluable",
+    "final_rescue_or_causal_reversal",
+    "final_label_code",
+    "final_confidence",
+    "final_source_locator",
+    "adjudication_reason_codes"
+  ],
+  "title": "EventAdjudicationRecord",
+  "type": "object"
+}

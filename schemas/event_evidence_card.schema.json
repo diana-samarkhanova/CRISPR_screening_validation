@@ -1,0 +1,201 @@
+{
+  "$defs": {
+    "PerturbationModality": {
+      "enum": [
+        "CRISPR_KO",
+        "CRISPRa",
+        "CRISPRi",
+        "RNAi",
+        "overexpression",
+        "mutation",
+        "inhibitor",
+        "other"
+      ],
+      "title": "PerturbationModality",
+      "type": "string"
+    },
+    "PhenotypeDirection": {
+      "enum": [
+        "resistance",
+        "sensitization",
+        "neutral",
+        "discordant",
+        "unknown"
+      ],
+      "title": "PhenotypeDirection",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Frozen, label-free evidence card shown identically to both reviewers.",
+  "properties": {
+    "packet_id": {
+      "minLength": 1,
+      "title": "Packet Id",
+      "type": "string"
+    },
+    "packet_version": {
+      "minimum": 1,
+      "title": "Packet Version",
+      "type": "integer"
+    },
+    "packet_event_id": {
+      "minLength": 1,
+      "title": "Packet Event Id",
+      "type": "string"
+    },
+    "packet_payload_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Packet Payload Sha256",
+      "type": "string"
+    },
+    "batch_id": {
+      "minLength": 1,
+      "title": "Batch Id",
+      "type": "string"
+    },
+    "source_family_id": {
+      "minLength": 1,
+      "title": "Source Family Id",
+      "type": "string"
+    },
+    "study_id": {
+      "minLength": 1,
+      "title": "Study Id",
+      "type": "string"
+    },
+    "screen_id": {
+      "minLength": 1,
+      "title": "Screen Id",
+      "type": "string"
+    },
+    "contrast_id": {
+      "minLength": 1,
+      "title": "Contrast Id",
+      "type": "string"
+    },
+    "gene_symbol": {
+      "minLength": 1,
+      "title": "Gene Symbol",
+      "type": "string"
+    },
+    "screen_predicted_direction": {
+      "$ref": "#/$defs/PhenotypeDirection"
+    },
+    "screen_drug": {
+      "minLength": 1,
+      "title": "Screen Drug",
+      "type": "string"
+    },
+    "screen_cell_model": {
+      "minLength": 1,
+      "title": "Screen Cell Model",
+      "type": "string"
+    },
+    "validation_drug": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Validation Drug"
+    },
+    "validation_cell_model": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Validation Cell Model"
+    },
+    "reported_perturbation_modality": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PerturbationModality"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "reported_assay_endpoint": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reported Assay Endpoint"
+    },
+    "source_url": {
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Source Url",
+      "type": "string"
+    },
+    "source_locator": {
+      "minLength": 1,
+      "title": "Source Locator",
+      "type": "string"
+    },
+    "prepared_at_utc": {
+      "format": "date-time",
+      "title": "Prepared At Utc",
+      "type": "string"
+    },
+    "prepared_by_actor_id": {
+      "minLength": 1,
+      "title": "Prepared By Actor Id",
+      "type": "string"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "packet_id",
+    "packet_version",
+    "packet_event_id",
+    "packet_payload_sha256",
+    "batch_id",
+    "source_family_id",
+    "study_id",
+    "screen_id",
+    "contrast_id",
+    "gene_symbol",
+    "screen_predicted_direction",
+    "screen_drug",
+    "screen_cell_model",
+    "source_url",
+    "source_locator",
+    "prepared_at_utc",
+    "prepared_by_actor_id"
+  ],
+  "title": "EventEvidenceCardRecord",
+  "type": "object"
+}

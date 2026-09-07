@@ -48,6 +48,11 @@ from .curation import (
     write_curation_batch,
     write_dual_review_bundle,
 )
+from .event_adjudication import (
+    write_event_review_comparison_bundle,
+    write_event_review_packet,
+    write_final_adjudication_bundle,
+)
 from .features import featurize_count_table, featurize_experimental_design
 from .immuno_context import ImmunoContextResult, summarize_immuno_context
 from .intake import SUPPORTED_POLICY_VERSIONS, triage_orcs_index
@@ -774,6 +779,46 @@ def command_complete_curation_reviews(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_prepare_event_review_packet(args: argparse.Namespace) -> int:
+    manifest = write_event_review_packet(
+        args.evidence_cards,
+        args.actor_registry,
+        args.rubric,
+        args.output_dir,
+        randomization_seed=args.randomization_seed,
+        access_isolation_attested=args.access_isolation_attested,
+        neutral_card_audit_attested=args.neutral_card_audit_attested,
+    )
+    print(json.dumps(manifest, indent=2, sort_keys=True))
+    return 0
+
+
+def command_compare_event_reviews(args: argparse.Namespace) -> int:
+    manifest = write_event_review_comparison_bundle(
+        args.packet_dir,
+        args.primary_reviews,
+        args.secondary_reviews,
+        args.actor_registry,
+        args.output_dir,
+        compared_at_utc=args.compared_at_utc,
+        expected_packet_manifest_sha256=(args.expected_packet_manifest_sha256),
+    )
+    print(json.dumps(manifest, indent=2, sort_keys=True))
+    return 0
+
+
+def command_finalize_event_adjudication(args: argparse.Namespace) -> int:
+    manifest = write_final_adjudication_bundle(
+        args.comparison_bundle_dir,
+        args.adjudications,
+        args.output_dir,
+        released_at_utc=args.released_at_utc,
+        expected_comparison_manifest_sha256=(args.expected_comparison_manifest_sha256),
+    )
+    print(json.dumps(manifest, indent=2, sort_keys=True))
+    return 0
+
+
 def command_ingest_orcs_screen(args: argparse.Namespace) -> int:
     metadata = read_table(args.index_metadata) if args.index_metadata else None
     parsed = parse_orcs_screen_scores(
@@ -996,6 +1041,82 @@ def build_parser() -> argparse.ArgumentParser:
         "--assessed-date", type=date.fromisoformat, required=True
     )
     review_completion.set_defaults(func=command_complete_curation_reviews)
+
+    event_packet = subparsers.add_parser(
+        "prepare-event-review-packet",
+        help=(
+            "freeze a randomized content-filtered packet in an access-isolated "
+            "review workspace"
+        ),
+    )
+    event_packet.add_argument("--evidence-cards", required=True)
+    event_packet.add_argument("--actor-registry", required=True)
+    event_packet.add_argument("--rubric", required=True)
+    event_packet.add_argument("--output-dir", required=True)
+    event_packet.add_argument(
+        "--randomization-seed",
+        required=True,
+        help="secret seed; only its SHA-256 is written to the packet manifest",
+    )
+    event_packet.add_argument(
+        "--access-isolation-attested",
+        action="store_true",
+        required=True,
+        help=(
+            "attest that reviewers cannot access joinable prior-review, "
+            "outcome-aware, or model-output artifacts"
+        ),
+    )
+    event_packet.add_argument(
+        "--neutral-card-audit-attested",
+        action="store_true",
+        required=True,
+        help=(
+            "attest that every distributable card received a manual neutrality "
+            "audit; automated leakage checks alone are insufficient"
+        ),
+    )
+    event_packet.set_defaults(func=command_prepare_event_review_packet)
+
+    event_comparison = subparsers.add_parser(
+        "compare-event-reviews",
+        help="freeze two complete human review streams and agreement statistics",
+    )
+    event_comparison.add_argument("--packet-dir", required=True)
+    event_comparison.add_argument("--primary-reviews", required=True)
+    event_comparison.add_argument("--secondary-reviews", required=True)
+    event_comparison.add_argument("--actor-registry", required=True)
+    event_comparison.add_argument("--output-dir", required=True)
+    event_comparison.add_argument(
+        "--compared-at-utc",
+        type=datetime.fromisoformat,
+        required=True,
+        help="UTC ISO-8601 timestamp, for example 2026-09-04T12:00:00+00:00",
+    )
+    event_comparison.add_argument(
+        "--expected-packet-manifest-sha256",
+        required=True,
+    )
+    event_comparison.set_defaults(func=command_compare_event_reviews)
+
+    event_adjudication = subparsers.add_parser(
+        "finalize-event-adjudication",
+        help="publish named human adjudications and derived validation events",
+    )
+    event_adjudication.add_argument("--comparison-bundle-dir", required=True)
+    event_adjudication.add_argument("--adjudications", required=True)
+    event_adjudication.add_argument("--output-dir", required=True)
+    event_adjudication.add_argument(
+        "--released-at-utc",
+        type=datetime.fromisoformat,
+        required=True,
+        help="UTC ISO-8601 timestamp, for example 2026-09-04T14:00:00+00:00",
+    )
+    event_adjudication.add_argument(
+        "--expected-comparison-manifest-sha256",
+        required=True,
+    )
+    event_adjudication.set_defaults(func=command_finalize_event_adjudication)
 
     rank = subparsers.add_parser(
         "rank-screen",

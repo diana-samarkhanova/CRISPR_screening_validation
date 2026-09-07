@@ -406,6 +406,75 @@ class ReviewComparisonStatus(StrEnum):
     SINGLE_CURATOR_ONLY = "single_curator_only"
 
 
+class CriterionAssessment(StrEnum):
+    """Explicit assessment of one label-driving validation criterion."""
+
+    YES = "yes"
+    NO = "no"
+    UNCLEAR = "unclear"
+    NOT_REPORTED = "not_reported"
+    NOT_APPLICABLE = "not_applicable"
+
+
+class ValidationEventScope(StrEnum):
+    """Whether a card describes an eligible targeted validation event."""
+
+    QUALIFYING_VALIDATION = "qualifying_validation"
+    EXTERNAL_SUPPORT = "external_support"
+    NOT_VALIDATION = "not_validation"
+    UNCLEAR = "unclear"
+
+
+class ValidationContextMatch(StrEnum):
+    """Relationship of the validation context to the linked screen contrast."""
+
+    EXACT = "exact"
+    CLOSE = "close"
+    EXTERNAL = "external"
+    UNCLEAR = "unclear"
+
+
+class ValidationOutcomeRelation(StrEnum):
+    """Observed validation outcome relative to the screen-predicted direction."""
+
+    CONCORDANT = "concordant"
+    OPPOSITE = "opposite"
+    NO_EFFECT = "no_effect"
+    MIXED = "mixed"
+    NOT_INTERPRETABLE = "not_interpretable"
+    NOT_REPORTED = "not_reported"
+
+
+class ReviewConfidence(StrEnum):
+    HIGH = "high"
+    MODERATE = "moderate"
+    LOW = "low"
+
+
+class EventReviewComparisonStatus(StrEnum):
+    """Deterministic relationship between two reviews of one frozen card."""
+
+    FULL_AGREEMENT = "full_agreement"
+    LABEL_AGREEMENT_FACT_DISAGREEMENT = "label_agreement_fact_disagreement"
+    LABEL_DISAGREEMENT = "label_disagreement"
+
+
+class AdjudicationResolutionMethod(StrEnum):
+    THIRD_EXPERT = "third_expert"
+    TWO_REVIEWER_CONSENSUS = "two_reviewer_consensus"
+    AGREEMENT_CONFIRMED = "agreement_confirmed"
+    INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+
+
+class CurationActorType(StrEnum):
+    """Actor class used to distinguish human gold review from automation."""
+
+    HUMAN = "human"
+    AI_SYSTEM = "ai_system"
+    SOFTWARE = "software"
+    HUMAN_AI_TEAM = "human_ai_team"
+
+
 class RunInclusionStatus(StrEnum):
     INCLUDED_DRUG_CONTRAST = "included_drug_contrast"
     EXCLUDED_OTHER_SCREEN = "excluded_other_screen"
@@ -1311,6 +1380,451 @@ class ReviewComparisonRecord(StrictRecord):
         return self
 
 
+_PIPE_TOKEN_PATTERN = r"^[a-z0-9_.-]+(?:\|[a-z0-9_.-]+)*$"
+_SHA256_PATTERN = r"^[0-9a-f]{64}$"
+
+
+def _validate_sorted_pipe_tokens(value: str, *, field_name: str) -> None:
+    tokens = value.split("|")
+    if tokens != sorted(set(tokens)) or any(not token for token in tokens):
+        raise ValueError(
+            f"{field_name} must be non-empty, unique, sorted, and pipe-delimited"
+        )
+
+
+def _validate_utc_datetime(value: datetime, *, field_name: str) -> None:
+    offset = value.utcoffset()
+    if offset is None or offset.total_seconds() != 0:
+        raise ValueError(f"{field_name} must include the UTC timezone")
+
+
+def _validate_event_label_decision(
+    *,
+    label_code: LabelCode,
+    event_scope: ValidationEventScope,
+    context_match: ValidationContextMatch,
+    testing_status: TestingStatus,
+    perturbation_confirmed: CriterionAssessment,
+    independent_reagent_count: int | None,
+    orthogonal_perturbation: CriterionAssessment,
+    appropriate_control: CriterionAssessment,
+    assay_adequate: CriterionAssessment,
+    outcome_relation: ValidationOutcomeRelation,
+    null_result_evaluable: CriterionAssessment,
+    rescue_or_causal_reversal: CriterionAssessment,
+) -> None:
+    """Apply the frozen gold-label rubric to one review or adjudication."""
+
+    primary_labels = {
+        LabelCode.V3,
+        LabelCode.V2,
+        LabelCode.F0,
+        LabelCode.D,
+    }
+    reagent_rule_met = (
+        independent_reagent_count is not None
+        and independent_reagent_count >= 1
+        and (
+            independent_reagent_count >= 2
+            or orthogonal_perturbation == CriterionAssessment.YES
+        )
+    )
+    meets_primary_base_criteria = (
+        event_scope == ValidationEventScope.QUALIFYING_VALIDATION
+        and context_match == ValidationContextMatch.EXACT
+        and testing_status == TestingStatus.TESTED
+        and perturbation_confirmed == CriterionAssessment.YES
+        and appropriate_control == CriterionAssessment.YES
+        and assay_adequate == CriterionAssessment.YES
+        and reagent_rule_met
+    )
+    meets_v2_criteria = (
+        meets_primary_base_criteria
+        and outcome_relation == ValidationOutcomeRelation.CONCORDANT
+    )
+    if label_code == LabelCode.U:
+        if testing_status not in {TestingStatus.NOT_TESTED, TestingStatus.UNKNOWN}:
+            raise ValueError("U requires testing_status=not_tested or unknown")
+        if event_scope not in {
+            ValidationEventScope.NOT_VALIDATION,
+            ValidationEventScope.UNCLEAR,
+        }:
+            raise ValueError("U requires event_scope=not_validation or unclear")
+        affirmative_criteria = {
+            perturbation_confirmed,
+            orthogonal_perturbation,
+            appropriate_control,
+            assay_adequate,
+            null_result_evaluable,
+            rescue_or_causal_reversal,
+        }
+        completed_outcomes = {
+            ValidationOutcomeRelation.CONCORDANT,
+            ValidationOutcomeRelation.OPPOSITE,
+            ValidationOutcomeRelation.NO_EFFECT,
+            ValidationOutcomeRelation.MIXED,
+        }
+        if (
+            CriterionAssessment.YES in affirmative_criteria
+            or (independent_reagent_count or 0) > 0
+            or outcome_relation in completed_outcomes
+        ):
+            raise ValueError("U cannot carry affirmative or completed outcome evidence")
+    elif testing_status != TestingStatus.TESTED:
+        raise ValueError("every non-U event label requires testing_status=tested")
+
+    if event_scope == ValidationEventScope.NOT_VALIDATION and label_code != LabelCode.U:
+        raise ValueError("not_validation scope can only receive label U")
+
+    if label_code in primary_labels:
+        if event_scope != ValidationEventScope.QUALIFYING_VALIDATION:
+            raise ValueError("V2/V3/F0/D require event_scope=qualifying_validation")
+        if context_match != ValidationContextMatch.EXACT:
+            raise ValueError("V2/V3/F0/D require context_match=exact")
+        if perturbation_confirmed != CriterionAssessment.YES:
+            raise ValueError("V2/V3/F0/D require confirmed perturbation")
+        if appropriate_control != CriterionAssessment.YES:
+            raise ValueError("V2/V3/F0/D require an appropriate control")
+        if assay_adequate != CriterionAssessment.YES:
+            raise ValueError("V2/V3/F0/D require an adequate assay")
+        if independent_reagent_count is None or independent_reagent_count < 1:
+            raise ValueError(
+                "V2/V3/F0/D require at least one independent primary reagent"
+            )
+        if not reagent_rule_met:
+            raise ValueError(
+                "V2/V3/F0/D require at least two independent reagents or an "
+                "orthogonal perturbation"
+            )
+
+    if label_code in {LabelCode.V2, LabelCode.V3}:
+        if outcome_relation != ValidationOutcomeRelation.CONCORDANT:
+            raise ValueError("V2/V3 require a concordant outcome")
+    if (
+        label_code == LabelCode.V3
+        and rescue_or_causal_reversal != CriterionAssessment.YES
+    ):
+        raise ValueError("V3 requires successful rescue or causal reversal")
+    if label_code == LabelCode.F0:
+        if outcome_relation != ValidationOutcomeRelation.NO_EFFECT:
+            raise ValueError("F0 requires outcome_relation=no_effect")
+        if null_result_evaluable != CriterionAssessment.YES:
+            raise ValueError("F0 requires an evaluable null result")
+    if (
+        label_code == LabelCode.D
+        and outcome_relation != ValidationOutcomeRelation.OPPOSITE
+    ):
+        raise ValueError("D requires outcome_relation=opposite")
+    if label_code == LabelCode.T and (
+        outcome_relation != ValidationOutcomeRelation.NOT_INTERPRETABLE
+    ):
+        raise ValueError("T requires outcome_relation=not_interpretable")
+    if label_code == LabelCode.V1:
+        if outcome_relation != ValidationOutcomeRelation.CONCORDANT:
+            raise ValueError("V1 requires a concordant outcome")
+        if event_scope not in {
+            ValidationEventScope.QUALIFYING_VALIDATION,
+            ValidationEventScope.EXTERNAL_SUPPORT,
+        }:
+            raise ValueError("V1 requires qualifying or external-support scope")
+        if meets_v2_criteria:
+            higher_label = (
+                "V3" if rescue_or_causal_reversal == CriterionAssessment.YES else "V2"
+            )
+            raise ValueError(
+                f"V1 cannot undergrade an event satisfying {higher_label} criteria"
+            )
+    if label_code == LabelCode.A and meets_v2_criteria:
+        raise ValueError("A cannot undergrade an event satisfying V2 criteria")
+    if (
+        label_code == LabelCode.A
+        and meets_primary_base_criteria
+        and outcome_relation == ValidationOutcomeRelation.OPPOSITE
+    ):
+        raise ValueError("A cannot undergrade an event satisfying D criteria")
+    if (
+        label_code == LabelCode.A
+        and meets_primary_base_criteria
+        and outcome_relation == ValidationOutcomeRelation.NO_EFFECT
+        and null_result_evaluable == CriterionAssessment.YES
+    ):
+        raise ValueError("A cannot undergrade an event satisfying F0 criteria")
+
+
+class CurationActorRecord(StrictRecord):
+    """Declared actor identity; gold reviewers and adjudicators must be human."""
+
+    primary_key = ("actor_id",)
+
+    actor_id: str = Field(min_length=1)
+    actor_type: CurationActorType
+    display_name: str = Field(min_length=1)
+    identity_verified: StrictBool
+    affiliation: str | None = None
+    persistent_id: str | None = None
+    notes: str | None = None
+
+
+class EventEvidenceCardRecord(StrictRecord):
+    """Frozen, label-free evidence card shown identically to both reviewers."""
+
+    primary_key = ("packet_id", "packet_version", "packet_event_id")
+
+    packet_id: str = Field(min_length=1)
+    packet_version: int = Field(ge=1)
+    packet_event_id: str = Field(min_length=1)
+    packet_payload_sha256: str = Field(pattern=_SHA256_PATTERN)
+    batch_id: str = Field(min_length=1)
+    source_family_id: str = Field(min_length=1)
+    study_id: str = Field(min_length=1)
+    screen_id: str = Field(min_length=1)
+    contrast_id: str = Field(min_length=1)
+    gene_symbol: str = Field(min_length=1)
+    screen_predicted_direction: PhenotypeDirection
+    screen_drug: str = Field(min_length=1)
+    screen_cell_model: str = Field(min_length=1)
+    validation_drug: str | None = Field(default=None, min_length=1)
+    validation_cell_model: str | None = Field(default=None, min_length=1)
+    reported_perturbation_modality: PerturbationModality | None = None
+    reported_assay_endpoint: str | None = Field(default=None, min_length=1)
+    source_url: HttpUrl
+    source_locator: str = Field(min_length=1)
+    prepared_at_utc: datetime
+    prepared_by_actor_id: str = Field(min_length=1)
+    notes: str | None = None
+
+    @model_validator(mode="after")
+    def card_is_internally_consistent(self) -> EventEvidenceCardRecord:
+        if self.screen_predicted_direction not in {
+            PhenotypeDirection.RESISTANCE,
+            PhenotypeDirection.SENSITIZATION,
+        }:
+            raise ValueError(
+                "event cards require a resistance or sensitization prediction"
+            )
+        _validate_utc_datetime(self.prepared_at_utc, field_name="prepared_at_utc")
+        return self
+
+
+class EventReviewRecord(StrictRecord):
+    """One independent human assessment of one frozen evidence card."""
+
+    primary_key = ("event_review_id",)
+
+    event_review_id: str = Field(min_length=1)
+    packet_id: str = Field(min_length=1)
+    packet_version: int = Field(ge=1)
+    packet_event_id: str = Field(min_length=1)
+    packet_payload_sha256: str = Field(pattern=_SHA256_PATTERN)
+    review_session_id: str = Field(min_length=1)
+    reviewer_id: str = Field(min_length=1)
+    rubric_version: str = Field(min_length=1)
+    reviewed_at_utc: datetime
+    independence_attested: StrictBool
+    peer_review_blinded: StrictBool
+    model_score_blinded: StrictBool
+    prior_label_blinded: StrictBool
+    event_scope: ValidationEventScope
+    context_match: ValidationContextMatch
+    testing_status: TestingStatus
+    perturbation_confirmed: CriterionAssessment
+    independent_reagent_count: int | None = Field(default=None, ge=0)
+    orthogonal_perturbation: CriterionAssessment
+    appropriate_control: CriterionAssessment
+    assay_adequate: CriterionAssessment
+    outcome_relation: ValidationOutcomeRelation
+    null_result_evaluable: CriterionAssessment
+    rescue_or_causal_reversal: CriterionAssessment
+    proposed_label_code: LabelCode
+    confidence: ReviewConfidence
+    source_locator: str = Field(min_length=1)
+    reason_codes: str = Field(min_length=1, pattern=_PIPE_TOKEN_PATTERN)
+    notes: str | None = None
+
+    @model_validator(mode="after")
+    def review_is_internally_consistent(self) -> EventReviewRecord:
+        attestations = {
+            "independence_attested": self.independence_attested,
+            "peer_review_blinded": self.peer_review_blinded,
+            "model_score_blinded": self.model_score_blinded,
+            "prior_label_blinded": self.prior_label_blinded,
+        }
+        missing = sorted(
+            name for name, value in attestations.items() if value is not True
+        )
+        if missing:
+            raise ValueError(f"gold event review requires true attestations: {missing}")
+        _validate_utc_datetime(self.reviewed_at_utc, field_name="reviewed_at_utc")
+        _validate_sorted_pipe_tokens(self.reason_codes, field_name="reason_codes")
+        _validate_event_label_decision(
+            label_code=self.proposed_label_code,
+            event_scope=self.event_scope,
+            context_match=self.context_match,
+            testing_status=self.testing_status,
+            perturbation_confirmed=self.perturbation_confirmed,
+            independent_reagent_count=self.independent_reagent_count,
+            orthogonal_perturbation=self.orthogonal_perturbation,
+            appropriate_control=self.appropriate_control,
+            assay_adequate=self.assay_adequate,
+            outcome_relation=self.outcome_relation,
+            null_result_evaluable=self.null_result_evaluable,
+            rescue_or_causal_reversal=self.rescue_or_causal_reversal,
+        )
+        return self
+
+
+class EventReviewComparisonRecord(StrictRecord):
+    """Deterministic field-level comparison; it never releases a final label."""
+
+    primary_key = ("comparison_id",)
+
+    comparison_id: str = Field(min_length=1)
+    packet_id: str = Field(min_length=1)
+    packet_version: int = Field(ge=1)
+    packet_event_id: str = Field(min_length=1)
+    packet_payload_sha256: str = Field(pattern=_SHA256_PATTERN)
+    rubric_version: str = Field(min_length=1)
+    primary_review_id: str = Field(min_length=1)
+    secondary_review_id: str = Field(min_length=1)
+    primary_reviewer_id: str = Field(min_length=1)
+    secondary_reviewer_id: str = Field(min_length=1)
+    primary_label_code: LabelCode
+    secondary_label_code: LabelCode
+    label_agreement: StrictBool
+    disagreement_fields: str | None = Field(default=None, pattern=_PIPE_TOKEN_PATTERN)
+    comparison_status: EventReviewComparisonStatus
+    human_adjudication_required: StrictBool
+    compared_at_utc: datetime
+    notes: str | None = None
+
+    @model_validator(mode="after")
+    def comparison_is_internally_consistent(self) -> EventReviewComparisonRecord:
+        if self.primary_review_id == self.secondary_review_id:
+            raise ValueError("event review IDs must differ")
+        if self.primary_reviewer_id == self.secondary_reviewer_id:
+            raise ValueError("event reviewer IDs must differ")
+        if self.human_adjudication_required is not True:
+            raise ValueError("event review comparisons require human adjudication")
+        _validate_utc_datetime(self.compared_at_utc, field_name="compared_at_utc")
+        if self.disagreement_fields is not None:
+            _validate_sorted_pipe_tokens(
+                self.disagreement_fields, field_name="disagreement_fields"
+            )
+
+        labels_agree = self.primary_label_code == self.secondary_label_code
+        if self.label_agreement != labels_agree:
+            raise ValueError("label_agreement does not match reviewer labels")
+        if labels_agree and self.disagreement_fields is None:
+            expected = EventReviewComparisonStatus.FULL_AGREEMENT
+        elif labels_agree:
+            expected = EventReviewComparisonStatus.LABEL_AGREEMENT_FACT_DISAGREEMENT
+        else:
+            if self.disagreement_fields is None:
+                raise ValueError("label disagreement requires disagreement_fields")
+            if "proposed_label_code" not in self.disagreement_fields.split("|"):
+                raise ValueError("label disagreement must include proposed_label_code")
+            expected = EventReviewComparisonStatus.LABEL_DISAGREEMENT
+        if self.comparison_status != expected:
+            raise ValueError("comparison_status does not match review differences")
+        return self
+
+
+class EventAdjudicationRecord(StrictRecord):
+    """Named human adjudication of a complete two-review comparison."""
+
+    primary_key = ("adjudication_id",)
+
+    adjudication_id: str = Field(min_length=1)
+    comparison_id: str = Field(min_length=1)
+    packet_id: str = Field(min_length=1)
+    packet_version: int = Field(ge=1)
+    packet_event_id: str = Field(min_length=1)
+    packet_payload_sha256: str = Field(pattern=_SHA256_PATTERN)
+    primary_review_id: str = Field(min_length=1)
+    secondary_review_id: str = Field(min_length=1)
+    primary_reviewer_id: str = Field(min_length=1)
+    secondary_reviewer_id: str = Field(min_length=1)
+    rubric_version: str = Field(min_length=1)
+    resolution_method: AdjudicationResolutionMethod
+    adjudicator_id: str = Field(min_length=1)
+    co_signer_id: str | None = Field(default=None, min_length=1)
+    adjudicated_at_utc: datetime
+    model_score_blinded: StrictBool
+    final_event_scope: ValidationEventScope
+    final_context_match: ValidationContextMatch
+    final_testing_status: TestingStatus
+    final_perturbation_confirmed: CriterionAssessment
+    final_independent_reagent_count: int | None = Field(default=None, ge=0)
+    final_orthogonal_perturbation: CriterionAssessment
+    final_appropriate_control: CriterionAssessment
+    final_assay_adequate: CriterionAssessment
+    final_outcome_relation: ValidationOutcomeRelation
+    final_null_result_evaluable: CriterionAssessment
+    final_rescue_or_causal_reversal: CriterionAssessment
+    final_label_code: LabelCode
+    final_confidence: ReviewConfidence
+    final_source_locator: str = Field(min_length=1)
+    adjudication_reason_codes: str = Field(min_length=1, pattern=_PIPE_TOKEN_PATTERN)
+    notes: str | None = None
+
+    @model_validator(mode="after")
+    def adjudication_is_internally_consistent(self) -> EventAdjudicationRecord:
+        if self.primary_review_id == self.secondary_review_id:
+            raise ValueError("adjudication requires two distinct event review IDs")
+        reviewer_ids = {self.primary_reviewer_id, self.secondary_reviewer_id}
+        if len(reviewer_ids) != 2:
+            raise ValueError("adjudication requires two distinct human reviewer IDs")
+        if self.model_score_blinded is not True:
+            raise ValueError("adjudication must be blinded to model scores")
+        _validate_utc_datetime(self.adjudicated_at_utc, field_name="adjudicated_at_utc")
+        _validate_sorted_pipe_tokens(
+            self.adjudication_reason_codes,
+            field_name="adjudication_reason_codes",
+        )
+        if (
+            self.resolution_method == AdjudicationResolutionMethod.INSUFFICIENT_EVIDENCE
+            and self.final_label_code
+            in {LabelCode.V2, LabelCode.V3, LabelCode.F0, LabelCode.D}
+        ):
+            raise ValueError(
+                "insufficient_evidence adjudication cannot release V2/V3/F0/D"
+            )
+
+        if (
+            self.resolution_method
+            == AdjudicationResolutionMethod.TWO_REVIEWER_CONSENSUS
+        ):
+            if self.co_signer_id is None:
+                raise ValueError("two-reviewer consensus requires a co-signer")
+            if {self.adjudicator_id, self.co_signer_id} != reviewer_ids:
+                raise ValueError(
+                    "two-reviewer consensus must be signed by both reviewers"
+                )
+        else:
+            if self.adjudicator_id in reviewer_ids:
+                raise ValueError(
+                    "non-consensus adjudicator must differ from both reviewers"
+                )
+            if self.co_signer_id is not None:
+                raise ValueError("only two-reviewer consensus may use a co-signer")
+
+        _validate_event_label_decision(
+            label_code=self.final_label_code,
+            event_scope=self.final_event_scope,
+            context_match=self.final_context_match,
+            testing_status=self.final_testing_status,
+            perturbation_confirmed=self.final_perturbation_confirmed,
+            independent_reagent_count=self.final_independent_reagent_count,
+            orthogonal_perturbation=self.final_orthogonal_perturbation,
+            appropriate_control=self.final_appropriate_control,
+            assay_adequate=self.final_assay_adequate,
+            outcome_relation=self.final_outcome_relation,
+            null_result_evaluable=self.final_null_result_evaluable,
+            rescue_or_causal_reversal=self.final_rescue_or_causal_reversal,
+        )
+        return self
+
+
 class EligibilityCheckRecord(StrictRecord):
     """Auditable result for one intake rule applied to one screen."""
 
@@ -1649,12 +2163,19 @@ _VALIDATION_EVENT_JSON_SCHEMA = {
                     "perturbation_confirmed",
                     "phenotype_reproduced",
                     "appropriate_control",
+                    "assay_adequate",
+                    "independent_reagent_count",
                 ],
                 "properties": {
                     "testing_status": {"const": "tested"},
                     "perturbation_confirmed": {"const": True},
                     "phenotype_reproduced": {"const": True},
                     "appropriate_control": {"const": True},
+                    "assay_adequate": {"const": True},
+                    "independent_reagent_count": {
+                        "type": "integer",
+                        "minimum": 1,
+                    },
                     "opposite_direction_reproduced": {"enum": [False, None]},
                 },
                 "anyOf": [
@@ -1695,16 +2216,40 @@ _VALIDATION_EVENT_JSON_SCHEMA = {
                 "required": [
                     "testing_status",
                     "perturbation_confirmed",
+                    "appropriate_control",
                     "assay_adequate",
+                    "independent_reagent_count",
                     "phenotype_reproduced",
+                    "null_result_evaluable",
                 ],
                 "properties": {
                     "testing_status": {"const": "tested"},
                     "perturbation_confirmed": {"const": True},
+                    "appropriate_control": {"const": True},
                     "assay_adequate": {"const": True},
+                    "independent_reagent_count": {
+                        "type": "integer",
+                        "minimum": 1,
+                    },
                     "phenotype_reproduced": {"const": False},
                     "opposite_direction_reproduced": {"enum": [False, None]},
+                    "null_result_evaluable": {"const": True},
                 },
+                "anyOf": [
+                    {
+                        "required": ["independent_reagent_count"],
+                        "properties": {
+                            "independent_reagent_count": {
+                                "type": "integer",
+                                "minimum": 2,
+                            }
+                        },
+                    },
+                    {
+                        "required": ["orthogonal_perturbation"],
+                        "properties": {"orthogonal_perturbation": {"const": True}},
+                    },
+                ],
             },
         },
         {
@@ -1713,15 +2258,39 @@ _VALIDATION_EVENT_JSON_SCHEMA = {
                 "required": [
                     "testing_status",
                     "perturbation_confirmed",
+                    "appropriate_control",
+                    "assay_adequate",
+                    "independent_reagent_count",
                     "phenotype_reproduced",
                     "opposite_direction_reproduced",
                 ],
                 "properties": {
                     "testing_status": {"const": "tested"},
                     "perturbation_confirmed": {"const": True},
+                    "appropriate_control": {"const": True},
+                    "assay_adequate": {"const": True},
+                    "independent_reagent_count": {
+                        "type": "integer",
+                        "minimum": 1,
+                    },
                     "phenotype_reproduced": {"const": False},
                     "opposite_direction_reproduced": {"const": True},
                 },
+                "anyOf": [
+                    {
+                        "required": ["independent_reagent_count"],
+                        "properties": {
+                            "independent_reagent_count": {
+                                "type": "integer",
+                                "minimum": 2,
+                            }
+                        },
+                    },
+                    {
+                        "required": ["orthogonal_perturbation"],
+                        "properties": {"orthogonal_perturbation": {"const": True}},
+                    },
+                ],
             },
         },
         {
@@ -1733,8 +2302,11 @@ _VALIDATION_EVENT_JSON_SCHEMA = {
                     "perturbation_confirmed": {"enum": [False, None]},
                     "independent_reagent_count": {"enum": [0, None]},
                     "orthogonal_perturbation": {"enum": [False, None]},
+                    "appropriate_control": {"enum": [False, None]},
+                    "assay_adequate": {"enum": [False, None]},
                     "phenotype_reproduced": {"enum": [False, None]},
                     "opposite_direction_reproduced": {"enum": [False, None]},
+                    "null_result_evaluable": {"enum": [False, None]},
                     "rescue_performed": {"enum": [False, None]},
                     "causal_reversal_performed": {"enum": [False, None]},
                     "effect_size": {"type": "null"},
@@ -1786,6 +2358,7 @@ class ValidationEventRecord(StrictRecord):
     orthogonal_perturbation: bool | None = None
     appropriate_control: bool | None = None
     assay_adequate: bool | None = None
+    null_result_evaluable: bool | None = None
     phenotype_reproduced: bool | None = None
     opposite_direction_reproduced: bool | None = None
     rescue_performed: bool | None = None
@@ -1826,25 +2399,34 @@ class ValidationEventRecord(StrictRecord):
                 "predicted and opposite-direction phenotypes cannot both "
                 "be marked reproduced in one event"
             )
-        if self.label_code in {LabelCode.V2, LabelCode.V3}:
+        primary_labels = {LabelCode.V2, LabelCode.V3, LabelCode.F0, LabelCode.D}
+        if self.label_code in primary_labels:
             if self.testing_status != TestingStatus.TESTED:
-                raise ValueError("V2/V3 require testing_status=tested")
+                raise ValueError("V2/V3/F0/D require testing_status=tested")
             if self.perturbation_confirmed is not True:
-                raise ValueError("V2/V3 require confirmed perturbation")
+                raise ValueError("V2/V3/F0/D require confirmed perturbation")
+            if self.appropriate_control is not True:
+                raise ValueError("V2/V3/F0/D require an appropriate control")
+            if self.assay_adequate is not True:
+                raise ValueError("V2/V3/F0/D require an adequate assay")
+            if (
+                self.independent_reagent_count is None
+                or self.independent_reagent_count < 1
+            ):
+                raise ValueError("V2/V3/F0/D require at least one primary reagent")
+            if (
+                self.independent_reagent_count < 2
+                and self.orthogonal_perturbation is not True
+            ):
+                raise ValueError(
+                    "V2/V3/F0/D require at least two independent reagents or an "
+                    "orthogonal perturbation strategy"
+                )
+        if self.label_code in {LabelCode.V2, LabelCode.V3}:
             if self.phenotype_reproduced is not True:
                 raise ValueError("V2/V3 require reproduced phenotype")
             if self.opposite_direction_reproduced is True:
                 raise ValueError("V2/V3 cannot reproduce the opposite direction")
-            if self.appropriate_control is not True:
-                raise ValueError("V2/V3 require an appropriate control")
-            reagent_rule_met = (
-                self.independent_reagent_count or 0
-            ) >= 2 or self.orthogonal_perturbation is True
-            if not reagent_rule_met:
-                raise ValueError(
-                    "V2/V3 require at least two independent reagents or an "
-                    "orthogonal perturbation strategy"
-                )
         if (
             self.label_code == LabelCode.V3
             and self.rescue_performed is not True
@@ -1853,26 +2435,19 @@ class ValidationEventRecord(StrictRecord):
             raise ValueError("V3 requires rescue or equivalent causal reversal")
         if self.label_code == LabelCode.F0:
             if (
-                self.testing_status != TestingStatus.TESTED
-                or self.perturbation_confirmed is not True
-                or self.assay_adequate is not True
-                or self.phenotype_reproduced is not False
+                self.phenotype_reproduced is not False
                 or self.opposite_direction_reproduced is True
+                or self.null_result_evaluable is not True
             ):
                 raise ValueError(
-                    "F0 requires a tested, confirmed perturbation, adequate assay, "
-                    "and non-reproduced phenotype"
+                    "F0 requires no reproduced phenotype and an evaluable null result"
                 )
         if self.label_code == LabelCode.D:
             if (
-                self.testing_status != TestingStatus.TESTED
-                or self.perturbation_confirmed is not True
-                or self.phenotype_reproduced is not False
+                self.phenotype_reproduced is not False
                 or self.opposite_direction_reproduced is not True
             ):
-                raise ValueError(
-                    "D requires confirmed testing with the opposite phenotype"
-                )
+                raise ValueError("D requires a reproduced opposite phenotype")
         if (
             self.label_code == LabelCode.U
             and self.testing_status == TestingStatus.TESTED
@@ -1883,6 +2458,9 @@ class ValidationEventRecord(StrictRecord):
                 self.perturbation_confirmed is True
                 or (self.independent_reagent_count or 0) > 0
                 or self.orthogonal_perturbation is True
+                or self.appropriate_control is True
+                or self.assay_adequate is True
+                or self.null_result_evaluable is True
                 or self.phenotype_reproduced is True
                 or self.opposite_direction_reproduced is True
                 or self.rescue_performed is True
@@ -3433,6 +4011,11 @@ CONTRACTS: dict[str, type[StrictRecord]] = {
     "curation_queue": CurationQueueRecord,
     "full_text_review": FullTextReviewRecord,
     "review_comparison": ReviewComparisonRecord,
+    "curation_actor": CurationActorRecord,
+    "event_evidence_card": EventEvidenceCardRecord,
+    "event_review": EventReviewRecord,
+    "event_review_comparison": EventReviewComparisonRecord,
+    "event_adjudication": EventAdjudicationRecord,
     "run_accession_inventory": RunAccessionInventoryRecord,
     "run_contrast_scope": RunContrastScopeRecord,
     "run_accession_map": RunAccessionMapRecord,
@@ -3504,9 +4087,6 @@ def validate_records(
     return valid, pd.DataFrame(errors)
 
 
-_PRIMARY_VALIDATION_LABELS = frozenset(
-    {LabelCode.V2, LabelCode.V3, LabelCode.F0, LabelCode.D}
-)
 _BENCHMARK_APPROVED_CURATOR_STATUSES = frozenset(
     {
         "approved",
@@ -3515,17 +4095,6 @@ _BENCHMARK_APPROVED_CURATOR_STATUSES = frozenset(
         "approved_for_benchmark",
         "verified_for_benchmark",
         "curated_for_benchmark",
-    }
-)
-_BENCHMARK_ADJUDICATION_STATUSES = frozenset(
-    {
-        "adjudicated",
-        "consensus",
-        "consensus_adjudicated",
-        "double_curated",
-        "dual_curator_consensus",
-        "approved_for_benchmark",
-        "verified_for_benchmark",
     }
 )
 
@@ -3679,17 +4248,6 @@ def _benchmark_fact_failures(
         for contrast_id, gene_symbol in numeric_score_pairs
         if contrast_id is not None and gene_symbol is not None
     }
-    score_directions: dict[tuple[str | None, str | None], set[str | None]] = {}
-    for record in _screen_records(gene_scores, screen_id):
-        pair = (
-            _fact_text(record.get("contrast_id")),
-            _fact_text(record.get("gene_symbol")),
-        )
-        if pair not in numeric_score_pairs:
-            continue
-        score_directions.setdefault(pair, set()).add(
-            _fact_token(record.get("direction"))
-        )
     signal_bearing_contrasts: set[str] = set()
     rights_verified = False
     for asset in _screen_records(data_assets, screen_id):
@@ -3714,44 +4272,10 @@ def _benchmark_fact_failures(
     if not rights_verified:
         failures.append("rights.source_and_raw_data")
 
-    primary_event_present = False
-    for event in _screen_records(validation_events, screen_id):
-        event_contrast = _fact_text(event.get("contrast_id"))
-        event_gene = _fact_text(event.get("gene_symbol"))
-        if (
-            event_contrast not in signal_bearing_contrasts
-            or (
-                event_contrast,
-                event_gene,
-            )
-            not in numeric_score_pairs
-        ):
-            continue
-        directions = score_directions[(event_contrast, event_gene)]
-        event_direction = _fact_token(event.get("phenotype_direction"))
-        if (
-            directions
-            and None not in directions
-            and PhenotypeDirection.UNKNOWN.value not in directions
-            and event_direction not in directions
-        ):
-            continue
-        clean_event = {
-            key: (None if pd.isna(value) else value) for key, value in event.items()
-        }
-        try:
-            parsed = ValidationEventRecord.model_validate(clean_event)
-        except (TypeError, ValueError):
-            continue
-        adjudication_status = _fact_token(parsed.adjudication_status)
-        if (
-            parsed.label_code in _PRIMARY_VALIDATION_LABELS
-            and adjudication_status in _BENCHMARK_ADJUDICATION_STATUSES
-        ):
-            primary_event_present = True
-            break
-    if not primary_event_present:
-        failures.append("labels.adjudicated_validation_event")
+    # Legacy ValidationEventRecord rows and their free-text adjudication_status
+    # remain diagnostic metadata. Until a benchmark screen can link to a validated
+    # Gold adjudication/promotion record, no string token can satisfy this gate.
+    failures.append("labels.adjudicated_validation_event")
     return failures
 
 

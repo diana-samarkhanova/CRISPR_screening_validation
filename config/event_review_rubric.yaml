@@ -1,0 +1,138 @@
+schema_version: 1
+rubric_id: gold_event_review_v1.0.0
+scope: reported_secondary_validation_outcomes_in_crispr_drug_response_screens
+
+review_unit: >-
+  One gene x source screen contrast x validation cell model x validation
+  treatment x perturbation strategy x assay family. Materially different
+  models, treatments, perturbations, or endpoints are separate events.
+
+blinding:
+  required:
+    - independent_review_attested
+    - co_reviewer_decision_blinded
+    - model_score_blinded
+    - ai_label_blinded
+  description: >-
+    Gene identity, treatment, cell context, and the frozen screen-predicted
+    direction remain visible because they are required to determine concordant
+    versus opposite validation. The process is prediction-blinded and
+    co-reviewer-blinded, not fully outcome-blinded.
+
+criterion_values:
+  - yes
+  - no
+  - unclear
+  - not_reported
+  - not_applicable
+
+primary_positive: [V2, V3]
+primary_negative: [F0, D]
+auxiliary_or_missing: [V1, A, T, U]
+
+labels:
+  V3:
+    meaning: causal_validation
+    requires:
+      - qualifying_validation_scope
+      - exact_context_match
+      - testing_status_tested
+      - perturbation_confirmed
+      - appropriate_control
+      - assay_adequate
+      - concordant_outcome
+      - at_least_one_primary_reagent
+      - at_least_two_independent_reagents_or_orthogonal_perturbation
+      - successful_rescue_or_causal_reversal
+  V2:
+    meaning: independent_reproduction
+    requires:
+      - qualifying_validation_scope
+      - exact_context_match
+      - testing_status_tested
+      - perturbation_confirmed
+      - appropriate_control
+      - assay_adequate
+      - concordant_outcome
+      - at_least_one_primary_reagent
+      - at_least_two_independent_reagents_or_orthogonal_perturbation
+  V1:
+    meaning: supportive_but_incomplete
+    requires:
+      - testing_status_tested
+      - concordant_outcome
+    excludes_from_primary_target: true
+  F0:
+    meaning: adequate_failure_to_reproduce
+    requires:
+      - qualifying_validation_scope
+      - exact_context_match
+      - testing_status_tested
+      - perturbation_confirmed
+      - appropriate_control
+      - assay_adequate
+      - no_effect_outcome
+      - null_result_evaluable
+      - at_least_one_primary_reagent
+      - at_least_two_independent_reagents_or_orthogonal_perturbation
+  D:
+    meaning: verified_opposite_direction
+    requires:
+      - qualifying_validation_scope
+      - exact_context_match
+      - testing_status_tested
+      - perturbation_confirmed
+      - appropriate_control
+      - assay_adequate
+      - opposite_outcome
+      - at_least_one_primary_reagent
+      - at_least_two_independent_reagents_or_orthogonal_perturbation
+  A:
+    meaning: ambiguous
+    excludes_from_primary_target: true
+  T:
+    meaning: technical_failure
+    requires:
+      - testing_status_tested
+      - outcome_not_interpretable
+    excludes_from_primary_target: true
+  U:
+    meaning: untested_or_unknown
+    requires:
+      - testing_status_not_tested_or_unknown
+      - event_scope_not_validation_or_unclear
+    excludes_from_primary_target: true
+
+prohibited_in_blinded_packet:
+  - ai_label
+  - candidate_v1
+  - candidate_v2
+  - candidate_v3
+  - comparison_status
+  - curator_a_decision
+  - evidencerank
+  - label_code
+  - mageck_rank
+  - model_score
+  - predicted_probability
+  - validation_success_estimate
+
+interpretation_guards:
+  - absence_from_validation_section_is_U_not_F0
+  - p_value_above_threshold_alone_is_not_F0
+  - failed_perturbation_or_assay_is_T_not_F0
+  - one_reagent_in_multiple_wells_is_one_reagent
+  - multiple_clones_from_one_sgrna_are_one_reagent_strategy
+  - different_cell_or_drug_context_cannot_create_primary_F0_or_D
+  - mechanistic_readout_without_drug_response_endpoint_is_nonqualifying
+  - generic_fitness_without_matched_vehicle_is_not_drug_resistance
+  - qrt_pcr_alone_usually_does_not_confirm_functional_crispr_KO
+  - auxiliary_labels_cannot_undergrade_events_meeting_primary_label_rules
+
+release_policy:
+  exact_reviewer_agreement_is_not_a_released_label: true
+  named_human_adjudication_required: true
+  reviewer_submissions_are_immutable: true
+  amendments_are_separate_and_versioned: true
+  insufficient_evidence_cannot_release_primary_label: true
+  benchmark_ready_is_never_created_by_review_or_adjudication: true

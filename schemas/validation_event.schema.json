@@ -157,6 +157,13 @@
           "appropriate_control": {
             "const": true
           },
+          "assay_adequate": {
+            "const": true
+          },
+          "independent_reagent_count": {
+            "minimum": 1,
+            "type": "integer"
+          },
           "opposite_direction_reproduced": {
             "enum": [
               false,
@@ -168,7 +175,9 @@
           "testing_status",
           "perturbation_confirmed",
           "phenotype_reproduced",
-          "appropriate_control"
+          "appropriate_control",
+          "assay_adequate",
+          "independent_reagent_count"
         ]
       }
     },
@@ -214,6 +223,29 @@
         }
       },
       "then": {
+        "anyOf": [
+          {
+            "properties": {
+              "independent_reagent_count": {
+                "minimum": 2,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "independent_reagent_count"
+            ]
+          },
+          {
+            "properties": {
+              "orthogonal_perturbation": {
+                "const": true
+              }
+            },
+            "required": [
+              "orthogonal_perturbation"
+            ]
+          }
+        ],
         "properties": {
           "testing_status": {
             "const": "tested"
@@ -221,8 +253,15 @@
           "perturbation_confirmed": {
             "const": true
           },
+          "appropriate_control": {
+            "const": true
+          },
           "assay_adequate": {
             "const": true
+          },
+          "independent_reagent_count": {
+            "minimum": 1,
+            "type": "integer"
           },
           "phenotype_reproduced": {
             "const": false
@@ -232,13 +271,19 @@
               false,
               null
             ]
+          },
+          "null_result_evaluable": {
+            "const": true
           }
         },
         "required": [
           "testing_status",
           "perturbation_confirmed",
+          "appropriate_control",
           "assay_adequate",
-          "phenotype_reproduced"
+          "independent_reagent_count",
+          "phenotype_reproduced",
+          "null_result_evaluable"
         ]
       }
     },
@@ -251,12 +296,45 @@
         }
       },
       "then": {
+        "anyOf": [
+          {
+            "properties": {
+              "independent_reagent_count": {
+                "minimum": 2,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "independent_reagent_count"
+            ]
+          },
+          {
+            "properties": {
+              "orthogonal_perturbation": {
+                "const": true
+              }
+            },
+            "required": [
+              "orthogonal_perturbation"
+            ]
+          }
+        ],
         "properties": {
           "testing_status": {
             "const": "tested"
           },
           "perturbation_confirmed": {
             "const": true
+          },
+          "appropriate_control": {
+            "const": true
+          },
+          "assay_adequate": {
+            "const": true
+          },
+          "independent_reagent_count": {
+            "minimum": 1,
+            "type": "integer"
           },
           "phenotype_reproduced": {
             "const": false
@@ -268,6 +346,9 @@
         "required": [
           "testing_status",
           "perturbation_confirmed",
+          "appropriate_control",
+          "assay_adequate",
+          "independent_reagent_count",
           "phenotype_reproduced",
           "opposite_direction_reproduced"
         ]
@@ -307,6 +388,18 @@
               null
             ]
           },
+          "appropriate_control": {
+            "enum": [
+              false,
+              null
+            ]
+          },
+          "assay_adequate": {
+            "enum": [
+              false,
+              null
+            ]
+          },
           "phenotype_reproduced": {
             "enum": [
               false,
@@ -314,6 +407,12 @@
             ]
           },
           "opposite_direction_reproduced": {
+            "enum": [
+              false,
+              null
+            ]
+          },
+          "null_result_evaluable": {
             "enum": [
               false,
               null
@@ -489,6 +588,18 @@
       ],
       "default": null,
       "title": "Assay Adequate"
+    },
+    "null_result_evaluable": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Null Result Evaluable"
     },
     "phenotype_reproduced": {
       "anyOf": [

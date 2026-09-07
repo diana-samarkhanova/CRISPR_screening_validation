@@ -4,19 +4,25 @@ labels:
     name: causal_validation
     model_role: positive
     minimum_requirements:
+      - testing_status_tested
       - perturbation_confirmed
       - phenotype_reproduced
-      - at_least_two_independent_reagents_or_orthogonal_perturbation
       - appropriate_control
+      - assay_adequate
+      - at_least_one_primary_reagent
+      - at_least_two_independent_reagents_or_orthogonal_perturbation
       - rescue_or_equivalent_causal_reversal
   V2:
     name: reproduced
     model_role: positive
     minimum_requirements:
+      - testing_status_tested
       - perturbation_confirmed
       - phenotype_reproduced
-      - at_least_two_independent_reagents_or_orthogonal_perturbation
       - appropriate_control
+      - assay_adequate
+      - at_least_one_primary_reagent
+      - at_least_two_independent_reagents_or_orthogonal_perturbation
   V1:
     name: supportive
     model_role: unlabeled
@@ -25,14 +31,25 @@ labels:
     name: failed_validation
     model_role: negative
     minimum_requirements:
+      - testing_status_tested
       - perturbation_confirmed
+      - appropriate_control
       - assay_adequate
+      - at_least_one_primary_reagent
+      - at_least_two_independent_reagents_or_orthogonal_perturbation
       - phenotype_not_reproduced
+      - null_result_evaluable
   D:
     name: discordant
     model_role: negative
     minimum_requirements:
+      - testing_status_tested
       - perturbation_confirmed
+      - appropriate_control
+      - assay_adequate
+      - at_least_one_primary_reagent
+      - at_least_two_independent_reagents_or_orthogonal_perturbation
+      - phenotype_not_reproduced
       - opposite_direction_reproduced
   A:
     name: ambiguous
@@ -77,7 +94,9 @@ validation_protocol_policy:
   purpose: label_adjudication_and_reporting
   success_model_feature_use: prohibited_unless_declared_before_prediction
   draft_status: single_curator
-  benchmark_ready_statuses:
+  status_strings_are_diagnostic_only: true
+  linked_gold_promotion_required: true
+  legacy_diagnostic_statuses:
     - adjudicated
     - consensus
     - consensus_adjudicated

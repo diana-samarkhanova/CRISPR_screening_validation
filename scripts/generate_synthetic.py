@@ -756,6 +756,7 @@ def main() -> None:
                         "orthogonal_perturbation": False,
                         "appropriate_control": not technical,
                         "assay_adequate": not technical,
+                        "null_result_evaluable": True if label == "F0" else None,
                         "phenotype_reproduced": (
                             True
                             if positive or supportive

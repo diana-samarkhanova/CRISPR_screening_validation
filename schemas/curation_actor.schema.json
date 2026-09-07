@@ -1,0 +1,80 @@
+{
+  "$defs": {
+    "CurationActorType": {
+      "description": "Actor class used to distinguish human gold review from automation.",
+      "enum": [
+        "human",
+        "ai_system",
+        "software",
+        "human_ai_team"
+      ],
+      "title": "CurationActorType",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Declared actor identity; gold reviewers and adjudicators must be human.",
+  "properties": {
+    "actor_id": {
+      "minLength": 1,
+      "title": "Actor Id",
+      "type": "string"
+    },
+    "actor_type": {
+      "$ref": "#/$defs/CurationActorType"
+    },
+    "display_name": {
+      "minLength": 1,
+      "title": "Display Name",
+      "type": "string"
+    },
+    "identity_verified": {
+      "title": "Identity Verified",
+      "type": "boolean"
+    },
+    "affiliation": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Affiliation"
+    },
+    "persistent_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Persistent Id"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "actor_id",
+    "actor_type",
+    "display_name",
+    "identity_verified"
+  ],
+  "title": "CurationActorRecord",
+  "type": "object"
+}

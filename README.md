@@ -29,6 +29,9 @@ foundation. The project includes:
   validation events, and external evidence;
 - an explicit validation-label ontology (`V3`, `V2`, `V1`, `F0`, `D`, `A`,
   `T`, `U`);
+- a checksum-bound event-level Gold workflow for randomized review packets,
+  two independent human reviews, field-level comparison, and separately
+  recorded named-human adjudication;
 - raw-count validation, robust median-ratio normalization, and guide-to-gene
   feature extraction;
 - a self-contained `rank-screen` bundle for MAGeCK summaries, count tables, or
@@ -80,6 +83,108 @@ metadata.
 All ten screens remain `metadata_only` because count ingestion/QC, rights,
 sample mapping, and/or adjudication are incomplete. Candidate validation
 grades are stored downstream of selection and are not training labels.
+
+### Event-level Gold review
+
+The event-level workflow is infrastructure for creating a Gold validation set;
+it is not evidence that a real Gold set already exists. The checked-in
+event-level records used by automated tests are artificial. No real human
+review packet, adjudicated biological label set, or `benchmark_ready` screen is
+released by this repository checkpoint.
+
+`prepare-event-review-packet` creates one randomized, checksum-bound **core
+table bundle** shown identically to Curators A and B. Its four generated files
+are:
+
+- `event_evidence_packet.tsv`: frozen event cards with packet-event IDs,
+  source/study/screen/contrast linkage, gene, the screen-predicted direction,
+  screen drug and cell model, reported validation context, and exact source URL
+  and locator;
+- `event_review_template.tsv`: the same event roster with all review decisions
+  blank;
+- `event_review_rubric.yaml`: the frozen label and decision rules; and
+- `event_packet_manifest.json`: record, roster, input, output, randomization,
+  and blinding checksums. Only the seed hash is recorded.
+
+Do not send those four files as the complete Curator B handoff. The operational
+packet must additionally contain the frozen handbook/workbook, complete source
+index, lawful full text and supplements (or access-controlled immutable source
+snapshot), source version/checksums, and the human independence/identity/COI
+declaration. These access-controlled materials remain outside this repository
+and the four-file writer; the coordinator must checksum-bind them in the
+operational batch manifest.
+
+The packet content excludes model predictions, prior labels, and co-reviewer
+decisions, but this is **procedural prediction and co-reviewer blinding**, not
+full outcome blinding or cryptographic non-disclosure. Gene identity,
+treatment context, the frozen screen-predicted direction, and joinable source
+identifiers remain visible because the reviewer must verify the cited source
+and judge concordant versus opposite validation. Curator B must therefore work
+in an access-isolated workspace without repository, confidential-crosswalk,
+or legacy-curation access. Curator B must not receive Curator A's review,
+comparison or adjudication output, EvidenceRank/model predictions, MAGeCK rank
+or score, prior/proposed/final labels, `benchmark_ready`, or unstructured
+pipeline notes. The actor registry is checksum-bound input but is not copied
+into the distributable packet. Automated text guards catch obvious leakage,
+but cannot prove that prose is cognitively neutral; packet preparation
+therefore also requires a recorded coordinator attestation that every card was
+manually audited for judgment-bearing text.
+
+Both review streams must cover the same frozen packet and come from distinct,
+verified human reviewers working in separate sessions. Their comparison
+reports exact and field-level agreement, a confusion matrix, Cohen's kappa,
+and Gwet's AC1, but it releases no final label. **Named human adjudication is
+required for every event, including exact reviewer agreement.** Finalization
+requires complete named-human adjudication of the frozen comparison, preserves
+its audit lineage, and derives validation-event records. The actor registry and
+attestation fields are audit metadata, not digital-signature verification.
+The workflow never creates or promotes `benchmark_ready`; screen readiness
+remains a separate registry
+decision requiring all design, quantitative-data, rights, family, sample-map,
+and label gates.
+
+The three implemented CLI stages are shown below. Set
+`EVENT_PACKET_RANDOMIZATION_SEED` to a batch-specific secret outside Git before
+preparing the packet.
+
+```bash
+crispr-evidencerank prepare-event-review-packet \
+  --evidence-cards ../curation-secure/batch_001/evidence_cards.tsv \
+  --actor-registry ../curation-secure/curation_actors.tsv \
+  --rubric config/event_review_rubric.yaml \
+  --randomization-seed "$EVENT_PACKET_RANDOMIZATION_SEED" \
+  --access-isolation-attested \
+  --neutral-card-audit-attested \
+  --output-dir ../curation-secure/batch_001/reviewer_packet
+
+PACKET_MANIFEST_SHA256=$(sha256sum \
+  ../curation-secure/batch_001/reviewer_packet/event_packet_manifest.json \
+  | cut -d ' ' -f 1)
+crispr-evidencerank compare-event-reviews \
+  --packet-dir ../curation-secure/batch_001/reviewer_packet \
+  --primary-reviews ../curation-secure/batch_001/curator_a.tsv \
+  --secondary-reviews ../curation-secure/batch_001/curator_b.tsv \
+  --actor-registry ../curation-secure/curation_actors.tsv \
+  --compared-at-utc 2026-09-04T12:00:00+00:00 \
+  --expected-packet-manifest-sha256 "$PACKET_MANIFEST_SHA256" \
+  --output-dir ../curation-secure/batch_001/comparison
+
+COMPARISON_MANIFEST_SHA256=$(sha256sum \
+  ../curation-secure/batch_001/comparison/event_review_comparison_manifest.json \
+  | cut -d ' ' -f 1)
+crispr-evidencerank finalize-event-adjudication \
+  --comparison-bundle-dir ../curation-secure/batch_001/comparison \
+  --adjudications ../curation-secure/batch_001/signed_adjudications.tsv \
+  --released-at-utc 2026-09-04T14:00:00+00:00 \
+  --expected-comparison-manifest-sha256 "$COMPARISON_MANIFEST_SHA256" \
+  --output-dir ../curation-secure/batch_001/final
+```
+
+These paths deliberately place operational curation outside the repository.
+Private source PDFs, copied figures, source workbooks, completed reviewer
+forms, and access-controlled extracts must remain outside Git. Git may retain
+the protocol, schemas, code, artificial/synthetic fixtures, lawful source
+links and locators, and only those derived records approved for release.
 
 Development from v0.2 onward is versioned in a private GitHub repository.
 Public visibility is a later release gate, not a prerequisite for using Git

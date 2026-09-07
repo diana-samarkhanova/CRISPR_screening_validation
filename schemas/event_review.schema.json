@@ -1,0 +1,252 @@
+{
+  "$defs": {
+    "CriterionAssessment": {
+      "description": "Explicit assessment of one label-driving validation criterion.",
+      "enum": [
+        "yes",
+        "no",
+        "unclear",
+        "not_reported",
+        "not_applicable"
+      ],
+      "title": "CriterionAssessment",
+      "type": "string"
+    },
+    "LabelCode": {
+      "description": "Evidence labels for an individual validation event.",
+      "enum": [
+        "V3",
+        "V2",
+        "V1",
+        "F0",
+        "D",
+        "A",
+        "T",
+        "U"
+      ],
+      "title": "LabelCode",
+      "type": "string"
+    },
+    "ReviewConfidence": {
+      "enum": [
+        "high",
+        "moderate",
+        "low"
+      ],
+      "title": "ReviewConfidence",
+      "type": "string"
+    },
+    "TestingStatus": {
+      "enum": [
+        "tested",
+        "not_tested",
+        "unknown"
+      ],
+      "title": "TestingStatus",
+      "type": "string"
+    },
+    "ValidationContextMatch": {
+      "description": "Relationship of the validation context to the linked screen contrast.",
+      "enum": [
+        "exact",
+        "close",
+        "external",
+        "unclear"
+      ],
+      "title": "ValidationContextMatch",
+      "type": "string"
+    },
+    "ValidationEventScope": {
+      "description": "Whether a card describes an eligible targeted validation event.",
+      "enum": [
+        "qualifying_validation",
+        "external_support",
+        "not_validation",
+        "unclear"
+      ],
+      "title": "ValidationEventScope",
+      "type": "string"
+    },
+    "ValidationOutcomeRelation": {
+      "description": "Observed validation outcome relative to the screen-predicted direction.",
+      "enum": [
+        "concordant",
+        "opposite",
+        "no_effect",
+        "mixed",
+        "not_interpretable",
+        "not_reported"
+      ],
+      "title": "ValidationOutcomeRelation",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One independent human assessment of one frozen evidence card.",
+  "properties": {
+    "event_review_id": {
+      "minLength": 1,
+      "title": "Event Review Id",
+      "type": "string"
+    },
+    "packet_id": {
+      "minLength": 1,
+      "title": "Packet Id",
+      "type": "string"
+    },
+    "packet_version": {
+      "minimum": 1,
+      "title": "Packet Version",
+      "type": "integer"
+    },
+    "packet_event_id": {
+      "minLength": 1,
+      "title": "Packet Event Id",
+      "type": "string"
+    },
+    "packet_payload_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Packet Payload Sha256",
+      "type": "string"
+    },
+    "review_session_id": {
+      "minLength": 1,
+      "title": "Review Session Id",
+      "type": "string"
+    },
+    "reviewer_id": {
+      "minLength": 1,
+      "title": "Reviewer Id",
+      "type": "string"
+    },
+    "rubric_version": {
+      "minLength": 1,
+      "title": "Rubric Version",
+      "type": "string"
+    },
+    "reviewed_at_utc": {
+      "format": "date-time",
+      "title": "Reviewed At Utc",
+      "type": "string"
+    },
+    "independence_attested": {
+      "title": "Independence Attested",
+      "type": "boolean"
+    },
+    "peer_review_blinded": {
+      "title": "Peer Review Blinded",
+      "type": "boolean"
+    },
+    "model_score_blinded": {
+      "title": "Model Score Blinded",
+      "type": "boolean"
+    },
+    "prior_label_blinded": {
+      "title": "Prior Label Blinded",
+      "type": "boolean"
+    },
+    "event_scope": {
+      "$ref": "#/$defs/ValidationEventScope"
+    },
+    "context_match": {
+      "$ref": "#/$defs/ValidationContextMatch"
+    },
+    "testing_status": {
+      "$ref": "#/$defs/TestingStatus"
+    },
+    "perturbation_confirmed": {
+      "$ref": "#/$defs/CriterionAssessment"
+    },
+    "independent_reagent_count": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Independent Reagent Count"
+    },
+    "orthogonal_perturbation": {
+      "$ref": "#/$defs/CriterionAssessment"
+    },
+    "appropriate_control": {
+      "$ref": "#/$defs/CriterionAssessment"
+    },
+    "assay_adequate": {
+      "$ref": "#/$defs/CriterionAssessment"
+    },
+    "outcome_relation": {
+      "$ref": "#/$defs/ValidationOutcomeRelation"
+    },
+    "null_result_evaluable": {
+      "$ref": "#/$defs/CriterionAssessment"
+    },
+    "rescue_or_causal_reversal": {
+      "$ref": "#/$defs/CriterionAssessment"
+    },
+    "proposed_label_code": {
+      "$ref": "#/$defs/LabelCode"
+    },
+    "confidence": {
+      "$ref": "#/$defs/ReviewConfidence"
+    },
+    "source_locator": {
+      "minLength": 1,
+      "title": "Source Locator",
+      "type": "string"
+    },
+    "reason_codes": {
+      "minLength": 1,
+      "pattern": "^[a-z0-9_.-]+(?:\\|[a-z0-9_.-]+)*$",
+      "title": "Reason Codes",
+      "type": "string"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "event_review_id",
+    "packet_id",
+    "packet_version",
+    "packet_event_id",
+    "packet_payload_sha256",
+    "review_session_id",
+    "reviewer_id",
+    "rubric_version",
+    "reviewed_at_utc",
+    "independence_attested",
+    "peer_review_blinded",
+    "model_score_blinded",
+    "prior_label_blinded",
+    "event_scope",
+    "context_match",
+    "testing_status",
+    "perturbation_confirmed",
+    "orthogonal_perturbation",
+    "appropriate_control",
+    "assay_adequate",
+    "outcome_relation",
+    "null_result_evaluable",
+    "rescue_or_causal_reversal",
+    "proposed_label_code",
+    "confidence",
+    "source_locator",
+    "reason_codes"
+  ],
+  "title": "EventReviewRecord",
+  "type": "object"
+}

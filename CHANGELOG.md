@@ -84,7 +84,46 @@ suffix and are not claims of a trained biological model.
   current lack of a redistributable frozen ICRAFT export, and remaining
   limitations.
 
-## Unreleased — ORCS 2.0.18 intake checkpoint
+## Unreleased
+
+### Gold validation-event curation
+
+- Added strict contracts and checksum-bound atomic stages for frozen event
+  cards, verified human actors, two independent human reviews, field-level
+  comparison and agreement statistics, named-human adjudication with recorded
+  attestations, and derived validation-event records.
+- Added `prepare-event-review-packet`, `compare-event-reviews`, and
+  `finalize-event-adjudication`. Each downstream stage requires the exact
+  predecessor-manifest SHA-256, complete event-roster coverage, and immutable
+  packet version/payload linkage.
+- Limited the generated four-file core bundle to randomized source-located
+  evidence cards, a blank review template, the frozen rubric, and a checksum
+  manifest. Its content excludes model/EvidenceRank predictions, prior labels,
+  and co-reviewer decisions; the screen-predicted direction remains visible so
+  concordant and opposite outcomes can be judged.
+- Kept all reviewer agreement provisional. Every event, including exact
+  agreement, requires named human adjudication; comparison alone cannot emit a
+  final validation label.
+- Limited finalization's scientific label output to derived validation-event
+  records while preserving its audit lineage and named adjudications. It
+  cannot emit or promote `benchmark_ready`; screen readiness still requires
+  the separate registry gates.
+- Kept the checked-in event-level examples and tests artificial/synthetic.
+  Real source PDFs, copied figures, private workbooks, completed review forms,
+  and access-controlled curation bundles remain outside Git.
+- Made the packet's blinding boundary explicit: joinable source identifiers
+  require a coordinator-attested, access-isolated reviewer workspace. Actor
+  identity and declaration fields are audit attestations, not cryptographic
+  signature verification.
+- Required a coordinator's manual neutral-card audit attestation in addition
+  to lexical leakage guards; neither mechanism is described as proof of
+  cognitive blinding.
+- Classified the generated four-file output as the core table bundle, not a
+  complete reviewer handoff: frozen sources/source index and the human
+  identity, independence, and conflict declaration remain required external
+  checksum-bound inputs.
+
+### ORCS 2.0.18 intake checkpoint
 
 - Pinned the human-screen intake to BioGRID ORCS `2.0.18`, compiled on
   `2025-09-09` and publicly available on `2025-10-07`, with a separate actual
