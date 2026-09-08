@@ -2,6 +2,14 @@
 
 Updated: 2026-09-01
 
+Post-checkpoint update (2026-09-08): executable nested model selection,
+development-only final configuration selection, frozen KO inference and paired
+prospective target allocation are now implemented. See
+[CODE_TO_WETLAB.md](CODE_TO_WETLAB.md) for commands, semantics and remaining gaps.
+These additions do not change the absence of a real adjudicated model/benchmark
+release described below. Current verification belongs to the relevant commit
+and CI record, not the historical checkpoint's numeric examples.
+
 The v0.5 checkpoint retains the v0.2 design contract described below, the
 checksum-bound screen, immune-context, and clinical treatment-by-cancer report
 engines, and adds a separate frozen ClinicalTrials.gov API intake. These are

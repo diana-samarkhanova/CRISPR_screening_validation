@@ -78,6 +78,7 @@ from .orcs import parse_orcs_index, parse_orcs_screen_scores
 from .orcs_prepare import prepare_orcs_release
 from .orcs_release import load_orcs_release_spec
 from .screen_report import ScreenReportResult, rank_screen
+from .workflow_cli import add_workflow_parsers
 
 
 def _write_frame(frame: pd.DataFrame, path: str | Path) -> None:
@@ -1280,6 +1281,7 @@ def command_freeze_model(args: argparse.Namespace) -> int:
         source_family_column=args.source_family_column,
         raw_family_column=args.raw_family_column,
         model_kind=args.model_kind,
+        logistic_c=args.logistic_c,
         random_state=args.random_state,
         propensity_clip=(
             args.propensity_clip_lower,
@@ -1862,6 +1864,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="logistic",
     )
     freeze_model.add_argument("--random-state", type=int, default=17)
+    freeze_model.add_argument("--logistic-c", type=float, default=1.0)
     freeze_model.add_argument("--propensity-clip-lower", type=float, default=0.1)
     freeze_model.add_argument("--propensity-clip-upper", type=float, default=0.95)
     freeze_model.set_defaults(func=command_freeze_model)
@@ -1879,6 +1882,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     verify_frozen_model.set_defaults(func=command_verify_frozen_model)
+    add_workflow_parsers(subparsers)
     return parser
 
 

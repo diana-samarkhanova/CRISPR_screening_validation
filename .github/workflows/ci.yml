@@ -120,3 +120,10 @@ jobs:
           test -s /tmp/clinical-context/clinical_context_studies.tsv
           test -s /tmp/clinical-context/clinical_context_used_assets.tsv
           test -s /tmp/clinical-context/summary.json
+
+      - name: Run installed prospective workflow on synthetic data
+        env:
+          CRISPR_EVIDENCERANK_BUILD_REVISION: ${{ github.sha }}
+          OMP_NUM_THREADS: "1"
+          OPENBLAS_NUM_THREADS: "1"
+        run: .venv/bin/python scripts/smoke_prospective.py --output-dir /tmp/prospective-smoke

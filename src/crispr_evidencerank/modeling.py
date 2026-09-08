@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from numbers import Real
 
 import numpy as np
 import pandas as pd
@@ -130,6 +131,12 @@ FORBIDDEN_SUCCESS_FEATURES = {
 
 
 def validate_success_feature_columns(feature_columns: list[str]) -> None:
+    if not feature_columns or any(
+        not isinstance(column, str) or not column.strip() for column in feature_columns
+    ):
+        raise ValueError("success-model features must be nonempty column names")
+    if len(set(feature_columns)) != len(feature_columns):
+        raise ValueError("success-model features must not contain duplicate columns")
     forbidden_tokens = (
         "report_only",
         "validation",
@@ -262,6 +269,10 @@ class WeightedMedianStandardizer(BaseEstimator, TransformerMixin):
         self.scale_ = np.sqrt(variance)
         self.scale_[self.scale_ == 0] = 1.0
         self.n_features_in_ = values.shape[1]
+        if isinstance(x, pd.DataFrame):
+            self.feature_names_in_ = np.asarray(x.columns, dtype=object)
+        elif hasattr(self, "feature_names_in_"):
+            del self.feature_names_in_
         return self
 
     def _impute_and_augment(self, values: np.ndarray) -> np.ndarray:
@@ -279,6 +290,9 @@ class WeightedMedianStandardizer(BaseEstimator, TransformerMixin):
         self,
         x: pd.DataFrame | np.ndarray,
     ) -> np.ndarray:
+        if isinstance(x, pd.DataFrame) and hasattr(self, "feature_names_in_"):
+            if list(x.columns) != list(self.feature_names_in_):
+                raise ValueError("preprocessor feature names or order differ from fit")
         values = np.asarray(x, dtype=float)
         if values.ndim != 2 or values.shape[1] != self.n_features_in_:
             raise ValueError("preprocessor input has incompatible shape")
@@ -287,7 +301,24 @@ class WeightedMedianStandardizer(BaseEstimator, TransformerMixin):
 
 
 def _prepare_direction_features(frame: pd.DataFrame) -> pd.DataFrame:
+    """Align source-native LFC to the candidate's biological direction.
+
+    A declared ``positive_lfc_means`` is row-specific and must be complete.
+    Legacy tables without this column retain the historical convention that
+    positive LFC means resistance. New deployment inputs should declare it
+    explicitly; comparator names alone cannot determine the correct sign.
+    """
+
     result = frame.copy()
+    native_sign = pd.Series(1.0, index=result.index)
+    if "positive_lfc_means" in result:
+        declaration = result["positive_lfc_means"]
+        if not declaration.isin(["resistance", "sensitization"]).all():
+            raise ValueError(
+                "positive_lfc_means must contain only complete resistance or "
+                "sensitization declarations"
+            )
+        native_sign = declaration.map({"resistance": 1.0, "sensitization": -1.0})
     required = {
         "phenotype_direction",
         "signal_direction",
@@ -305,10 +336,10 @@ def _prepare_direction_features(frame: pd.DataFrame) -> pd.DataFrame:
             }
         )
         result["direction_aligned_median_guide_lfc"] = (
-            result["median_guide_lfc"] * expected_sign
+            result["median_guide_lfc"] * native_sign * expected_sign
         )
         result["direction_aligned_mean_guide_lfc"] = (
-            result["mean_guide_lfc"] * expected_sign
+            result["mean_guide_lfc"] * native_sign * expected_sign
         )
         result["direction_signal_agreement"] = (
             (
@@ -338,16 +369,8 @@ def _preflight_candidate_frame(
         raise ValueError(f"model frame is missing candidate fields: {sorted(missing)}")
     if label_column not in frame or tested_column not in frame:
         raise ValueError(f"model frame requires {label_column!r} and {tested_column!r}")
-    allowed_directions = {"resistance", "sensitization"}
-    observed_directions = set(
-        frame["phenotype_direction"].astype(str).str.strip().str.lower()
-    )
-    invalid_directions = sorted(observed_directions - allowed_directions)
-    if invalid_directions:
-        raise ValueError(
-            "v1 reproducibility model accepts only resistance or "
-            f"sensitization candidate directions; found {invalid_directions}"
-        )
+    _require_ko_modality_if_reported(frame)
+    _require_candidate_direction(frame)
     candidate = frame[list(required)].copy()
     candidate["label_code"] = frame[label_column]
     candidate["testing_status"] = frame[tested_column]
@@ -360,10 +383,29 @@ def _preflight_candidate_frame(
         raise ValueError("each screen_id must be nested within one study_id")
 
 
+def _require_candidate_direction(frame: pd.DataFrame) -> None:
+    allowed_directions = {"resistance", "sensitization"}
+    observed_directions = set(frame["phenotype_direction"].astype(str))
+    invalid_directions = sorted(observed_directions - allowed_directions)
+    if invalid_directions:
+        raise ValueError(
+            "v1 reproducibility model accepts only resistance or "
+            f"sensitization candidate directions; found {invalid_directions}"
+        )
+
+
+def _require_ko_modality_if_reported(frame: pd.DataFrame) -> None:
+    if "perturbation_modality" in frame:
+        modality = frame["perturbation_modality"].astype("string")
+        if not modality.eq("CRISPR_KO").fillna(False).all():
+            raise ValueError("v1 reproducibility model accepts only CRISPR_KO modality")
+
+
 def _logistic_pipeline(
     *,
     class_weight: str | None = None,
     random_state: int = 17,
+    logistic_c: float = 1.0,
 ) -> Pipeline:
     return Pipeline(
         steps=[
@@ -371,6 +413,7 @@ def _logistic_pipeline(
             (
                 "model",
                 LogisticRegression(
+                    C=logistic_c,
                     max_iter=2_000,
                     class_weight=class_weight,
                     random_state=random_state,
@@ -386,9 +429,16 @@ def _selection_pipeline(*, random_state: int = 17) -> Pipeline:
     return _logistic_pipeline(class_weight=None, random_state=random_state)
 
 
-def _success_pipeline(model_kind: str, *, random_state: int = 17) -> Pipeline:
+def _success_pipeline(
+    model_kind: str,
+    *,
+    random_state: int = 17,
+    logistic_c: float = 1.0,
+) -> Pipeline:
     if model_kind == "logistic":
-        return _logistic_pipeline(class_weight=None, random_state=random_state)
+        return _logistic_pipeline(
+            class_weight=None, random_state=random_state, logistic_c=logistic_c
+        )
     if model_kind == "hist_gradient_boosting":
         return Pipeline(
             steps=[
@@ -401,6 +451,10 @@ def _success_pipeline(model_kind: str, *, random_state: int = 17) -> Pipeline:
                         max_leaf_nodes=15,
                         min_samples_leaf=10,
                         l2_regularization=1.0,
+                        # Iteration count is prespecified. sklearn's automatic
+                        # early stopping would create a row-random validation
+                        # split above 10k rows, ignoring source/raw families.
+                        early_stopping=False,
                         random_state=random_state,
                     ),
                 ),
@@ -488,6 +542,7 @@ class ReproducibilityModel:
     model_kind: str = "logistic"
     random_state: int = 17
     fit_diagnostics: dict[str, float] | None = None
+    logistic_c: float = 1.0
 
     def fit(
         self,
@@ -499,6 +554,28 @@ class ReproducibilityModel:
         selection_groups: pd.Series | None = None,
     ) -> ReproducibilityModel:
         validate_success_feature_columns(self.feature_columns)
+        if (
+            isinstance(self.logistic_c, bool)
+            or not isinstance(self.logistic_c, Real)
+            or not np.isfinite(self.logistic_c)
+            or self.logistic_c <= 0
+        ):
+            raise ValueError("logistic_c must be finite and strictly positive")
+        if self.model_kind != "logistic" and self.logistic_c != 1.0:
+            raise ValueError("logistic_c can only be changed for logistic models")
+        if selection_groups is not None:
+            if not isinstance(selection_groups, pd.Series) or not (
+                selection_groups.index.equals(frame.index)
+                and len(selection_groups) == len(frame)
+            ):
+                raise ValueError("selection_groups must match the frame index and rows")
+            if (
+                selection_groups.isna()
+                | selection_groups.astype("string").str.strip().eq("").fillna(True)
+            ).any():
+                raise ValueError(
+                    "selection_groups must not contain missing identifiers"
+                )
         lower, upper = self.propensity_clip
         if not 0 < lower < upper <= 1:
             raise ValueError("propensity_clip must satisfy 0 < lower < upper <= 1")
@@ -585,6 +662,7 @@ class ReproducibilityModel:
         self.success_model = _success_pipeline(
             self.model_kind,
             random_state=self.random_state,
+            logistic_c=self.logistic_c,
         )
         self.success_model.fit(
             x.loc[labeled],
@@ -597,6 +675,9 @@ class ReproducibilityModel:
     def predict(self, frame: pd.DataFrame) -> pd.DataFrame:
         if self.success_model is None:
             raise RuntimeError("model has not been fitted")
+        _require_ko_modality_if_reported(frame)
+        if "phenotype_direction" in frame:
+            _require_candidate_direction(frame)
         frame = _prepare_direction_features(frame)
         x = frame[self.feature_columns]
         score = self.success_model.predict_proba(x)[:, 1]
@@ -828,4 +909,5 @@ def clone_model(model: ReproducibilityModel) -> ReproducibilityModel:
         propensity_clip=model.propensity_clip,
         model_kind=model.model_kind,
         random_state=model.random_state,
+        logistic_c=model.logistic_c,
     )

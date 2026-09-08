@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
-import os
+import math
 import platform
 import re
 import shutil
@@ -21,13 +22,21 @@ import yaml
 from pandas.testing import assert_frame_equal
 
 from . import __version__
-from .modeling import ReproducibilityModel, _study_family_groups
+from .clinicaltrials_gov import _publish_directory_noreplace
+from .modeling import (
+    ReproducibilityModel,
+    _study_family_groups,
+    validate_success_feature_columns,
+)
 
 MODEL_FILENAME = "reproducibility_model.joblib"
 FEATURES_FILENAME = "feature_columns.json"
 FEATURE_REGISTRY_FILENAME = "features.yaml"
 ENVIRONMENT_LOCK_FILENAME = "uv.lock"
 MANIFEST_FILENAME = "frozen_model_manifest.json"
+RUNTIME_DEPENDENCIES = ("joblib", "numpy", "pandas", "scikit-learn")
+TRAINING_IDENTITY_ROLES = ("study_id", "source_family_id", "raw_data_family_id")
+TRAINING_IDENTITY_HASH_ALGORITHM = "sha256_utf8_role_nul_stripped_value_v1"
 MODEL_BUNDLE_FILENAMES = (
     MODEL_FILENAME,
     FEATURES_FILENAME,
@@ -62,6 +71,19 @@ def _sha256_bytes(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
+def _strict_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"JSON object contains a duplicate key: {key}")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"JSON must not contain non-finite constants: {value}")
+
+
 def _utc_timestamp(value: datetime) -> datetime:
     resolved = value.astimezone(UTC) if value.tzinfo is not None else value
     if value.tzinfo is None or resolved.utcoffset() is None:
@@ -92,6 +114,7 @@ def _validate_feature_registry_bytes(
     if not isinstance(feature_groups, dict) or not feature_groups:
         raise ValueError("feature registry must define nonempty feature_groups")
     declared: set[str] = set()
+    disallowed: set[str] = set()
     for group_name, group in feature_groups.items():
         if not isinstance(group_name, str) or not isinstance(group, dict):
             raise ValueError("feature registry groups must be named mappings")
@@ -103,11 +126,20 @@ def _validate_feature_registry_bytes(
                 f"feature registry group {group_name!r} has an invalid features list"
             )
         declared.update(values)
+        if group.get("allowed_for_primary_model") is not True:
+            disallowed.update(values)
     missing = sorted(set(feature_columns) - declared)
     if missing:
         raise ValueError(
             f"feature registry does not declare frozen feature columns: {missing}"
         )
+    forbidden = sorted(set(feature_columns) & disallowed)
+    if forbidden:
+        raise ValueError(
+            "feature registry does not allow frozen features in the primary model: "
+            f"{forbidden}"
+        )
+    validate_success_feature_columns(feature_columns)
 
 
 def _validate_environment_lock_bytes(content: bytes) -> dict[str, set[str]]:
@@ -142,6 +174,11 @@ def _validate_runtime_dependencies_against_lock(
 ) -> None:
     if not isinstance(runtime_dependencies, dict) or not runtime_dependencies:
         raise ValueError("runtime_dependencies must be a nonempty mapping")
+    if set(runtime_dependencies) != set(RUNTIME_DEPENDENCIES):
+        raise ValueError(
+            "runtime_dependencies must declare exactly joblib, numpy, pandas, "
+            "and scikit-learn"
+        )
     mismatches = sorted(
         name
         for name, version in runtime_dependencies.items()
@@ -153,6 +190,31 @@ def _validate_runtime_dependencies_against_lock(
     if mismatches:
         raise ValueError(
             "runtime dependency versions are absent from the environment lock: "
+            f"{mismatches}"
+        )
+
+
+def _validate_loading_environment(manifest: dict[str, object]) -> None:
+    """Fail before unpickling if the recorded inference environment differs."""
+
+    if manifest.get("package_version") != __version__:
+        raise ValueError(
+            "frozen model package version differs from the loading runtime"
+        )
+    recorded_python = str(manifest.get("python_version", ""))
+    if recorded_python.split(".")[:2] != platform.python_version().split(".")[:2]:
+        raise ValueError(
+            "frozen model Python major/minor version differs from the loading runtime"
+        )
+    recorded = manifest["runtime_dependencies"]
+    mismatches = [
+        name
+        for name in RUNTIME_DEPENDENCIES
+        if importlib_metadata.version(name) != recorded[name]
+    ]
+    if mismatches:
+        raise ValueError(
+            "frozen model dependency versions differ from the loading runtime: "
             f"{mismatches}"
         )
 
@@ -240,6 +302,91 @@ def _independent_training_groups(
     return frame[study_column].astype(str)
 
 
+def training_identity_sha256(role: str, value: object) -> str:
+    """Hash a nonempty study/family identifier with a stable semantic namespace."""
+
+    if role not in TRAINING_IDENTITY_ROLES:
+        raise ValueError(f"unknown training identity role: {role}")
+    if pd.isna(value) or not str(value).strip():
+        raise ValueError("training identity value must be nonmissing and nonempty")
+    return _sha256_bytes(f"{role}\0{str(value).strip()}".encode())
+
+
+def _training_identity_inventory(
+    frame: pd.DataFrame,
+    columns: tuple[str, str, str],
+) -> dict[str, object]:
+    identities: dict[str, object] = {}
+    for role, column in zip(TRAINING_IDENTITY_ROLES, columns, strict=True):
+        values = (
+            frame[column].astype("string").str.strip()
+            if column in frame
+            else pd.Series(pd.NA, index=frame.index, dtype="string")
+        )
+        present = values.notna() & values.ne("").fillna(False)
+        missing = int((~present).sum())
+        identities[role] = {
+            "source_column": column,
+            "status": (
+                "not_attested"
+                if missing == len(frame)
+                else "partial"
+                if missing
+                else "complete"
+            ),
+            "missing_row_count": missing,
+            "identity_sha256": sorted(
+                {training_identity_sha256(role, value) for value in values[present]}
+            ),
+        }
+    return {
+        "identity_hash_algorithm": TRAINING_IDENTITY_HASH_ALGORITHM,
+        "identities": identities,
+    }
+
+
+def _validate_training_identity_inventory(value: object, row_count: int) -> None:
+    if (
+        not isinstance(value, dict)
+        or value.get("identity_hash_algorithm") != TRAINING_IDENTITY_HASH_ALGORITHM
+        or not isinstance(value.get("identities"), dict)
+        or set(value["identities"]) != set(TRAINING_IDENTITY_ROLES)
+    ):
+        raise ValueError("frozen model has invalid training_provenance structure")
+    for role, inventory in value["identities"].items():
+        if not isinstance(inventory, dict):
+            raise ValueError(f"invalid training_provenance inventory for {role}")
+        column = inventory.get("source_column")
+        missing = inventory.get("missing_row_count")
+        hashes = inventory.get("identity_sha256")
+        if (
+            not isinstance(column, str)
+            or not column.strip()
+            or type(missing) is not int
+            or not 0 <= missing <= row_count
+            or not isinstance(hashes, list)
+            or not all(
+                isinstance(digest, str) and re.fullmatch(r"[0-9a-f]{64}", digest)
+                for digest in hashes
+            )
+            or hashes != sorted(set(hashes))
+            or len(hashes) > row_count - missing
+            or bool(hashes) != (missing < row_count)
+        ):
+            raise ValueError(f"invalid training_provenance inventory for {role}")
+        expected_status = (
+            "not_attested"
+            if missing == row_count
+            else "partial"
+            if missing
+            else "complete"
+        )
+        if inventory.get("status") != expected_status:
+            raise ValueError(f"inconsistent training_provenance status for {role}")
+        if role == "study_id" and expected_status != "complete":
+            raise ValueError("training_provenance requires complete study identities")
+
+
 def freeze_model_bundle(
     frame: pd.DataFrame,
     output_dir: str | Path,
@@ -259,6 +406,7 @@ def freeze_model_bundle(
     label_column: str = "label_code",
     tested_column: str = "testing_status",
     model_kind: str = "logistic",
+    logistic_c: float = 1.0,
     random_state: int = 17,
     propensity_clip: tuple[float, float] = (0.1, 0.95),
 ) -> dict[str, object]:
@@ -308,8 +456,7 @@ def freeze_model_bundle(
     _validate_feature_registry_bytes(feature_registry_bytes, feature_columns)
     lock_versions = _validate_environment_lock_bytes(environment_lock_bytes)
     runtime_dependencies = {
-        name: importlib_metadata.version(name)
-        for name in ("joblib", "numpy", "pandas", "scikit-learn")
+        name: importlib_metadata.version(name) for name in RUNTIME_DEPENDENCIES
     }
     _validate_runtime_dependencies_against_lock(runtime_dependencies, lock_versions)
     feature_registry_sha256 = _sha256_bytes(feature_registry_bytes)
@@ -334,9 +481,15 @@ def freeze_model_bundle(
         source_family_column=source_family_column,
         raw_family_column=raw_family_column,
     )
+    training_provenance = _training_identity_inventory(
+        frame,
+        (study_column, source_family_column, raw_family_column),
+    )
+    _validate_training_identity_inventory(training_provenance, len(frame))
     model = ReproducibilityModel(
         list(feature_columns),
         model_kind=model_kind,
+        logistic_c=logistic_c,
         random_state=random_state,
         propensity_clip=propensity_clip,
     ).fit(
@@ -384,6 +537,7 @@ def freeze_model_bundle(
                     .items()
                 },
             },
+            "training_provenance": training_provenance,
             "feature_registry": {
                 "filename": FEATURE_REGISTRY_FILENAME,
                 "source_filename": feature_registry_path.name,
@@ -407,6 +561,7 @@ def freeze_model_bundle(
                 "sha256": _sha256(model_path),
                 "byte_size": model_path.stat().st_size,
                 "model_kind": model_kind,
+                "logistic_c": logistic_c,
                 "random_state": random_state,
                 "propensity_clip": list(propensity_clip),
                 "selection_weighting": False,
@@ -445,7 +600,7 @@ def freeze_model_bundle(
                 raise ValueError(
                     "source-tree attestation changed during model freezing"
                 )
-        os.replace(staging, output_dir)
+        _publish_directory_noreplace(staging, output_dir)
     except Exception:
         shutil.rmtree(staging, ignore_errors=True)
         raise
@@ -481,15 +636,26 @@ def verify_model_bundle(
             f"{invalid_files}"
         )
     manifest_path = bundle_dir / MANIFEST_FILENAME
+    manifest_content = manifest_path.read_bytes()
     if expected_manifest_sha256 is not None:
         if not re.fullmatch(r"[0-9a-f]{64}", expected_manifest_sha256):
             raise ValueError("expected_manifest_sha256 must be a lowercase SHA-256")
-        if _sha256(manifest_path) != expected_manifest_sha256:
+        if _sha256_bytes(manifest_content) != expected_manifest_sha256:
             raise ValueError("frozen model manifest identity hash mismatch")
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    try:
+        manifest = json.loads(
+            manifest_content.decode("utf-8"),
+            object_pairs_hook=_strict_json_object,
+            parse_constant=_reject_json_constant,
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("frozen model manifest must contain valid UTF-8 JSON") from exc
     if not isinstance(manifest, dict):
         raise ValueError("frozen model manifest must be a JSON object")
-    if manifest.get("schema_version") != 1:
+    if (
+        type(manifest.get("schema_version")) is not int
+        or manifest["schema_version"] != 1
+    ):
         raise ValueError("unsupported frozen model manifest schema_version")
     if manifest.get("bundle_type") != "frozen_reproducibility_model":
         raise ValueError("unexpected frozen model bundle_type")
@@ -512,6 +678,7 @@ def verify_model_bundle(
         ("model", MODEL_FILENAME),
     )
     file_manifests: dict[str, dict[str, object]] = {}
+    verified_contents: dict[str, bytes] = {}
     for role, filename in file_specs:
         file_manifest = manifest.get(role)
         if not isinstance(file_manifest, dict):
@@ -535,11 +702,13 @@ def verify_model_bundle(
                 f"frozen model manifest has an invalid byte_size for {role}"
             )
         path = bundle_dir / filename
-        if path.stat().st_size != byte_size:
+        content = path.read_bytes()
+        if len(content) != byte_size:
             raise ValueError(f"frozen model bundle byte_size mismatch: {filename}")
-        if _sha256(path) != expected_sha256:
+        if _sha256_bytes(content) != expected_sha256:
             raise ValueError(f"frozen model bundle hash mismatch: {filename}")
         file_manifests[role] = file_manifest
+        verified_contents[role] = content
 
     training_manifest = manifest.get("training_table")
     if not isinstance(training_manifest, dict):
@@ -563,6 +732,47 @@ def verify_model_bundle(
         or training_row_count < 1
     ):
         raise ValueError("frozen model manifest has an invalid training row count")
+    label_counts = training_manifest.get("label_counts")
+    if (
+        not isinstance(label_counts, dict)
+        or not label_counts
+        or not all(
+            isinstance(label, str) and type(count) is int and count > 0
+            for label, count in label_counts.items()
+        )
+        or sum(label_counts.values()) != training_row_count
+    ):
+        raise ValueError("frozen model manifest has inconsistent training label counts")
+    if "training_provenance" in manifest:
+        _validate_training_identity_inventory(
+            manifest["training_provenance"], training_row_count
+        )
+
+    model_manifest = file_manifests["model"]
+    model_kind = model_manifest.get("model_kind")
+    logistic_c = model_manifest.get("logistic_c", 1.0)
+    clipping = model_manifest.get("propensity_clip")
+    if model_kind not in {"logistic", "hist_gradient_boosting"}:
+        raise ValueError("frozen model manifest has an invalid model_kind")
+    if (
+        type(logistic_c) not in {int, float}
+        or not math.isfinite(logistic_c)
+        or logistic_c <= 0
+        or (model_kind != "logistic" and logistic_c != 1.0)
+    ):
+        raise ValueError("frozen model manifest has an invalid logistic_c")
+    if (
+        type(model_manifest.get("random_state")) is not int
+        or not 0 <= model_manifest["random_state"] < 2**32
+        or model_manifest.get("selection_weighting") is not False
+        or type(model_manifest.get("independent_group_count")) is not int
+        or not 1 <= model_manifest["independent_group_count"] <= training_row_count
+        or not isinstance(clipping, list)
+        or len(clipping) != 2
+        or not all(type(value) in {int, float} for value in clipping)
+        or not 0 < clipping[0] < clipping[1] <= 1
+    ):
+        raise ValueError("frozen model manifest has invalid model parameters")
 
     attestation = manifest.get("source_tree_attestation")
     if not isinstance(attestation, dict):
@@ -585,7 +795,7 @@ def verify_model_bundle(
     else:
         raise ValueError("unknown source-tree attestation mode")
 
-    features_content = (bundle_dir / FEATURES_FILENAME).read_bytes()
+    features_content = verified_contents["feature_columns"]
     try:
         features = json.loads(features_content.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -600,14 +810,15 @@ def verify_model_bundle(
         raise ValueError("feature_columns.json must not contain duplicates")
     if _canonical_json_bytes(features) != features_content:
         raise ValueError("feature_columns.json must use canonical JSON encoding")
-    if len(features) != file_manifests["feature_columns"].get("count"):
+    count = file_manifests["feature_columns"].get("count")
+    if type(count) is not int or len(features) != count:
         raise ValueError("frozen model feature count does not match manifest")
     _validate_feature_registry_bytes(
-        (bundle_dir / FEATURE_REGISTRY_FILENAME).read_bytes(),
+        verified_contents["feature_registry"],
         features,
     )
     lock_versions = _validate_environment_lock_bytes(
-        (bundle_dir / ENVIRONMENT_LOCK_FILENAME).read_bytes()
+        verified_contents["environment_lock"]
     )
     _validate_runtime_dependencies_against_lock(
         manifest.get("runtime_dependencies"),
@@ -633,9 +844,58 @@ def load_model_bundle(
             "joblib model loading can execute code; set trusted_local_bundle=True "
             "only for a locally controlled, verified bundle"
         )
-    model = joblib.load(Path(bundle_dir) / MODEL_FILENAME)
+    _validate_loading_environment(manifest)
+    # Hash the exact immutable bytes passed to joblib; a later path replacement
+    # must never turn verification into deserialization of a different pickle.
+    model_content = (Path(bundle_dir) / MODEL_FILENAME).read_bytes()
+    features_content = (Path(bundle_dir) / FEATURES_FILENAME).read_bytes()
+    for role, content in (
+        ("model", model_content),
+        ("feature_columns", features_content),
+    ):
+        if _sha256_bytes(content) != manifest[role]["sha256"]:
+            raise ValueError(f"frozen model {role} changed before loading")
+    features = json.loads(features_content.decode("utf-8"))
+    model = joblib.load(io.BytesIO(model_content))
     if not isinstance(model, ReproducibilityModel):
         raise TypeError("frozen model artifact has an unexpected object type")
+    if model.feature_columns != features:
+        raise ValueError("loaded model feature order differs from the frozen contract")
+    model_manifest = manifest["model"]
+    for attribute in ("model_kind", "random_state"):
+        if getattr(model, attribute, None) != model_manifest[attribute]:
+            raise ValueError(
+                f"loaded model {attribute} differs from the frozen contract"
+            )
+    if list(model.propensity_clip) != model_manifest["propensity_clip"]:
+        raise ValueError(
+            "loaded model propensity_clip differs from the frozen contract"
+        )
+    if model.logistic_c != model_manifest.get("logistic_c", 1.0):
+        raise ValueError("loaded model logistic_c differs from the frozen contract")
+    if model.success_model is None:
+        raise ValueError("loaded frozen model has no fitted success model")
+    for role, pipeline in (
+        ("success", model.success_model),
+        ("selection", model.selection_model),
+    ):
+        if pipeline is None:
+            continue
+        if getattr(pipeline, "n_features_in_", None) != len(features):
+            raise ValueError(
+                f"loaded {role} pipeline has an incompatible feature count"
+            )
+        fitted_names = getattr(pipeline, "feature_names_in_", None)
+        if fitted_names is not None and list(fitted_names) != features:
+            raise ValueError(
+                f"loaded {role} pipeline has an incompatible feature order"
+            )
+        if list(getattr(pipeline, "classes_", [])) != [0, 1]:
+            raise ValueError(f"loaded {role} pipeline has incompatible target classes")
+        estimator = pipeline.named_steps["model"]
+        if role == "success" and model.model_kind == "logistic":
+            if getattr(estimator, "C", None) != model.logistic_c:
+                raise ValueError("loaded success estimator differs from logistic_c")
     return model, manifest
 
 
@@ -646,7 +906,10 @@ __all__ = [
     "MANIFEST_FILENAME",
     "MODEL_BUNDLE_FILENAMES",
     "MODEL_FILENAME",
+    "TRAINING_IDENTITY_HASH_ALGORITHM",
+    "TRAINING_IDENTITY_ROLES",
     "freeze_model_bundle",
     "load_model_bundle",
+    "training_identity_sha256",
     "verify_model_bundle",
 ]

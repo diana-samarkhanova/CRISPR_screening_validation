@@ -4,9 +4,12 @@ import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
+import joblib
 import pandas as pd
 import pytest
+import yaml
 
+import crispr_evidencerank.model_artifact as artifact_module
 from crispr_evidencerank.model_artifact import (
     ENVIRONMENT_LOCK_FILENAME,
     FEATURE_REGISTRY_FILENAME,
@@ -16,6 +19,7 @@ from crispr_evidencerank.model_artifact import (
     MODEL_FILENAME,
     freeze_model_bundle,
     load_model_bundle,
+    training_identity_sha256,
     verify_model_bundle,
 )
 from crispr_evidencerank.modeling import DEFAULT_FEATURE_COLUMNS
@@ -32,6 +36,7 @@ def _freeze_fixture(
     *,
     code_revision: str = "a" * 40,
     current_checkout_path: Path | None = None,
+    logistic_c: float = 1.0,
 ) -> dict[str, object]:
     training_path = ROOT / "examples/synthetic/labeled_gene_features.csv"
     return freeze_model_bundle(
@@ -46,6 +51,7 @@ def _freeze_fixture(
         code_revision=code_revision,
         created_at_utc=datetime(2026, 9, 7, 12, 0, tzinfo=UTC),
         current_checkout_path=current_checkout_path,
+        logistic_c=logistic_c,
     )
 
 
@@ -446,3 +452,242 @@ def test_frozen_model_source_attestation_rejects_dirty_checkout(tmp_path):
             code_revision=revision,
             current_checkout_path=checkout,
         )
+
+
+def _repin_model(output_dir, manifest, model):
+    path = output_dir / MODEL_FILENAME
+    joblib.dump(model, path, compress=3)
+    manifest["model"]["sha256"] = _sha256(path)
+    manifest["model"]["byte_size"] = path.stat().st_size
+    _rewrite_manifest(output_dir, manifest)
+
+
+def test_loaded_payload_feature_order_must_match_bound_feature_contract(tmp_path):
+    output_dir = tmp_path / "bundle"
+    manifest = _freeze_fixture(output_dir)
+    model = joblib.load(output_dir / MODEL_FILENAME)
+    model.feature_columns = list(reversed(model.feature_columns))
+    _repin_model(output_dir, manifest, model)
+
+    with pytest.raises(ValueError, match="feature order differs"):
+        load_model_bundle(output_dir, trusted_local_bundle=True)
+
+
+@pytest.mark.parametrize(
+    "attribute,value",
+    [
+        ("model_kind", "hist_gradient_boosting"),
+        ("random_state", 99),
+        ("logistic_c", 2.0),
+    ],
+)
+def test_loaded_payload_parameters_must_match_bound_manifest(
+    tmp_path, attribute, value
+):
+    output_dir = tmp_path / "bundle"
+    manifest = _freeze_fixture(output_dir)
+    model = joblib.load(output_dir / MODEL_FILENAME)
+    setattr(model, attribute, value)
+    _repin_model(output_dir, manifest, model)
+
+    with pytest.raises(ValueError, match=f"{attribute} differs"):
+        load_model_bundle(output_dir, trusted_local_bundle=True)
+
+
+def test_loaded_pipeline_feature_order_must_match_wrapper_and_manifest(tmp_path):
+    output_dir = tmp_path / "bundle"
+    manifest = _freeze_fixture(output_dir)
+    model = joblib.load(output_dir / MODEL_FILENAME)
+    preprocessor = model.success_model.named_steps["preprocess"]
+    preprocessor.feature_names_in_ = preprocessor.feature_names_in_[::-1]
+    _repin_model(output_dir, manifest, model)
+
+    with pytest.raises(ValueError, match="incompatible feature order"):
+        load_model_bundle(output_dir, trusted_local_bundle=True)
+
+
+def test_loader_checks_replaced_pickle_before_deserializing(tmp_path, monkeypatch):
+    output_dir = tmp_path / "bundle"
+    _freeze_fixture(output_dir)
+    real_verify = artifact_module.verify_model_bundle
+
+    def replace_after_verification(*args, **kwargs):
+        verified = real_verify(*args, **kwargs)
+        (output_dir / MODEL_FILENAME).write_bytes(b"replacement-pickle")
+        return verified
+
+    def forbidden_load(*args, **kwargs):
+        pytest.fail("unverified replacement was passed to joblib")
+
+    monkeypatch.setattr(
+        artifact_module, "verify_model_bundle", replace_after_verification
+    )
+    monkeypatch.setattr(artifact_module.joblib, "load", forbidden_load)
+    with pytest.raises(ValueError, match="changed before loading"):
+        load_model_bundle(output_dir, trusted_local_bundle=True)
+
+
+def test_loader_deserializes_verified_bytes_even_when_path_is_replaced(
+    tmp_path, monkeypatch
+):
+    output_dir = tmp_path / "bundle"
+    _freeze_fixture(output_dir)
+    real_load = joblib.load
+
+    def replace_when_loading(source):
+        assert hasattr(source, "read")
+        (output_dir / MODEL_FILENAME).write_bytes(b"replacement-pickle")
+        return real_load(source)
+
+    monkeypatch.setattr(artifact_module.joblib, "load", replace_when_loading)
+    model, _ = load_model_bundle(output_dir, trusted_local_bundle=True)
+    assert model.feature_columns == list(DEFAULT_FEATURE_COLUMNS)
+
+
+def test_loader_rejects_incompatible_runtime_before_deserializing(
+    tmp_path, monkeypatch
+):
+    output_dir = tmp_path / "bundle"
+    _freeze_fixture(output_dir)
+    real_version = artifact_module.importlib_metadata.version
+    monkeypatch.setattr(
+        artifact_module.importlib_metadata,
+        "version",
+        lambda name: "0.0.0" if name == "scikit-learn" else real_version(name),
+    )
+    monkeypatch.setattr(
+        artifact_module.joblib,
+        "load",
+        lambda *args, **kwargs: pytest.fail("incompatible runtime reached joblib"),
+    )
+    # Integrity verification must remain portable, since it never unpickles.
+    assert verify_model_bundle(output_dir)["schema_version"] == 1
+    with pytest.raises(ValueError, match="dependency versions differ"):
+        load_model_bundle(output_dir, trusted_local_bundle=True)
+
+
+@pytest.mark.parametrize(
+    "replacement,message",
+    [
+        ('{"schema_version":1,"schema_version":1}', "duplicate key"),
+        ('{"schema_version":NaN}', "non-finite"),
+    ],
+)
+def test_verifier_rejects_ambiguous_or_nonstandard_json(tmp_path, replacement, message):
+    output_dir = tmp_path / "bundle"
+    _freeze_fixture(output_dir)
+    (output_dir / MANIFEST_FILENAME).write_text(replacement)
+    with pytest.raises(ValueError, match=message):
+        verify_model_bundle(output_dir)
+
+
+def test_frozen_inventory_records_hashes_without_plaintext_family_ids(tmp_path):
+    output_dir = tmp_path / "bundle"
+    manifest = _freeze_fixture(output_dir)
+    frame = pd.read_csv(ROOT / "examples/synthetic/labeled_gene_features.csv")
+    inventory = manifest["training_provenance"]["identities"]
+    assert inventory["study_id"]["status"] == "complete"
+    assert inventory["study_id"]["identity_sha256"] == sorted(
+        {training_identity_sha256("study_id", value) for value in frame.study_id}
+    )
+    for role in ("source_family_id", "raw_data_family_id"):
+        if role not in frame:
+            assert inventory[role]["status"] == "not_attested"
+            assert inventory[role]["missing_row_count"] == len(frame)
+    assert training_identity_sha256("study_id", " S1 ") == training_identity_sha256(
+        "study_id", "S1"
+    )
+    assert training_identity_sha256("study_id", "S1") != training_identity_sha256(
+        "source_family_id", "S1"
+    )
+    assert (
+        verify_model_bundle(output_dir)["training_provenance"]
+        == manifest["training_provenance"]
+    )
+
+
+def test_verifier_accepts_legacy_v1_without_identity_inventory(tmp_path):
+    output_dir = tmp_path / "bundle"
+    manifest = _freeze_fixture(output_dir)
+    del manifest["training_provenance"]
+    del manifest["model"]["logistic_c"]
+    _rewrite_manifest(output_dir, manifest)
+    _, verified = load_model_bundle(output_dir, trusted_local_bundle=True)
+    assert "training_provenance" not in verified
+
+
+def test_verifier_rejects_inconsistent_inventory_and_missing_dependency(tmp_path):
+    output_dir = tmp_path / "bundle"
+    manifest = _freeze_fixture(output_dir)
+    manifest["training_provenance"]["identities"]["study_id"]["missing_row_count"] = 1
+    _rewrite_manifest(output_dir, manifest)
+    with pytest.raises(ValueError, match="training_provenance"):
+        verify_model_bundle(output_dir)
+    manifest["training_provenance"]["identities"]["study_id"]["missing_row_count"] = 0
+    del manifest["runtime_dependencies"]["numpy"]
+    _rewrite_manifest(output_dir, manifest)
+    with pytest.raises(ValueError, match="must declare exactly"):
+        verify_model_bundle(output_dir)
+
+
+def test_freeze_does_not_replace_concurrently_created_empty_destination(
+    tmp_path, monkeypatch
+):
+    output_dir = tmp_path / "bundle"
+    real_publish = artifact_module._publish_directory_noreplace
+
+    def raced_publish(source, destination):
+        destination.mkdir()
+        return real_publish(source, destination)
+
+    monkeypatch.setattr(artifact_module, "_publish_directory_noreplace", raced_publish)
+    with pytest.raises(FileExistsError):
+        _freeze_fixture(output_dir)
+    assert output_dir.is_dir()
+    assert not list(output_dir.iterdir())
+    assert not list(tmp_path.glob(".bundle.staging-*"))
+
+
+def test_frozen_model_preserves_selected_logistic_regularization(tmp_path):
+    output_dir = tmp_path / "bundle"
+    manifest = _freeze_fixture(output_dir, logistic_c=0.25)
+    assert manifest["model"]["logistic_c"] == 0.25
+    model, _ = load_model_bundle(output_dir, trusted_local_bundle=True)
+    assert model.logistic_c == 0.25
+    assert model.success_model.named_steps["model"].C == 0.25
+    if model.selection_model is not None:
+        assert model.selection_model.named_steps["model"].C == 1.0
+
+
+def test_verifier_honors_embedded_registry_primary_model_policy(tmp_path):
+    output_dir = tmp_path / "bundle"
+    manifest = _freeze_fixture(output_dir)
+    path = output_dir / FEATURE_REGISTRY_FILENAME
+    registry = yaml.safe_load(path.read_text())
+    registry["feature_groups"]["screen_signal"]["allowed_for_primary_model"] = False
+    path.write_text(yaml.safe_dump(registry))
+    manifest["feature_registry"]["sha256"] = _sha256(path)
+    manifest["feature_registry"]["byte_size"] = path.stat().st_size
+    _rewrite_manifest(output_dir, manifest)
+    with pytest.raises(ValueError, match="does not allow frozen features"):
+        verify_model_bundle(output_dir)
+
+
+def test_training_inventory_marks_partial_family_coverage_without_imputing(tmp_path):
+    frame = pd.DataFrame(
+        {
+            "study_id": ["S1", "S2", "S3"],
+            "source_family_id": [" A ", pd.NA, " "],
+        }
+    )
+    inventory = artifact_module._training_identity_inventory(
+        frame, ("study_id", "source_family_id", "raw_data_family_id")
+    )
+    source = inventory["identities"]["source_family_id"]
+    assert source["status"] == "partial"
+    assert source["missing_row_count"] == 2
+    assert source["identity_sha256"] == [
+        training_identity_sha256("source_family_id", "A")
+    ]
+    assert inventory["identities"]["raw_data_family_id"]["status"] == "not_attested"
+    artifact_module._validate_training_identity_inventory(inventory, len(frame))

@@ -1,0 +1,7 @@
+{
+  "selection_metric": "study_macro_average_precision",
+  "candidates": [
+    {"candidate_id": "logistic_c01", "model_kind": "logistic", "feature_profile": "screen_only", "logistic_c": 0.1},
+    {"candidate_id": "logistic_c1", "model_kind": "logistic", "feature_profile": "screen_only", "logistic_c": 1.0}
+  ]
+}

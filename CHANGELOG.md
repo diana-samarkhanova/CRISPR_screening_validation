@@ -4,6 +4,21 @@ All notable project changes are recorded here. The project follows semantic
 versioning once public releases begin; development checkpoints use a `.devN`
 suffix and are not claims of a trained biological model.
 
+## Unreleased — development selection to prospective allocation
+
+- Added nested source/raw-family grouped configuration selection and a separate
+  development-only final selector, with complete inner/outer diagnostics.
+- Preserved selected logistic regularization; disabled row-level HGB early
+  stopping and corrected explicit reverse-native LFC alignment.
+- Hardened model loading with verified bytes, runtime/feature/parameter checks,
+  training-family hash inventories and no-clobber publication.
+- Added outcome-free frozen KO inference with family-overlap and missing-feature
+  guards, source-attested baseline rank linkage, and checksummed predictions.
+- Added complete paired top-k allocation, randomized remainder candidates,
+  declared prior-exposure exclusions, masked assay roster and offline verifier.
+- Added installed CLI end-to-end CI coverage using synthetic inputs only.
+- Documented wet-lab validation and remaining scientific/publication gaps.
+
 ## 0.5.0.dev0 — ClinicalTrials.gov frozen snapshot intake
 
 - Added a separate bounded ClinicalTrials.gov v2 acquisition path that retains

@@ -300,3 +300,120 @@ def test_paired_bootstrap_minimum_effective_fraction_is_forwarded(monkeypatch):
     )
 
     assert captured["min_effective_fraction"] == 0.9
+
+
+def _attested_multi_source_frame():
+    frame = baseline_frame()
+    sources = []
+    for index, (_, query) in enumerate(frame.groupby("screen_id")):
+        query = query.copy()
+        query["analysis_tail"] = "mageck_pos"
+        query["mageck_rank"] = [1, 4, 2, 3, 5, 6]
+        query["drugz_normz"] = [4.0, 0.0, 3.0, 1.0, -1.0, -2.0]
+        if index:
+            query["analysis_tail"] = "mageck_neg"
+            query["drugz_normz"] *= -1
+        meaning = "sensitization" if index else "resistance"
+        query = adapt_repo_native_mageck_baseline(
+            query,
+            positive_tail_means=meaning,
+            mageck_version=f"0.5.9.{index + 4}",
+            source_locator=f"frozen/study{index}/mageck.tsv",
+            source_sha256=str(index) * 64,
+        )
+        sources.append(
+            adapt_direction_aligned_drugz_baseline(
+                query,
+                positive_normz_means=meaning,
+                drugz_version="1.1.0",
+                source_locator=f"frozen/study{index}/drugz.tsv",
+                source_sha256=str(index + 2) * 64,
+            )
+        )
+    return pd.concat(sources)
+
+
+def test_benchmark_allows_independent_sources_and_tail_semantics_across_queries():
+    frame = _attested_multi_source_frame()
+    result = evaluate_fixed_score_baselines(
+        frame,
+        screen_column="screen_id",
+        target_column="target",
+        study_column="study_id",
+        random_seeds=(1,),
+        ks=(2,),
+    )
+    for name in ("mageck_rank", "drugz_normz"):
+        assert result[name]["status"] == "evaluated"
+        assert result[name]["metrics"]["study_macro_normalized_average_precision"] == 1
+
+
+@pytest.mark.parametrize("column", ["mageck_source_sha256", "drugz_source_locator"])
+def test_benchmark_still_rejects_mixed_provenance_within_one_query(column):
+    frame = _attested_multi_source_frame()
+    frame.loc[0, column] = "f" * 64
+    with pytest.raises(ValueError, match="one complete value"):
+        evaluate_fixed_score_baselines(
+            frame,
+            screen_column="screen_id",
+            target_column="target",
+            study_column="study_id",
+            random_seeds=(1,),
+            ks=(2,),
+        )
+
+
+@pytest.mark.parametrize("seeds", [(1, 1), (True,), (-1,), (1.5,)])
+def test_random_baseline_requires_distinct_nonnegative_integer_seeds(seeds):
+    with pytest.raises(ValueError, match="random_seeds"):
+        evaluate_fixed_score_baselines(
+            baseline_frame(),
+            screen_column="screen_id",
+            target_column="target",
+            study_column="study_id",
+            random_seeds=seeds,
+        )
+
+
+@pytest.mark.parametrize(
+    "column", ["_baseline_query_id", "_fixed_baseline_score", "_random_score_1"]
+)
+def test_baselines_cannot_overwrite_caller_data_with_temporary_columns(column):
+    frame = baseline_frame()
+    frame[column] = frame.target
+    with pytest.raises(ValueError, match="reserved internal columns"):
+        evaluate_fixed_score_baselines(
+            frame,
+            screen_column="screen_id",
+            target_column="target",
+            study_column="study_id",
+            random_seeds=(1,),
+        )
+    assert frame[column].equals(frame.target)
+
+
+def test_mageck_adapter_rejects_invalid_native_score_before_attestation():
+    frame = baseline_frame()
+    frame["analysis_tail"] = "mageck_pos"
+    frame["mageck_fdr"] = 2.0
+    with pytest.raises(ValueError, match=r"\[0, 1\]"):
+        adapt_repo_native_mageck_baseline(
+            frame,
+            positive_tail_means="resistance",
+            mageck_version="0.5.9.5",
+            source_locator="frozen/mageck.tsv",
+            source_sha256="a" * 64,
+        )
+
+
+def test_drugz_adapter_does_not_convert_boolean_metadata_into_scores():
+    frame = baseline_frame()
+    frame["drugz_normz"] = True
+    with pytest.raises(ValueError, match="not boolean"):
+        adapt_direction_aligned_drugz_baseline(
+            frame,
+            positive_normz_means="resistance",
+            drugz_version="1.1.0",
+            source_locator="frozen/drugz.tsv",
+            source_sha256="a" * 64,
+        )

@@ -135,6 +135,9 @@ def adapt_repo_native_mageck_baseline(
         result["mageck_direction_rank"] = result["mageck_rank"]
     if "mageck_fdr" in result:
         result["mageck_direction_fdr"] = result["mageck_fdr"]
+    for spec in FIXED_BASELINES:
+        if spec.name.startswith("mageck_") and spec.column in result:
+            _validated_baseline_numeric(result, spec)
     result["mageck_positive_tail_means_attested"] = positive_tail_means
     result["mageck_source_method"] = "MAGeCK-RRA"
     result["mageck_source_version"] = mageck_version.strip()
@@ -182,6 +185,12 @@ def adapt_direction_aligned_drugz_baseline(
             "drugZ phenotype_direction must be resistance or sensitization; "
             f"found {invalid}"
         )
+    if (
+        frame["drugz_normz"]
+        .map(lambda value: isinstance(value, (bool, np.bool_)))
+        .any()
+    ):
+        raise ValueError("drugz_normz must contain numeric, not boolean values")
     normz = pd.to_numeric(frame["drugz_normz"], errors="coerce")
     if normz.isna().any() or not np.isfinite(normz.to_numpy(dtype=float)).all():
         raise ValueError("drugz_normz must contain complete finite numeric values")
@@ -208,6 +217,12 @@ def _validate_direction_attestation(
     frame: pd.DataFrame,
     spec: FixedBaselineSpec,
 ) -> None:
+    # Provenance is constant within one ranking query, but an external benchmark
+    # naturally combines different upstream summaries and software versions.
+    if "_baseline_query_id" in frame and frame["_baseline_query_id"].nunique() > 1:
+        for _, query in frame.groupby("_baseline_query_id", sort=False):
+            _validate_direction_attestation(query, spec)
+        return
     if spec.name.startswith("mageck_"):
         required = {
             "analysis_tail",
@@ -303,6 +318,8 @@ def _validated_baseline_numeric(
     spec: FixedBaselineSpec,
 ) -> pd.Series:
     source = frame[spec.column]
+    if source.map(lambda value: isinstance(value, (bool, np.bool_))).any():
+        raise ValueError(f"{spec.name} baseline values must be numeric, not boolean")
     numeric = pd.to_numeric(source, errors="coerce")
     nonnumeric = source.notna() & numeric.isna()
     if nonnumeric.any():
@@ -379,8 +396,21 @@ def evaluate_fixed_score_baselines(
 
     if not random_seeds:
         raise ValueError("random_seeds must contain at least one seed")
-    if paired_bootstrap_repetitions < 0:
-        raise ValueError("paired_bootstrap_repetitions cannot be negative")
+    if any(
+        not isinstance(seed, (int, np.integer))
+        or isinstance(seed, (bool, np.bool_))
+        or seed < 0
+        for seed in random_seeds
+    ):
+        raise ValueError("random_seeds must be nonnegative integers")
+    if len(set(random_seeds)) != len(random_seeds):
+        raise ValueError("random_seeds must not contain duplicates")
+    if (
+        not isinstance(paired_bootstrap_repetitions, (int, np.integer))
+        or isinstance(paired_bootstrap_repetitions, (bool, np.bool_))
+        or paired_bootstrap_repetitions < 0
+    ):
+        raise ValueError("paired_bootstrap_repetitions must be a nonnegative integer")
     if not 0 < paired_bootstrap_min_effective_fraction <= 1:
         raise ValueError(
             "paired_bootstrap_min_effective_fraction must be in the interval (0, 1]"
@@ -397,6 +427,19 @@ def evaluate_fixed_score_baselines(
             if column in frame and column not in resolved_query_columns:
                 resolved_query_columns.append(column)
     working = frame.copy()
+    reserved = sorted(
+        column
+        for column in working.columns
+        if isinstance(column, str)
+        and (
+            column in {"_baseline_query_id", "_fixed_baseline_score"}
+            or column.startswith("_random_score_")
+        )
+    )
+    if reserved:
+        raise ValueError(
+            f"baseline frame contains reserved internal columns: {reserved}"
+        )
     working["_baseline_query_id"] = _composite_query_keys(
         working,
         resolved_query_columns,

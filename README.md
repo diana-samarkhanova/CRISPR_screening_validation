@@ -16,6 +16,14 @@ or a single database score as experimental validation.
 
 ## Status
 
+The [code-to-wet-lab workflow](docs/CODE_TO_WETLAB.md) now connects nested
+source/raw-family model selection, development-only configuration selection,
+frozen-model inference, and paired model/baseline target allocation. The
+[Russian wet-lab plan](docs/WET_LAB_VALIDATION_PLAN_RU.md) describes subsequent
+perturbation, drug-response, orthogonal and rescue experiments. These additions
+are tested infrastructure; real adjudicated training data and new biological
+validation remain necessary.
+
 Version `0.5.0.dev0` is a reproducible development system, not a released
 pretrained model. It includes one-command MAGeCK/count reporting, an auxiliary
 ICRAFT-inspired immune-context method, and a separate checksum-bound clinical
