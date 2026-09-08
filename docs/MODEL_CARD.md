@@ -22,12 +22,19 @@ as study → screen → contrast → sample, and predictions are made for a
 
 ## Current model
 
+For a new unlabeled screen, v0.3 exposes a deterministic
+`screen_signal_baseline` through `rank-screen`. It preserves native MAGeCK rank
+or ranks absolute guide-level effects within the explicitly declared phenotype
+direction. This report is not produced by the validation-success model and is
+not a probability of reproduction.
+
 The repository implements a transparent two-stage baseline:
 
 1. logistic selection model for `tested` versus explicitly `not_tested`;
 2. regularized logistic success model among tested genes;
-3. inverse-study base weights so one publication cannot dominate by reporting
-   more screens or tested genes;
+3. inverse independent-provenance-group base weights so one connected
+   source/raw-data family cannot dominate by reporting more screens or tested
+   genes;
 4. optional clipped selection-IPW, disabled when inner grouped cross-fitting is
    impossible or any inner training fold contains a single testing-status
    class;
@@ -40,14 +47,21 @@ experimental material into one source/raw-data family.
 
 ## Feature profiles
 
-- `screen_only`: gene scores/count-derived guide evidence and technical QC;
-- `screen_plus_design`: `screen_only` plus structured experimental design;
-- `context_aware`: `screen_plus_design` plus versioned artifact/CNV, cell,
-  drug, pathway, and training-only cross-screen evidence;
-- `selection_model`: separate author-testing endpoint; selection-only fields are
-  forbidden in the validation-success model.
+- `screen_only`: implemented benchmark profile using gene scores/count-derived
+  guide evidence and technical QC;
+- `screen_plus_design`: implemented benchmark profile adding structured
+  experimental design;
+- `context_aware`: specified but not implemented as a modeling profile; it is
+  intended to add versioned artifact/CNV, cell, drug, pathway, and
+  outer-training-only cross-screen evidence;
+- `selection_model`: implemented as a separate author-testing endpoint, but it
+  currently uses the same reviewed pre-outcome feature columns as the paired
+  success model. Dedicated selection-only covariates remain planned.
 
-Profiles are evaluated separately. Missing inputs retain explicit availability
+Only `screen_only` and `screen_plus_design` are currently exposed by the
+benchmark runtime. The auxiliary immune and clinical-context outputs remain
+report-only and do not implement or backfill `context_aware`. Implemented
+profiles are evaluated separately. Missing inputs retain explicit availability
 indicators; reported zero is not treated as missing, and unsupported inputs
 route to a reduced profile or abstention.
 
@@ -65,13 +79,39 @@ evaluation.
 ## Outputs
 
 - `reproducibility_score`;
-- `selection_propensity_known_status`;
-- `artifact_risk` component;
-- feature missingness;
-- within-screen rank;
-- uncertainty from study-level resampling;
-- separate mechanistic, therapeutic, and novelty evidence components.
-- profile name, metadata completeness, and outside-training-support flags.
+- `selection_propensity` (estimated for every candidate, including candidates
+  whose testing status is unknown);
+- outer fold and independent-provenance-group identifiers;
+- benchmark metrics, prevalence and informative denominators;
+- direction-stratified metrics, conditional calibration bins, fixed-fold seed
+  sensitivity, and source-family bootstrap intervals;
+- available baseline rows and paired candidate-minus-baseline intervals;
+- a within-query feature-invariance audit.
+
+The benchmark report is checksum-bound to its input and prediction artifact.
+Direction-specific MAGeCK/drugZ baselines require explicit semantics and source
+provenance. Top-k ties are handled fractionally, and single-class queries are
+reported as non-informative rather than contributing constant ranking values.
+
+Artifact-risk components, context-aware modeling, within-screen rank,
+profile-support routing, and mechanistic/therapeutic/novelty components remain
+specified future outputs unless produced by their explicitly separate
+report-only commands. They must not be described as current model outputs.
+
+The auxiliary immune-context command writes only `report_only_*` columns. It
+reports tumor/immune recurrence, conflicts, dual-action hypotheses, and
+verified-full-list RRA without changing any primary output. These columns are
+programmatically forbidden from the current success model. Candidate rows from
+`rank-screen` retain their screen, contrast, direction, tail, and signal rank;
+the immune axis neither filters nor reorders them.
+
+The clinical-context command is independent of genes and writes only
+`report_only_clinical_*` treatment-by-cancer descriptors. Registry presence,
+phase, recruitment status, and posted aggregate results are not efficacy and
+cannot enter the feature matrix, change a rank, or create a validation label.
+Every normalized clinical row must resolve to a frozen checksum-pinned source
+asset. Patient omics and regulatory indications are not inferred from trial
+registry metadata.
 
 ## Known limitations
 
@@ -93,6 +133,13 @@ evaluation.
   metric has fewer than the prespecified effective number of study draws.
 - BioGRID ORCS preserves heterogeneous author-defined screen scores and hit
   calls; these are not independent-validation outcomes.
+- ICRAFT recurrence and RRA are immune-screen context, not effect size,
+  orthogonal validation, therapeutic efficacy, or validation probability. No
+  frozen ICRAFT export is bundled in v0.3.
+- A dual-action class is a hypothesis-generating candidate category. CRISPRa
+  display inversion is accepted only as a registered numeric LFC sign-pair and
+  is not propagated, modality-mismatched evidence is not combined, versioned
+  dual-action groups require review, and ambiguous orthology is annotation-only.
 - missingness patterns can encode publication era, repository choice, or input
   mode and therefore require profile- and coverage-stratified analyses.
 

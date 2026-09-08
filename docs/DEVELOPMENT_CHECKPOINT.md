@@ -1,6 +1,37 @@
-# Development checkpoint — v0.2.0.dev0
+# Development checkpoint — v0.5.0.dev0
 
-Date: 2026-07-30
+Updated: 2026-09-01
+
+Post-checkpoint update (2026-09-08): executable nested model selection,
+development-only final configuration selection, frozen KO inference and paired
+prospective target allocation are now implemented. See
+[CODE_TO_WETLAB.md](CODE_TO_WETLAB.md) for commands, semantics and remaining gaps.
+These additions do not change the absence of a real adjudicated model/benchmark
+release described below. Current verification belongs to the relevant commit
+and CI record, not the historical checkpoint's numeric examples.
+
+The v0.5 checkpoint retains the v0.2 design contract described below, the
+checksum-bound screen, immune-context, and clinical treatment-by-cancer report
+engines, and adds a separate frozen ClinicalTrials.gov API intake. These are
+development/reporting components; the real harmonized training set,
+adjudicated benchmark, pretrained model, and calibrated validation probability
+still do not exist.
+
+At checkpoint commit `c39f81c`, release verification on Python 3.12 passed the
+then-current test suite and coverage gate, repository and formatting guards,
+the smoke benchmark, deterministic schema/fixture regeneration, and an
+installed-wheel end-to-end run. Test and coverage counts are intentionally not
+copied into this living document because post-checkpoint changes make them
+stale; the pinned commit and its CI record are authoritative. The synthetic
+clinical-context fixture contains five non-patient registry rows and one
+checksum-pinned source asset; the separate ClinicalTrials.gov fixture contains
+two explicitly synthetic studies and three injected-response assets.
+
+The v0.5 intake retains every exact response byte, pins the query, field
+projection, opaque page-token chain, `totalCount`, and before/after API version
+envelope, and reproduces all derived TSVs offline. Search hits remain unreviewed
+study-level co-mentions: they cannot become exact concept mappings, efficacy
+claims, gene evidence, model features, or validation labels automatically.
 
 ## Executable baseline inherited from v0.1
 
@@ -23,8 +54,8 @@ The v0.2 configuration and documentation add:
 
 - the normalized study → screen → contrast → sample hierarchy;
 - explicit source-family and raw-data-family deduplication before splitting;
-- `screen_only`, `screen_plus_design`, `context_aware`, and separate
-  `selection_model` feature profiles;
+- executable `screen_only` and `screen_plus_design` feature profiles, plus the
+  planned `context_aware` profile and separate author-testing endpoint;
 - structured treatment, comparator, replicate, library, representation, and
   endpoint metadata with explicit missingness;
 - BioGRID ORCS as an official discovery/metadata/author-score layer, not a
@@ -48,9 +79,37 @@ ranking queries, 480 gene-screen rows, 1,920 guides, and 112 validation events.
 It is designed only to verify software behavior.
 
 | Candidate model | Global PR-AUC | Study-macro PR-AUC | Observed NDCG@10 | Observed success yield@5 | Uncalibrated Brier |
-|---|---:|---:|---:|---:|
+|---|---:|---:|---:|---:|---:|
 | Regularized logistic regression | 0.6951 | 0.7650 | 0.7696 | 0.4375 | 0.2352 |
 | Histogram gradient boosting | 0.6436 | 0.7676 | 0.6734 | 0.4750 | 0.2565 |
+
+The table records the historical synthetic checkpoint at commit `dbc8d73`.
+Both rows use the `screen_only` profile, four grouped outer folds, and the
+fixed model seed in the implementation. Reproduce the protocol from a checkout
+of that commit and its own `uv.lock` as follows:
+
+```bash
+uv sync --locked --all-extras
+uv run python scripts/generate_synthetic.py
+uv run crispr-evidencerank benchmark \
+  --table examples/synthetic/labeled_gene_features.csv \
+  --feature-profile screen_only \
+  --folds 4 \
+  --model-kind logistic \
+  --output /tmp/evidencerank-logistic-fold4.csv
+uv run crispr-evidencerank benchmark \
+  --table examples/synthetic/labeled_gene_features.csv \
+  --feature-profile screen_only \
+  --folds 4 \
+  --model-kind hist_gradient_boosting \
+  --output /tmp/evidencerank-boosting-fold4.csv
+```
+
+The CLI default remains five folds. Running without `--folds 4` is therefore a
+different protocol and must not be compared with the recorded table as though
+it were an exact reproduction. On the current branch, the same commands are a
+regression check; any changed value is a new result that must be recorded with
+the new code commit and lock-file hash.
 
 These values are not biological performance estimates. On this fixture, the
 transparent logistic baseline is the checkpoint winner; the boosted model is

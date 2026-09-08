@@ -1,6 +1,17 @@
-version: 2
+version: 3
 primary_endpoint: within_screen_reproducibility_ranking
 unit: gene_x_screen_x_contrast_x_direction
+
+primary_metric_decision:
+  status: requires_human_preregistration_before_real_label_analysis
+  selected_metric: null
+  candidate_metric: study_macro_normalized_average_precision
+  candidate_definition: (average_precision - positive_prevalence) / (1 - positive_prevalence)
+  eligibility_requirement: >-
+    The analysis population and outcome-completeness rule must be frozen before
+    real labels are examined. A literature-selected set of documented outcomes
+    cannot be treated as an outcome-complete candidate universe.
+  owner: principal_investigator_and_statistical_lead
 
 data_hierarchy:
   - study
@@ -29,35 +40,73 @@ splits:
     - cold_gene
     - temporal
 
-primary_metrics:
-  - observed_success_yield_at_5
-  - observed_success_yield_at_10
-  - observed_success_yield_at_20
-  - observed_recall_at_5
-  - observed_recall_at_10
-  - observed_recall_at_20
-  - observed_ndcg_at_5
-  - observed_ndcg_at_10
-  - observed_ndcg_at_20
-  - macro_average_precision
-
 secondary_metrics:
   - global_average_precision
+  - positive_prevalence
+  - average_precision_above_prevalence
+  - normalized_average_precision
+  - study_macro_average_precision
+  - study_macro_positive_prevalence
+  - study_macro_normalized_average_precision
   - adjudicated_precision_at_5
   - adjudicated_precision_at_10
   - adjudicated_precision_at_20
+  - adjudicated_precision_lift_at_5
+  - adjudicated_precision_lift_at_10
+  - adjudicated_precision_lift_at_20
+  - strict_adjudicated_ndcg_at_5
+  - strict_adjudicated_ndcg_at_10
+  - strict_adjudicated_ndcg_at_20
+  - documented_success_capture_at_5
+  - documented_success_capture_at_10
+  - documented_success_capture_at_20
+  - documented_success_lift_at_5
+  - documented_success_lift_at_10
+  - documented_success_lift_at_20
   - uncalibrated_brier_score
   - calibration_slope
   - calibration_intercept
 
+metric_semantics:
+  top_k_tie_policy: fractional_expected_relevance_at_cutoff
+  single_class_query_policy: >-
+    Queries containing only one adjudicated class have no within-query ranking
+    resolution. Report their counts separately and exclude them from
+    inferential ranking macros.
+  precision_cutoff_policy: undefined_when_k_is_greater_than_or_equal_to_roster_size
+  ndcg_policy: >-
+    Standard NDCG remains rank-sensitive at the full roster. Report the
+    unsaturated-query fraction and strict NDCG, and never present repeated
+    NDCG@k values without their effective denominators.
+  documented_success_policy: >-
+    Missing outcomes count only as not documented. These metrics are
+    ascertainment-sensitive operational diagnostics, not validation yield or
+    biological failure rates, and cannot be selected as primary until an
+    outcome-complete denominator is defined.
+  normalized_ap_limitation: >-
+    Scaling AP above prevalence does not make it fully prevalence invariant;
+    prevalence and informative-query counts remain mandatory.
+
 uncertainty:
   resampling_unit: source_or_raw_family
-  secondary_resampling_unit: study
+  metric_macro_unit: study
+  separation_rule: >-
+    The source/raw-family cluster is resampled, while every study-macro metric
+    remains aggregated by study. These identifiers must not be substituted for
+    one another when a family contains multiple studies.
   method: cluster_bootstrap
   confidence: 0.95
   minimum_effective_draw_fraction: 0.8
   require_both_global_target_classes: true
   query_key_encoding: tuple
+  development_bootstrap_repetitions: 200
+  release_bootstrap_repetitions: 1000
+  fitted_score_bootstrap_limitation: >-
+    Resampling fixed OOF predictions conditions on model fitting. Full model
+    uncertainty requires refitting within the resampling design.
+  seed_sensitivity:
+    seeds: [17, 29, 43, 59, 71]
+    interpretation: diagnostic_not_confidence_interval
 
 training_weights:
   base: inverse_study_frequency
@@ -69,14 +118,26 @@ training_weights:
   limitation: >-
     Selection IPW does not yet model whether a tested outcome becomes
     adjudicable; V1/A/T observation missingness is reported separately.
+  propensity_clip: [0.1, 0.95]
 
 required_baselines:
+  - random_100_seeds
   - absolute_effect
   - mageck_rank
   - mageck_fdr
   - drugz_normz
   - cross_screen_recurrence
   - regularized_logistic
+baseline_policy:
+  primary_comparator: requires_preregistration
+  multiplicity: >-
+    Superiority is tested against the preregistered primary comparator using a
+    paired source-family resampling distribution. Other baseline comparisons
+    are secondary or multiplicity-adjusted.
+  direction_semantics: >-
+    MAGeCK and drugZ columns must be explicitly aligned to the candidate
+    phenotype direction and checksum-bound to their source with method/version
+    metadata; column names or signs are never trusted as attestation.
 
 adjacent_non_equivalent_benchmarks:
   assaybench:
@@ -87,6 +148,7 @@ adjacent_non_equivalent_benchmarks:
 
 leakage_rules:
   - no_rows_from_the_same_source_or_raw_family_across_train_and_test
+  - family_union_is_applied_even_when_a_custom_primary_group_column_is_requested
   - no_rows_from_the_same_study_across_train_and_test
   - reanalyses_and_duplicate_orcs_screen_records_are_not_independent
   - cross_screen_features_are_recomputed_from_outer_training_families_only

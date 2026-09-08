@@ -5,6 +5,7 @@ import pytest
 
 from crispr_evidencerank.evaluation import _composite_query_keys
 from crispr_evidencerank.modeling import (
+    ReproducibilityModel,
     WeightedMedianStandardizer,
     _cross_fitted_propensity,
     _study_family_groups,
@@ -17,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_grouped_oof_predictions_cover_every_row():
     path = ROOT / "examples" / "synthetic" / "labeled_gene_features.csv"
-    frame = pd.read_csv(path)
+    frame = pd.read_csv(path).copy()
     predictions, metrics = grouped_oof_predictions(frame, n_splits=4)
     assert predictions["reproducibility_score"].notna().all()
     assert predictions["fold"].nunique() == 4
@@ -106,6 +107,17 @@ def test_success_model_rejects_validation_leakage_features(forbidden):
         validate_success_feature_columns(["guide_n", forbidden])
 
 
+def test_direct_model_fit_rejects_report_only_features() -> None:
+    model = ReproducibilityModel(["report_only_immuno_dual_action_class"])
+    with pytest.raises(ValueError, match="leakage fields"):
+        model.fit(pd.DataFrame())
+
+
+def test_success_model_rejects_unregistered_clinical_feature() -> None:
+    with pytest.raises(ValueError, match="reviewed allowlist"):
+        validate_success_feature_columns(["guide_n", "clinical_trial_phase_max"])
+
+
 def test_shared_raw_data_family_stays_in_one_oof_fold():
     path = ROOT / "examples" / "synthetic" / "labeled_gene_features.csv"
     frame = pd.read_csv(path)
@@ -137,6 +149,27 @@ def test_shared_source_family_stays_in_one_oof_fold():
     assert predictions.loc[shared_rows, "fold"].nunique() == 1
 
 
+def test_custom_split_group_still_unions_shared_raw_data_families():
+    path = ROOT / "examples" / "synthetic" / "labeled_gene_features.csv"
+    frame = pd.read_csv(path).copy()
+    frame["custom_split_group"] = frame["study_id"]
+    shared_studies = frame["study_id"].drop_duplicates().iloc[:2]
+    frame["raw_data_family_id"] = pd.NA
+    frame.loc[
+        frame["study_id"].isin(shared_studies),
+        "raw_data_family_id",
+    ] = "SHARED_RAW_DATA"
+
+    predictions, _ = grouped_oof_predictions(
+        frame,
+        group_column="custom_split_group",
+        metric_study_column="study_id",
+        n_splits=4,
+    )
+    shared_rows = predictions["study_id"].isin(shared_studies)
+    assert predictions.loc[shared_rows, "fold"].nunique() == 1
+
+
 def test_source_and_raw_family_links_are_transitive():
     frame = pd.DataFrame(
         {
@@ -151,3 +184,17 @@ def test_source_and_raw_family_links_are_transitive():
         family_columns=("source_family_id", "raw_data_family_id"),
     )
     assert groups.nunique() == 1
+
+
+def test_unlabeled_direction_is_reported_unavailable_without_aborting():
+    path = ROOT / "examples" / "synthetic" / "labeled_gene_features.csv"
+    frame = pd.read_csv(path).copy()
+    sensitization = frame["phenotype_direction"].eq("sensitization")
+    frame.loc[sensitization, "label_code"] = "U"
+    frame.loc[sensitization, "testing_status"] = "unknown"
+
+    _, metrics = grouped_oof_predictions(frame, n_splits=4)
+
+    assert metrics["direction_sensitization_n_adjudicated"] == 0
+    assert metrics["direction_sensitization_ranking_available"] == 0
+    assert metrics["direction_resistance_ranking_available"] == 1

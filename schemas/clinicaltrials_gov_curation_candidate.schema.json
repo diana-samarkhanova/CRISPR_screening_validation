@@ -1,0 +1,310 @@
+{
+  "additionalProperties": false,
+  "description": "Unreviewed study-level intervention/condition co-mention for curation.",
+  "properties": {
+    "candidate_id": {
+      "minLength": 1,
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "snapshot_id": {
+      "minLength": 1,
+      "title": "Snapshot Id",
+      "type": "string"
+    },
+    "source_study_id": {
+      "pattern": "^NCT\\d{8}$",
+      "title": "Source Study Id",
+      "type": "string"
+    },
+    "source_family_id": {
+      "minLength": 1,
+      "title": "Source Family Id",
+      "type": "string"
+    },
+    "source_asset_id": {
+      "minLength": 1,
+      "title": "Source Asset Id",
+      "type": "string"
+    },
+    "source_asset_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Source Asset Sha256",
+      "type": "string"
+    },
+    "source_page_index": {
+      "minimum": 1,
+      "title": "Source Page Index",
+      "type": "integer"
+    },
+    "source_study_index": {
+      "minimum": 0,
+      "title": "Source Study Index",
+      "type": "integer"
+    },
+    "source_intervention_index": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Intervention Index"
+    },
+    "source_condition_index": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Condition Index"
+    },
+    "source_treatment_locator": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Treatment Locator"
+    },
+    "source_condition_locator": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Condition Locator"
+    },
+    "source_treatment_text": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Treatment Text"
+    },
+    "source_intervention_type": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Intervention Type"
+    },
+    "source_arm_group_labels_json": {
+      "title": "Source Arm Group Labels Json",
+      "type": "string"
+    },
+    "source_other_names_json": {
+      "title": "Source Other Names Json",
+      "type": "string"
+    },
+    "source_linked_arm_groups_json": {
+      "title": "Source Linked Arm Groups Json",
+      "type": "string"
+    },
+    "source_unmatched_arm_group_labels_json": {
+      "title": "Source Unmatched Arm Group Labels Json",
+      "type": "string"
+    },
+    "source_linked_arm_locators_json": {
+      "title": "Source Linked Arm Locators Json",
+      "type": "string"
+    },
+    "population_scope_locator_candidates_json": {
+      "title": "Population Scope Locator Candidates Json",
+      "type": "string"
+    },
+    "population_scope_text_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Population Scope Text Sha256",
+      "type": "string"
+    },
+    "source_condition_text": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Condition Text"
+    },
+    "query_intervention_text": {
+      "minLength": 1,
+      "title": "Query Intervention Text",
+      "type": "string"
+    },
+    "query_condition_text": {
+      "minLength": 1,
+      "title": "Query Condition Text",
+      "type": "string"
+    },
+    "treatment_concept_id": {
+      "default": null,
+      "title": "Treatment Concept Id",
+      "type": "null"
+    },
+    "treatment_mapping_relation": {
+      "const": "unknown",
+      "default": "unknown",
+      "title": "Treatment Mapping Relation",
+      "type": "string"
+    },
+    "treatment_mapping_review_status": {
+      "const": "not_performed",
+      "default": "not_performed",
+      "title": "Treatment Mapping Review Status",
+      "type": "string"
+    },
+    "cancer_concept_id": {
+      "default": null,
+      "title": "Cancer Concept Id",
+      "type": "null"
+    },
+    "cancer_mapping_relation": {
+      "const": "unknown",
+      "default": "unknown",
+      "title": "Cancer Mapping Relation",
+      "type": "string"
+    },
+    "cancer_mapping_review_status": {
+      "const": "not_performed",
+      "default": "not_performed",
+      "title": "Cancer Mapping Review Status",
+      "type": "string"
+    },
+    "intervention_role": {
+      "const": "unknown",
+      "default": "unknown",
+      "title": "Intervention Role",
+      "type": "string"
+    },
+    "regimen_context": {
+      "const": "unknown",
+      "default": "unknown",
+      "title": "Regimen Context",
+      "type": "string"
+    },
+    "population_scope_review_status": {
+      "const": "not_performed",
+      "default": "not_performed",
+      "title": "Population Scope Review Status",
+      "type": "string"
+    },
+    "treatment_cancer_linkage_status": {
+      "const": "not_performed",
+      "default": "not_performed",
+      "title": "Treatment Cancer Linkage Status",
+      "type": "string"
+    },
+    "treatment_cancer_linkage_locator": {
+      "default": null,
+      "title": "Treatment Cancer Linkage Locator",
+      "type": "null"
+    },
+    "co_mention_only": {
+      "const": true,
+      "default": true,
+      "title": "Co Mention Only",
+      "type": "boolean"
+    },
+    "blocker_codes_json": {
+      "title": "Blocker Codes Json",
+      "type": "string"
+    },
+    "normalization_status": {
+      "enum": [
+        "requires_curator_review",
+        "missing_source_intervention",
+        "missing_source_condition",
+        "missing_source_intervention_and_condition"
+      ],
+      "title": "Normalization Status",
+      "type": "string"
+    },
+    "exclusion_reason": {
+      "enum": [
+        "unreviewed_study_level_co_mention",
+        "missing_source_intervention",
+        "missing_source_condition",
+        "missing_source_intervention_and_condition"
+      ],
+      "title": "Exclusion Reason",
+      "type": "string"
+    },
+    "tsv_formula_escape_applied": {
+      "title": "Tsv Formula Escape Applied",
+      "type": "boolean"
+    },
+    "eligible_for_clinical_context": {
+      "const": false,
+      "default": false,
+      "title": "Eligible For Clinical Context",
+      "type": "boolean"
+    },
+    "used_for_label": {
+      "const": false,
+      "default": false,
+      "title": "Used For Label",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "candidate_id",
+    "snapshot_id",
+    "source_study_id",
+    "source_family_id",
+    "source_asset_id",
+    "source_asset_sha256",
+    "source_page_index",
+    "source_study_index",
+    "source_arm_group_labels_json",
+    "source_other_names_json",
+    "source_linked_arm_groups_json",
+    "source_unmatched_arm_group_labels_json",
+    "source_linked_arm_locators_json",
+    "population_scope_locator_candidates_json",
+    "population_scope_text_sha256",
+    "query_intervention_text",
+    "query_condition_text",
+    "blocker_codes_json",
+    "normalization_status",
+    "exclusion_reason",
+    "tsv_formula_escape_applied"
+  ],
+  "title": "ClinicalTrialsGovCurationCandidateRecord",
+  "type": "object"
+}

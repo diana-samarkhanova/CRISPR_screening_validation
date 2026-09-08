@@ -1,0 +1,965 @@
+{
+  "$defs": {
+    "AssayConsequence": {
+      "enum": [
+        "drug_resistance",
+        "drug_sensitization",
+        "tumor_immune_escape",
+        "tumor_immune_sensitization",
+        "immune_effector_gain",
+        "immune_effector_loss",
+        "immune_fitness_gain",
+        "immune_fitness_loss",
+        "marker_increased",
+        "marker_decreased",
+        "in_vivo_positive_selection",
+        "in_vivo_negative_selection",
+        "neutral",
+        "ambiguous"
+      ],
+      "title": "AssayConsequence",
+      "type": "string"
+    },
+    "DirectionMappingStatus": {
+      "enum": [
+        "exact",
+        "conditional",
+        "unresolved"
+      ],
+      "title": "DirectionMappingStatus",
+      "type": "string"
+    },
+    "EndpointPolarity": {
+      "description": "Whether enrichment or depletion is favorable for antitumor activity.",
+      "enum": [
+        "enrichment_is_favorable",
+        "depletion_is_favorable",
+        "unknown"
+      ],
+      "title": "EndpointPolarity",
+      "type": "string"
+    },
+    "ExperimentalSetting": {
+      "enum": [
+        "in_vitro",
+        "in_vivo",
+        "ex_vivo",
+        "unknown"
+      ],
+      "title": "ExperimentalSetting",
+      "type": "string"
+    },
+    "ImmuneScreenCategory": {
+      "description": "Phenotype strata adapted from, but not restricted to, ICRAFT.",
+      "enum": [
+        "cell_viability_proliferation",
+        "marker_expression",
+        "coculture_immune_killing",
+        "immune_cell_function",
+        "in_vivo_selection",
+        "other"
+      ],
+      "title": "ImmuneScreenCategory",
+      "type": "string"
+    },
+    "InputDataLevel": {
+      "enum": [
+        "fastq",
+        "raw_counts",
+        "normalized_counts",
+        "derived_gene_scores",
+        "unknown"
+      ],
+      "title": "InputDataLevel",
+      "type": "string"
+    },
+    "NativeEffectDirection": {
+      "description": "Direction in the source's native, non-display-inverted contrast.",
+      "enum": [
+        "enriched",
+        "depleted",
+        "neutral",
+        "unknown"
+      ],
+      "title": "NativeEffectDirection",
+      "type": "string"
+    },
+    "OrthologyMappingStatus": {
+      "enum": [
+        "not_needed",
+        "one_to_one",
+        "ambiguous",
+        "unmapped"
+      ],
+      "title": "OrthologyMappingStatus",
+      "type": "string"
+    },
+    "PerturbationModality": {
+      "enum": [
+        "CRISPR_KO",
+        "CRISPRa",
+        "CRISPRi",
+        "RNAi",
+        "overexpression",
+        "mutation",
+        "inhibitor",
+        "other"
+      ],
+      "title": "PerturbationModality",
+      "type": "string"
+    },
+    "PerturbedCompartment": {
+      "description": "Cell compartment in which the perturbation was introduced.",
+      "enum": [
+        "tumor_cell",
+        "immune_cell",
+        "other",
+        "unknown"
+      ],
+      "title": "PerturbedCompartment",
+      "type": "string"
+    },
+    "RankListCompleteness": {
+      "enum": [
+        "full_ranked_list",
+        "top_hits_only",
+        "unknown"
+      ],
+      "title": "RankListCompleteness",
+      "type": "string"
+    },
+    "RawEffectSignSemantics": {
+      "enum": [
+        "positive_is_enrichment",
+        "positive_is_depletion",
+        "unsigned_or_not_applicable"
+      ],
+      "title": "RawEffectSignSemantics",
+      "type": "string"
+    },
+    "SourceEffectSemantics": {
+      "enum": [
+        "native",
+        "icraft_ko_equivalent_display",
+        "other"
+      ],
+      "title": "SourceEffectSemantics",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "rank_list_completeness": {
+            "const": "full_ranked_list"
+          }
+        },
+        "required": [
+          "rank_list_completeness"
+        ]
+      },
+      "then": {
+        "properties": {
+          "rank_list_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "rank_list_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "source_rank": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "gene_universe_size": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "analysis_tail": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "rank_metric_type": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "rank_ordering": {
+            "enum": [
+              "ascending",
+              "descending"
+            ]
+          },
+          "rank_tie_policy": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "rank_list_id",
+          "rank_list_sha256",
+          "source_rank",
+          "gene_universe_size",
+          "analysis_tail",
+          "rank_metric_type",
+          "rank_ordering",
+          "rank_tie_policy"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "raw_effect": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "raw_effect"
+        ]
+      },
+      "then": {
+        "properties": {
+          "raw_effect_type": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "raw_effect_sign_semantics": {
+            "enum": [
+              "positive_is_enrichment",
+              "positive_is_depletion",
+              "unsigned_or_not_applicable"
+            ]
+          }
+        },
+        "required": [
+          "raw_effect_type",
+          "raw_effect_sign_semantics"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "raw_effect_type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "raw_effect_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "raw_effect": {
+            "type": "number"
+          },
+          "raw_effect_sign_semantics": {
+            "enum": [
+              "positive_is_enrichment",
+              "positive_is_depletion",
+              "unsigned_or_not_applicable"
+            ]
+          }
+        },
+        "required": [
+          "raw_effect",
+          "raw_effect_sign_semantics"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "raw_effect_sign_semantics": {
+            "enum": [
+              "positive_is_enrichment",
+              "positive_is_depletion",
+              "unsigned_or_not_applicable"
+            ]
+          }
+        },
+        "required": [
+          "raw_effect_sign_semantics"
+        ]
+      },
+      "then": {
+        "properties": {
+          "raw_effect": {
+            "type": "number"
+          },
+          "raw_effect_type": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "raw_effect",
+          "raw_effect_type"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "source_score": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "source_score"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source_score_type": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_score_type"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "source_score_type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_score_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source_score": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "source_score"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "dual_action_group_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "dual_action_group_id"
+        ]
+      },
+      "then": {
+        "properties": {
+          "dual_action_group_version": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "dual_action_group_version"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "dual_action_group_version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "dual_action_group_version"
+        ]
+      },
+      "then": {
+        "properties": {
+          "dual_action_group_id": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "dual_action_group_id"
+        ]
+      }
+    }
+  ],
+  "anyOf": [
+    {
+      "properties": {
+        "raw_effect": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "raw_effect"
+      ]
+    },
+    {
+      "properties": {
+        "source_score": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "source_score"
+      ]
+    },
+    {
+      "properties": {
+        "source_fdr": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "source_fdr"
+      ]
+    },
+    {
+      "properties": {
+        "source_rank": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "source_rank"
+      ]
+    }
+  ],
+  "description": "Canonical comparison-by-gene evidence for immune-context reporting.\n\nThis contract deliberately stores the native source direction separately\nfrom endpoint desirability. It is auxiliary evidence: it cannot create a\nvalidation label or enter the success model as a current-snapshot feature.",
+  "properties": {
+    "evidence_id": {
+      "minLength": 1,
+      "title": "Evidence Id",
+      "type": "string"
+    },
+    "source_name": {
+      "minLength": 1,
+      "title": "Source Name",
+      "type": "string"
+    },
+    "source_version": {
+      "minLength": 1,
+      "title": "Source Version",
+      "type": "string"
+    },
+    "source_snapshot_date": {
+      "format": "date",
+      "title": "Source Snapshot Date",
+      "type": "string"
+    },
+    "external_study_id": {
+      "minLength": 1,
+      "title": "External Study Id",
+      "type": "string"
+    },
+    "external_screen_id": {
+      "minLength": 1,
+      "title": "External Screen Id",
+      "type": "string"
+    },
+    "external_comparison_id": {
+      "minLength": 1,
+      "title": "External Comparison Id",
+      "type": "string"
+    },
+    "source_family_id": {
+      "minLength": 1,
+      "title": "Source Family Id",
+      "type": "string"
+    },
+    "raw_data_family_id": {
+      "minLength": 1,
+      "title": "Raw Data Family Id",
+      "type": "string"
+    },
+    "gene_symbol": {
+      "minLength": 1,
+      "title": "Gene Symbol",
+      "type": "string"
+    },
+    "source_organism": {
+      "minLength": 1,
+      "title": "Source Organism",
+      "type": "string"
+    },
+    "mapped_human_gene_symbol": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Mapped Human Gene Symbol"
+    },
+    "orthology_mapping_status": {
+      "$ref": "#/$defs/OrthologyMappingStatus"
+    },
+    "orthology_source": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Orthology Source"
+    },
+    "orthology_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Orthology Version"
+    },
+    "perturbation_modality": {
+      "$ref": "#/$defs/PerturbationModality"
+    },
+    "perturbed_compartment": {
+      "$ref": "#/$defs/PerturbedCompartment"
+    },
+    "experimental_setting": {
+      "$ref": "#/$defs/ExperimentalSetting"
+    },
+    "screen_category": {
+      "$ref": "#/$defs/ImmuneScreenCategory"
+    },
+    "cell_model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cell Model"
+    },
+    "immune_cell_type": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Immune Cell Type"
+    },
+    "cancer_type": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cancer Type"
+    },
+    "treatment": {
+      "minLength": 1,
+      "title": "Treatment",
+      "type": "string"
+    },
+    "comparator": {
+      "minLength": 1,
+      "title": "Comparator",
+      "type": "string"
+    },
+    "contrast_definition": {
+      "minLength": 1,
+      "title": "Contrast Definition",
+      "type": "string"
+    },
+    "phenotype_endpoint": {
+      "minLength": 1,
+      "title": "Phenotype Endpoint",
+      "type": "string"
+    },
+    "assay_consequence": {
+      "$ref": "#/$defs/AssayConsequence"
+    },
+    "timepoint": {
+      "minLength": 1,
+      "title": "Timepoint",
+      "type": "string"
+    },
+    "recurrence_stratum_id": {
+      "minLength": 1,
+      "title": "Recurrence Stratum Id",
+      "type": "string"
+    },
+    "dual_action_group_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Dual Action Group Id"
+    },
+    "dual_action_group_version": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Dual Action Group Version"
+    },
+    "native_effect_direction": {
+      "$ref": "#/$defs/NativeEffectDirection"
+    },
+    "endpoint_polarity": {
+      "$ref": "#/$defs/EndpointPolarity"
+    },
+    "direction_mapping_status": {
+      "$ref": "#/$defs/DirectionMappingStatus"
+    },
+    "direction_mapping_rule": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Direction Mapping Rule"
+    },
+    "raw_effect": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Raw Effect"
+    },
+    "raw_effect_type": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Raw Effect Type"
+    },
+    "raw_effect_sign_semantics": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RawEffectSignSemantics"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "source_score": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Score"
+    },
+    "source_score_type": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Score Type"
+    },
+    "source_fdr": {
+      "anyOf": [
+        {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Fdr"
+    },
+    "source_rank": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Rank"
+    },
+    "rank_list_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Rank List Id"
+    },
+    "rank_list_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "SHA-256 of the canonical UTF-8 roster sorted by source rank as gene_symbol<TAB>source_rank<LF>",
+      "title": "Rank List Sha256"
+    },
+    "gene_universe_size": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Gene Universe Size"
+    },
+    "analysis_tail": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Analysis Tail"
+    },
+    "rank_metric_type": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Rank Metric Type"
+    },
+    "rank_ordering": {
+      "anyOf": [
+        {
+          "enum": [
+            "ascending",
+            "descending"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Ordering of the source metric used to derive the ordinal rank; source_rank=1 must always denote the best-ranked gene",
+      "title": "Rank Ordering"
+    },
+    "rank_tie_policy": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Rank Tie Policy"
+    },
+    "rank_list_completeness": {
+      "$ref": "#/$defs/RankListCompleteness"
+    },
+    "source_effect_semantics": {
+      "$ref": "#/$defs/SourceEffectSemantics",
+      "default": "native"
+    },
+    "published_sign_inverted": {
+      "default": false,
+      "title": "Published Sign Inverted",
+      "type": "boolean"
+    },
+    "input_data_level": {
+      "$ref": "#/$defs/InputDataLevel",
+      "default": "unknown"
+    },
+    "source_url": {
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Source Url",
+      "type": "string"
+    },
+    "source_locator": {
+      "minLength": 1,
+      "title": "Source Locator",
+      "type": "string"
+    },
+    "available_date": {
+      "format": "date",
+      "title": "Available Date",
+      "type": "string"
+    },
+    "transformation_available_date": {
+      "format": "date",
+      "title": "Transformation Available Date",
+      "type": "string"
+    },
+    "retrieved_date": {
+      "format": "date",
+      "title": "Retrieved Date",
+      "type": "string"
+    },
+    "transformation_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Transformation Id"
+    },
+    "used_for_label": {
+      "const": false,
+      "default": false,
+      "title": "Used For Label",
+      "type": "boolean"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "evidence_id",
+    "source_name",
+    "source_version",
+    "source_snapshot_date",
+    "external_study_id",
+    "external_screen_id",
+    "external_comparison_id",
+    "source_family_id",
+    "raw_data_family_id",
+    "gene_symbol",
+    "source_organism",
+    "orthology_mapping_status",
+    "perturbation_modality",
+    "perturbed_compartment",
+    "experimental_setting",
+    "screen_category",
+    "treatment",
+    "comparator",
+    "contrast_definition",
+    "phenotype_endpoint",
+    "assay_consequence",
+    "timepoint",
+    "recurrence_stratum_id",
+    "native_effect_direction",
+    "endpoint_polarity",
+    "direction_mapping_status",
+    "rank_list_completeness",
+    "source_url",
+    "source_locator",
+    "available_date",
+    "transformation_available_date",
+    "retrieved_date"
+  ],
+  "title": "ImmuneScreenEvidenceRecord",
+  "type": "object",
+  "x-semantic-rules": [
+    "raw_effect is always native and is never overwritten by an ICRAFT CRISPRa display inversion",
+    "a full_ranked_list row requires checksum-bound rank-list ID, source rank, universe, tail, metric, ordering, and tie policy",
+    "full-list completeness is verified across the complete input table before RRA; the row declaration alone is insufficient",
+    "used_for_label is always false",
+    "ambiguous or unmapped orthology remains annotation-only",
+    "raw effect sign is interpreted only through the controlled raw_effect_sign_semantics field"
+  ]
+}

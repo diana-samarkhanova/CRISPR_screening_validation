@@ -1,0 +1,493 @@
+{
+  "$defs": {
+    "ClinicalInterventionRole": {
+      "enum": [
+        "experimental",
+        "active_comparator",
+        "placebo_comparator",
+        "sham_comparator",
+        "no_intervention",
+        "other",
+        "unknown"
+      ],
+      "title": "ClinicalInterventionRole",
+      "type": "string"
+    },
+    "ClinicalMappingRelation": {
+      "description": "Relationship between a source term and its normalized concept.",
+      "enum": [
+        "exact",
+        "broader_than_source",
+        "narrower_than_source",
+        "related",
+        "unknown"
+      ],
+      "title": "ClinicalMappingRelation",
+      "type": "string"
+    },
+    "ClinicalMappingReviewStatus": {
+      "description": "Review state of a treatment or cancer concept mapping.",
+      "enum": [
+        "curator_reviewed",
+        "source_asserted",
+        "automated_unreviewed",
+        "unknown"
+      ],
+      "title": "ClinicalMappingReviewStatus",
+      "type": "string"
+    },
+    "ClinicalPhaseCategory": {
+      "description": "Normalized phase; higher phase is not treated as evidence of efficacy.",
+      "enum": [
+        "early_phase_1",
+        "phase_1",
+        "phase_1_2",
+        "phase_2",
+        "phase_2_3",
+        "phase_3",
+        "phase_4",
+        "not_applicable",
+        "unknown"
+      ],
+      "title": "ClinicalPhaseCategory",
+      "type": "string"
+    },
+    "ClinicalRegimenContext": {
+      "enum": [
+        "monotherapy",
+        "combination",
+        "add_on",
+        "maintenance",
+        "background",
+        "other",
+        "unknown"
+      ],
+      "title": "ClinicalRegimenContext",
+      "type": "string"
+    },
+    "ClinicalStatusCategory": {
+      "description": "Coarse registry status without any efficacy interpretation.",
+      "enum": [
+        "not_yet_recruiting",
+        "recruiting",
+        "active_not_recruiting",
+        "enrolling_by_invitation",
+        "suspended",
+        "terminated",
+        "completed",
+        "withdrawn",
+        "unknown"
+      ],
+      "title": "ClinicalStatusCategory",
+      "type": "string"
+    },
+    "ClinicalStudyType": {
+      "description": "Normalized ClinicalTrials.gov-compatible study type.",
+      "enum": [
+        "interventional",
+        "observational",
+        "expanded_access",
+        "other",
+        "unknown"
+      ],
+      "title": "ClinicalStudyType",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "results_posted": {
+            "const": true
+          }
+        },
+        "required": [
+          "results_posted"
+        ]
+      },
+      "then": {
+        "required": [
+          "results_first_posted_date"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "study_type": {
+            "enum": [
+              "observational",
+              "expanded_access",
+              "other",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "study_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "phase_category": {
+            "enum": [
+              "not_applicable",
+              "unknown"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "description": "Frozen study-level treatment-by-cancer registry evidence.\n\nOne row represents one source study, one normalized treatment concept, and\none normalized cancer concept.  It records registry presence and metadata;\nit never represents efficacy, patient-level data, or validation of a CRISPR\nhit.",
+  "properties": {
+    "evidence_id": {
+      "minLength": 1,
+      "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+      "title": "Evidence Id",
+      "type": "string"
+    },
+    "source_asset_id": {
+      "minLength": 1,
+      "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+      "title": "Source Asset Id",
+      "type": "string"
+    },
+    "source_asset_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Source Asset Sha256",
+      "type": "string"
+    },
+    "source_name": {
+      "minLength": 1,
+      "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+      "title": "Source Name",
+      "type": "string"
+    },
+    "source_version": {
+      "minLength": 1,
+      "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+      "title": "Source Version",
+      "type": "string"
+    },
+    "source_api_version": {
+      "minLength": 1,
+      "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+      "title": "Source Api Version",
+      "type": "string"
+    },
+    "source_snapshot_date": {
+      "format": "date",
+      "title": "Source Snapshot Date",
+      "type": "string"
+    },
+    "source_study_id": {
+      "minLength": 1,
+      "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+      "title": "Source Study Id",
+      "type": "string"
+    },
+    "source_family_id": {
+      "minLength": 1,
+      "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+      "title": "Source Family Id",
+      "type": "string"
+    },
+    "source_record_version": {
+      "minLength": 1,
+      "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+      "title": "Source Record Version",
+      "type": "string"
+    },
+    "record_last_update_date": {
+      "format": "date",
+      "title": "Record Last Update Date",
+      "type": "string"
+    },
+    "study_type": {
+      "$ref": "#/$defs/ClinicalStudyType"
+    },
+    "source_overall_status": {
+      "minLength": 1,
+      "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+      "title": "Source Overall Status",
+      "type": "string"
+    },
+    "status_category": {
+      "$ref": "#/$defs/ClinicalStatusCategory"
+    },
+    "source_phase": {
+      "minLength": 1,
+      "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+      "title": "Source Phase",
+      "type": "string"
+    },
+    "phase_category": {
+      "$ref": "#/$defs/ClinicalPhaseCategory"
+    },
+    "source_treatment_text": {
+      "minLength": 1,
+      "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+      "title": "Source Treatment Text",
+      "type": "string"
+    },
+    "treatment_concept_id": {
+      "minLength": 1,
+      "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+      "title": "Treatment Concept Id",
+      "type": "string"
+    },
+    "treatment_preferred_name": {
+      "minLength": 1,
+      "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+      "title": "Treatment Preferred Name",
+      "type": "string"
+    },
+    "treatment_mapping_source": {
+      "minLength": 1,
+      "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+      "title": "Treatment Mapping Source",
+      "type": "string"
+    },
+    "treatment_mapping_version": {
+      "minLength": 1,
+      "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+      "title": "Treatment Mapping Version",
+      "type": "string"
+    },
+    "treatment_mapping_relation": {
+      "$ref": "#/$defs/ClinicalMappingRelation"
+    },
+    "treatment_mapping_review_status": {
+      "$ref": "#/$defs/ClinicalMappingReviewStatus"
+    },
+    "treatment_mapping_review_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Treatment Mapping Review Id"
+    },
+    "treatment_mapping_review_date": {
+      "anyOf": [
+        {
+          "format": "date",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Treatment Mapping Review Date"
+    },
+    "source_condition_text": {
+      "minLength": 1,
+      "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+      "title": "Source Condition Text",
+      "type": "string"
+    },
+    "cancer_concept_id": {
+      "minLength": 1,
+      "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+      "title": "Cancer Concept Id",
+      "type": "string"
+    },
+    "cancer_preferred_name": {
+      "minLength": 1,
+      "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+      "title": "Cancer Preferred Name",
+      "type": "string"
+    },
+    "cancer_mapping_source": {
+      "minLength": 1,
+      "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+      "title": "Cancer Mapping Source",
+      "type": "string"
+    },
+    "cancer_mapping_version": {
+      "minLength": 1,
+      "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+      "title": "Cancer Mapping Version",
+      "type": "string"
+    },
+    "cancer_mapping_relation": {
+      "$ref": "#/$defs/ClinicalMappingRelation"
+    },
+    "cancer_mapping_review_status": {
+      "$ref": "#/$defs/ClinicalMappingReviewStatus"
+    },
+    "cancer_mapping_review_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cancer Mapping Review Id"
+    },
+    "cancer_mapping_review_date": {
+      "anyOf": [
+        {
+          "format": "date",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cancer Mapping Review Date"
+    },
+    "intervention_role": {
+      "$ref": "#/$defs/ClinicalInterventionRole"
+    },
+    "regimen_context": {
+      "$ref": "#/$defs/ClinicalRegimenContext"
+    },
+    "source_subtype_definition": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Subtype Definition"
+    },
+    "results_posted": {
+      "title": "Results Posted",
+      "type": "boolean"
+    },
+    "results_first_posted_date": {
+      "anyOf": [
+        {
+          "format": "date",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Results First Posted Date"
+    },
+    "source_url": {
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Source Url",
+      "type": "string"
+    },
+    "source_locator": {
+      "minLength": 1,
+      "pattern": "^[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?$",
+      "title": "Source Locator",
+      "type": "string"
+    },
+    "available_date": {
+      "format": "date",
+      "title": "Available Date",
+      "type": "string"
+    },
+    "transformation_available_date": {
+      "format": "date",
+      "title": "Transformation Available Date",
+      "type": "string"
+    },
+    "retrieved_date": {
+      "format": "date",
+      "title": "Retrieved Date",
+      "type": "string"
+    },
+    "used_for_label": {
+      "const": false,
+      "default": false,
+      "title": "Used For Label",
+      "type": "boolean"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "evidence_id",
+    "source_asset_id",
+    "source_asset_sha256",
+    "source_name",
+    "source_version",
+    "source_api_version",
+    "source_snapshot_date",
+    "source_study_id",
+    "source_family_id",
+    "source_record_version",
+    "record_last_update_date",
+    "study_type",
+    "source_overall_status",
+    "status_category",
+    "source_phase",
+    "phase_category",
+    "source_treatment_text",
+    "treatment_concept_id",
+    "treatment_preferred_name",
+    "treatment_mapping_source",
+    "treatment_mapping_version",
+    "treatment_mapping_relation",
+    "treatment_mapping_review_status",
+    "source_condition_text",
+    "cancer_concept_id",
+    "cancer_preferred_name",
+    "cancer_mapping_source",
+    "cancer_mapping_version",
+    "cancer_mapping_relation",
+    "cancer_mapping_review_status",
+    "intervention_role",
+    "regimen_context",
+    "results_posted",
+    "source_url",
+    "source_locator",
+    "available_date",
+    "transformation_available_date",
+    "retrieved_date"
+  ],
+  "title": "ClinicalTrialEvidenceRecord",
+  "type": "object",
+  "x-semantic-rules": [
+    "available_date <= source_snapshot_date <= retrieved_date",
+    "record_last_update_date cannot follow source_snapshot_date",
+    "transformation_available_date cannot follow retrieved_date",
+    "results_posted is paired with results_first_posted_date and the results date cannot follow the source snapshot",
+    "source_asset_id and source_asset_sha256 must resolve to a checksum-pinned DataAssetRecord at report runtime",
+    "report eligibility requires exact curator-reviewed treatment and cancer mappings",
+    "curator-reviewed mappings require a review event identifier and review date no later than transformation availability",
+    "report eligibility requires an interventional study with the treatment in the experimental role",
+    "used_for_label is always false"
+  ]
+}

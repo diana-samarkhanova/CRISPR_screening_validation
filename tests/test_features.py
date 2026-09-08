@@ -27,10 +27,83 @@ def test_positive_treatment_shift_produces_positive_lfc():
             "replicate": [1, 2, 1, 2],
         }
     )
-    features = featurize_count_table(counts, samples).set_index("gene_symbol")
+    features = featurize_count_table(
+        counts,
+        samples,
+        positive_lfc_means="resistance",
+    ).set_index("gene_symbol")
     assert features.loc["A", "median_guide_lfc"] > 0
     assert features.loc["B", "median_guide_lfc"] < 0
     assert features.loc["A", "guide_direction_agreement"] == 1.0
+    assert features.loc["A", "native_lfc_direction"] == "positive"
+    assert features.loc["B", "native_lfc_direction"] == "negative"
+    assert features.loc["A", "signal_direction"] == "resistance"
+    assert features.loc["B", "signal_direction"] == "sensitization"
+
+
+def test_explicit_positive_lfc_semantics_can_reverse_biological_direction():
+    counts = pd.DataFrame(
+        {
+            "sgrna_id": ["g1", "g2", "g3", "g4"],
+            "gene_symbol": ["A", "A", "B", "B"],
+            "c1": [100, 120, 100, 120],
+            "c2": [110, 115, 110, 115],
+            "t1": [400, 450, 25, 30],
+            "t2": [420, 430, 30, 35],
+        }
+    )
+    samples = pd.DataFrame(
+        {
+            "sample_id": ["c1", "c2", "t1", "t2"],
+            "screen_id": ["S1"] * 4,
+            "contrast_id": ["S1_drug"] * 4,
+            "condition_role": ["control", "control", "treatment", "treatment"],
+            "replicate": [1, 2, 1, 2],
+        }
+    )
+
+    features = featurize_count_table(
+        counts,
+        samples,
+        positive_lfc_means="sensitization",
+    ).set_index("gene_symbol")
+
+    assert features.loc["A", "native_lfc_direction"] == "positive"
+    assert features.loc["B", "native_lfc_direction"] == "negative"
+    assert features.loc["A", "signal_direction"] == "sensitization"
+    assert features.loc["B", "signal_direction"] == "resistance"
+    assert features.loc["A", "is_sensitization_signal"] == 1.0
+    assert features.loc["B", "is_sensitization_signal"] == 0.0
+    assert features["positive_lfc_means"].eq("sensitization").all()
+
+
+def test_count_featurization_requires_explicit_lfc_semantics():
+    counts = pd.DataFrame(
+        {
+            "sgrna_id": ["g1"],
+            "gene_symbol": ["A"],
+            "c1": [100],
+            "t1": [200],
+        }
+    )
+    samples = pd.DataFrame(
+        {
+            "sample_id": ["c1", "t1"],
+            "screen_id": ["S1", "S1"],
+            "contrast_id": ["C1", "C1"],
+            "condition_role": ["control", "treatment"],
+            "replicate": [1, 1],
+        }
+    )
+
+    with pytest.raises(TypeError, match="positive_lfc_means"):
+        featurize_count_table(counts, samples)  # type: ignore[call-arg]
+    with pytest.raises(ValueError, match="positive_lfc_means"):
+        featurize_count_table(
+            counts,
+            samples,
+            positive_lfc_means="unknown",
+        )
 
 
 def test_zero_effect_guides_do_not_look_directionally_concordant():
@@ -51,7 +124,11 @@ def test_zero_effect_guides_do_not_look_directionally_concordant():
             "replicate": [1, 1],
         }
     )
-    features = featurize_count_table(counts, samples)
+    features = featurize_count_table(
+        counts,
+        samples,
+        positive_lfc_means="resistance",
+    )
     assert features.loc[0, "guide_direction_agreement"] == 0.0
     assert features.loc[0, "neutral_guide_fraction"] == 1.0
 
@@ -74,7 +151,11 @@ def test_numeric_sample_ids_are_normalized():
             "replicate": [1, 1],
         }
     )
-    features = featurize_count_table(counts, samples)
+    features = featurize_count_table(
+        counts,
+        samples,
+        positive_lfc_means="resistance",
+    )
     assert len(features) == 1
 
 
@@ -97,11 +178,16 @@ def test_invalid_count_inputs_are_rejected():
         }
     )
     with pytest.raises(ValueError, match="finite"):
-        featurize_count_table(counts, samples)
+        featurize_count_table(
+            counts,
+            samples,
+            positive_lfc_means="resistance",
+        )
     with pytest.raises(ValueError, match="pseudocount"):
         featurize_count_table(
             counts.assign(c1=100),
             samples,
+            positive_lfc_means="resistance",
             pseudocount=0,
         )
 
@@ -124,7 +210,11 @@ def test_median_ratio_normalization_resists_compositional_shift():
             "replicate": [1, 1],
         }
     )
-    features = featurize_count_table(counts, samples).set_index("gene_symbol")
+    features = featurize_count_table(
+        counts,
+        samples,
+        positive_lfc_means="resistance",
+    ).set_index("gene_symbol")
     assert features.loc["A", "median_guide_lfc"] > 5
     assert abs(features.loc["B", "median_guide_lfc"]) < 0.05
     assert abs(features.loc["C", "median_guide_lfc"]) < 0.05
@@ -149,7 +239,11 @@ def test_all_zero_guides_do_not_bias_median_ratio_size_factors():
             "replicate": [1, 1],
         }
     )
-    features = featurize_count_table(counts, samples).set_index("gene_symbol")
+    features = featurize_count_table(
+        counts,
+        samples,
+        positive_lfc_means="resistance",
+    ).set_index("gene_symbol")
     assert abs(features.loc["A", "median_guide_lfc"]) < 0.05
     assert abs(features.loc["B", "median_guide_lfc"]) < 0.05
 
@@ -173,10 +267,18 @@ def test_fractional_counts_and_unclassified_columns_are_rejected():
         }
     )
     with pytest.raises(ValueError, match="integer-valued"):
-        featurize_count_table(fractional, samples)
+        featurize_count_table(
+            fractional,
+            samples,
+            positive_lfc_means="resistance",
+        )
     extra = fractional.assign(c1=10, annotation="unexpected")
     with pytest.raises(ValueError, match="not declared"):
-        featurize_count_table(extra, samples)
+        featurize_count_table(
+            extra,
+            samples,
+            positive_lfc_means="resistance",
+        )
 
 
 def test_design_features_preserve_zero_and_pairing_metadata():

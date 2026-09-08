@@ -1,0 +1,150 @@
+{
+  "$defs": {
+    "EventReviewComparisonStatus": {
+      "description": "Deterministic relationship between two reviews of one frozen card.",
+      "enum": [
+        "full_agreement",
+        "label_agreement_fact_disagreement",
+        "label_disagreement"
+      ],
+      "title": "EventReviewComparisonStatus",
+      "type": "string"
+    },
+    "LabelCode": {
+      "description": "Evidence labels for an individual validation event.",
+      "enum": [
+        "V3",
+        "V2",
+        "V1",
+        "F0",
+        "D",
+        "A",
+        "T",
+        "U"
+      ],
+      "title": "LabelCode",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Deterministic field-level comparison; it never releases a final label.",
+  "properties": {
+    "comparison_id": {
+      "minLength": 1,
+      "title": "Comparison Id",
+      "type": "string"
+    },
+    "packet_id": {
+      "minLength": 1,
+      "title": "Packet Id",
+      "type": "string"
+    },
+    "packet_version": {
+      "minimum": 1,
+      "title": "Packet Version",
+      "type": "integer"
+    },
+    "packet_event_id": {
+      "minLength": 1,
+      "title": "Packet Event Id",
+      "type": "string"
+    },
+    "packet_payload_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Packet Payload Sha256",
+      "type": "string"
+    },
+    "rubric_version": {
+      "minLength": 1,
+      "title": "Rubric Version",
+      "type": "string"
+    },
+    "primary_review_id": {
+      "minLength": 1,
+      "title": "Primary Review Id",
+      "type": "string"
+    },
+    "secondary_review_id": {
+      "minLength": 1,
+      "title": "Secondary Review Id",
+      "type": "string"
+    },
+    "primary_reviewer_id": {
+      "minLength": 1,
+      "title": "Primary Reviewer Id",
+      "type": "string"
+    },
+    "secondary_reviewer_id": {
+      "minLength": 1,
+      "title": "Secondary Reviewer Id",
+      "type": "string"
+    },
+    "primary_label_code": {
+      "$ref": "#/$defs/LabelCode"
+    },
+    "secondary_label_code": {
+      "$ref": "#/$defs/LabelCode"
+    },
+    "label_agreement": {
+      "title": "Label Agreement",
+      "type": "boolean"
+    },
+    "disagreement_fields": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z0-9_.-]+(?:\\|[a-z0-9_.-]+)*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Disagreement Fields"
+    },
+    "comparison_status": {
+      "$ref": "#/$defs/EventReviewComparisonStatus"
+    },
+    "human_adjudication_required": {
+      "title": "Human Adjudication Required",
+      "type": "boolean"
+    },
+    "compared_at_utc": {
+      "format": "date-time",
+      "title": "Compared At Utc",
+      "type": "string"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "comparison_id",
+    "packet_id",
+    "packet_version",
+    "packet_event_id",
+    "packet_payload_sha256",
+    "rubric_version",
+    "primary_review_id",
+    "secondary_review_id",
+    "primary_reviewer_id",
+    "secondary_reviewer_id",
+    "primary_label_code",
+    "secondary_label_code",
+    "label_agreement",
+    "comparison_status",
+    "human_adjudication_required",
+    "compared_at_utc"
+  ],
+  "title": "EventReviewComparisonRecord",
+  "type": "object"
+}

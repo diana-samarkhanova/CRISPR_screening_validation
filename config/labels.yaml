@@ -4,19 +4,25 @@ labels:
     name: causal_validation
     model_role: positive
     minimum_requirements:
+      - testing_status_tested
       - perturbation_confirmed
       - phenotype_reproduced
-      - at_least_two_independent_reagents_or_orthogonal_perturbation
       - appropriate_control
+      - assay_adequate
+      - at_least_one_primary_reagent
+      - at_least_two_independent_reagents_or_orthogonal_perturbation
       - rescue_or_equivalent_causal_reversal
   V2:
     name: reproduced
     model_role: positive
     minimum_requirements:
+      - testing_status_tested
       - perturbation_confirmed
       - phenotype_reproduced
-      - at_least_two_independent_reagents_or_orthogonal_perturbation
       - appropriate_control
+      - assay_adequate
+      - at_least_one_primary_reagent
+      - at_least_two_independent_reagents_or_orthogonal_perturbation
   V1:
     name: supportive
     model_role: unlabeled
@@ -25,14 +31,25 @@ labels:
     name: failed_validation
     model_role: negative
     minimum_requirements:
+      - testing_status_tested
       - perturbation_confirmed
+      - appropriate_control
       - assay_adequate
+      - at_least_one_primary_reagent
+      - at_least_two_independent_reagents_or_orthogonal_perturbation
       - phenotype_not_reproduced
+      - null_result_evaluable
   D:
     name: discordant
     model_role: negative
     minimum_requirements:
+      - testing_status_tested
       - perturbation_confirmed
+      - appropriate_control
+      - assay_adequate
+      - at_least_one_primary_reagent
+      - at_least_two_independent_reagents_or_orthogonal_perturbation
+      - phenotype_not_reproduced
       - opposite_direction_reproduced
   A:
     name: ambiguous
@@ -58,17 +75,28 @@ label_source_policy:
     - biogrid_orcs_hit_call
     - author_screen_gene_score
     - cross_screen_recurrence
+    - icraft_rra
+    - immune_screen_recurrence
+    - immune_dual_action_class
+    - scrna_expression_association
+    - tcga_or_icb_clinical_association
+    - clinical_trial_registry_presence
+    - clinical_trial_phase_or_status
+    - clinical_results_posted
     - absence_from_validation_section
   note: >-
-    ORCS and other screen databases provide discovery metadata and gene-score
-    evidence. They do not establish that a gene was independently perturbed and
-    reproduced the phenotype.
+    ORCS, ICRAFT, and other screen databases provide discovery, recurrence, and
+    context evidence. They do not establish that a gene was independently
+    perturbed and reproduced the exact phenotype. Immune and clinical-registry
+    context are auxiliary and cannot create V2, V3, F0, or D.
 
 validation_protocol_policy:
   purpose: label_adjudication_and_reporting
   success_model_feature_use: prohibited_unless_declared_before_prediction
   draft_status: single_curator
-  benchmark_ready_statuses:
+  status_strings_are_diagnostic_only: true
+  linked_gold_promotion_required: true
+  legacy_diagnostic_statuses:
     - adjudicated
     - consensus
     - consensus_adjudicated

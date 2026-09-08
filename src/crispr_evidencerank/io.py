@@ -35,17 +35,33 @@ def normalize_count_inputs(
 
     normalized_counts = counts.copy()
     normalized_samples = samples.copy()
-    normalized_column_names = [str(column) for column in normalized_counts.columns]
+    normalized_column_names = [
+        str(column).strip() for column in normalized_counts.columns
+    ]
+    if any(not column for column in normalized_column_names):
+        raise ValueError("count-table column names cannot be empty")
     if len(set(normalized_column_names)) != len(normalized_column_names):
         raise ValueError(
             "count-table column names are duplicated after string normalization"
         )
     normalized_counts.columns = normalized_column_names
-    if "sample_id" in normalized_samples:
-        if normalized_samples["sample_id"].isna().any():
-            raise ValueError("sample_id cannot be missing")
-        normalized_samples["sample_id"] = (
-            normalized_samples["sample_id"].astype(str).str.strip()
+    for column in COUNT_ID_COLUMNS:
+        if column in normalized_counts:
+            normalized_counts[column] = (
+                normalized_counts[column].astype("string").str.strip()
+            )
+    for column in (
+        "sample_id",
+        "screen_id",
+        "contrast_id",
+        "condition_role",
+    ):
+        if column not in normalized_samples:
+            continue
+        if normalized_samples[column].isna().any():
+            raise ValueError(f"{column} cannot be missing")
+        normalized_samples[column] = (
+            normalized_samples[column].astype("string").str.strip()
         )
     return normalized_counts, normalized_samples
 
@@ -137,6 +153,7 @@ def normalize_mageck_gene_summary(
         "p_value": ("p-value", "pvalue", "p_value"),
         "fdr": ("fdr",),
         "rank": ("rank",),
+        "good_sgrna_n": ("goodsgrna", "good_sgrna"),
     }
     records: list[dict[str, object]] = []
     for mageck_direction in ("pos", "neg"):
@@ -160,12 +177,15 @@ def normalize_mageck_gene_summary(
             record: dict[str, object] = {
                 "screen_id": screen_id,
                 "contrast_id": contrast_id,
-                "gene_symbol": str(row[gene_column]),
+                "gene_symbol": str(row[gene_column]).strip(),
                 "method": "MAGeCK-RRA",
                 "analysis_tail": f"mageck_{mageck_direction}",
                 "direction": "unknown",
                 "cnv_corrected": False,
             }
+            if "num" in frame:
+                value = row["num"]
+                record["input_sgrna_n"] = None if pd.isna(value) else float(value)
             for target, column in selected.items():
                 value = row[column]
                 record[target] = None if pd.isna(value) else float(value)

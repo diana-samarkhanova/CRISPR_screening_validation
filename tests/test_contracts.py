@@ -1,11 +1,14 @@
+import hashlib
 import json
 from pathlib import Path
 
 import pandas as pd
 import pytest
+import yaml
 
 from crispr_evidencerank.contracts import (
     CONTRACTS,
+    DOCUMENT_CONTRACTS,
     INTAKE_POLICY_V2_BENCHMARK_RULE_IDS,
     INTAKE_POLICY_V2_SCOPE_RULE_IDS,
     CandidateRecord,
@@ -20,6 +23,14 @@ from crispr_evidencerank.contracts import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _assert_exported_schema_matches_runtime(name, model):
+    schema_path = ROOT / "schemas" / f"{name}.schema.json"
+    exported_text = schema_path.read_text(encoding="utf-8")
+    expected_text = json.dumps(model.model_json_schema(), indent=2)
+    assert exported_text == expected_text
+    assert json.loads(exported_text) == model.model_json_schema()
 
 
 def base_event():
@@ -40,6 +51,7 @@ def base_event():
         "orthogonal_perturbation": False,
         "appropriate_control": True,
         "assay_adequate": True,
+        "null_result_evaluable": None,
         "phenotype_reproduced": True,
         "opposite_direction_reproduced": False,
         "rescue_performed": False,
@@ -55,17 +67,107 @@ def base_event():
     }
 
 
+def primary_event(label_code):
+    record = base_event()
+    record["label_code"] = label_code
+    if label_code == "V3":
+        record["rescue_performed"] = True
+    elif label_code == "F0":
+        record["phenotype_reproduced"] = False
+        record["null_result_evaluable"] = True
+    elif label_code == "D":
+        record["phenotype_reproduced"] = False
+        record["opposite_direction_reproduced"] = True
+    return record
+
+
 def test_exported_contract_schemas_match_runtime_models():
     for name, model in CONTRACTS.items():
-        exported = json.loads(
-            (ROOT / "schemas" / f"{name}.schema.json").read_text(encoding="utf-8")
+        _assert_exported_schema_matches_runtime(name, model)
+
+
+def test_exported_document_schemas_match_runtime_models():
+    assert "clinicaltrials_gov_snapshot_manifest" in DOCUMENT_CONTRACTS
+    for name, model in DOCUMENT_CONTRACTS.items():
+        _assert_exported_schema_matches_runtime(name, model)
+
+
+def test_snapshot_manifest_schema_hash_matches_packaged_build_metadata():
+    schema_path = ROOT / "schemas/clinicaltrials_gov_snapshot_manifest.schema.json"
+    build_metadata = json.loads(
+        (ROOT / "src/crispr_evidencerank/_build_metadata.json").read_text(
+            encoding="utf-8"
         )
-        assert exported == model.model_json_schema()
+    )
+    assert (
+        build_metadata["clinicaltrials_gov_snapshot_manifest_schema_sha256"]
+        == hashlib.sha256(schema_path.read_bytes()).hexdigest()
+    )
 
 
 def test_valid_v2_event():
     event = ValidationEventRecord.model_validate(base_event())
     assert event.label_code == "V2"
+
+
+@pytest.mark.parametrize("label_code", ["V2", "V3", "F0", "D"])
+def test_primary_validation_labels_accept_gold_core(label_code):
+    event = ValidationEventRecord.model_validate(primary_event(label_code))
+    assert event.label_code == label_code
+
+
+@pytest.mark.parametrize("label_code", ["V2", "V3", "F0", "D"])
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("testing_status", "unknown"),
+        ("perturbation_confirmed", False),
+        ("appropriate_control", False),
+        ("assay_adequate", False),
+    ],
+)
+def test_primary_validation_labels_require_shared_gold_core(label_code, field, value):
+    record = primary_event(label_code)
+    record[field] = value
+    with pytest.raises(ValueError):
+        ValidationEventRecord.model_validate(record)
+
+
+@pytest.mark.parametrize("label_code", ["V2", "V3", "F0", "D"])
+def test_primary_validation_labels_require_a_primary_reagent(label_code):
+    record = primary_event(label_code)
+    record["independent_reagent_count"] = 0
+    record["orthogonal_perturbation"] = True
+    with pytest.raises(ValueError):
+        ValidationEventRecord.model_validate(record)
+
+
+@pytest.mark.parametrize("label_code", ["V2", "V3", "F0", "D"])
+def test_primary_validation_labels_require_reagent_redundancy(label_code):
+    record = primary_event(label_code)
+    record["independent_reagent_count"] = 1
+    record["orthogonal_perturbation"] = False
+    with pytest.raises(ValueError):
+        ValidationEventRecord.model_validate(record)
+
+
+@pytest.mark.parametrize("label_code", ["V2", "V3", "F0", "D"])
+def test_primary_validation_labels_accept_one_reagent_with_orthogonal_confirmation(
+    label_code,
+):
+    record = primary_event(label_code)
+    record["independent_reagent_count"] = 1
+    record["orthogonal_perturbation"] = True
+    event = ValidationEventRecord.model_validate(record)
+    assert event.label_code == label_code
+
+
+@pytest.mark.parametrize("null_result_evaluable", [None, False])
+def test_f0_requires_an_evaluable_null_result(null_result_evaluable):
+    record = primary_event("F0")
+    record["null_result_evaluable"] = null_result_evaluable
+    with pytest.raises(ValueError):
+        ValidationEventRecord.model_validate(record)
 
 
 def test_v3_requires_rescue():
@@ -153,6 +255,28 @@ def test_validation_event_schema_contains_runtime_label_invariants():
         == "tested"
         for branch in schema["allOf"]
     )
+
+
+def test_label_policy_matches_primary_core_and_status_gate():
+    policy = yaml.safe_load((ROOT / "config/labels.yaml").read_text(encoding="utf-8"))
+    shared_primary_requirements = {
+        "testing_status_tested",
+        "perturbation_confirmed",
+        "appropriate_control",
+        "assay_adequate",
+        "at_least_one_primary_reagent",
+        "at_least_two_independent_reagents_or_orthogonal_perturbation",
+    }
+    for label_code in ("V2", "V3", "F0", "D"):
+        assert shared_primary_requirements <= set(
+            policy["labels"][label_code]["minimum_requirements"]
+        )
+    assert "null_result_evaluable" in policy["labels"]["F0"]["minimum_requirements"]
+    validation_policy = policy["validation_protocol_policy"]
+    assert validation_policy["status_strings_are_diagnostic_only"] is True
+    assert validation_policy["linked_gold_promotion_required"] is True
+    assert "consensus_adjudicated" in validation_policy["legacy_diagnostic_statuses"]
+    assert "benchmark_ready_statuses" not in validation_policy
 
 
 def test_registry_checks_orphan_events_and_evidence_chronology():
@@ -643,9 +767,25 @@ def test_registry_rejects_all_pass_ready_assertion_without_linked_facts():
     assert "labels.adjudicated_validation_event" in message
 
 
-def test_registry_accepts_ready_status_only_with_linked_fact_evidence():
+@pytest.mark.parametrize(
+    "adjudication_status",
+    [
+        "adjudicated",
+        "consensus",
+        "consensus_adjudicated",
+        "double_curated",
+        "dual_curator_consensus",
+        "approved_for_benchmark",
+        "verified_for_benchmark",
+    ],
+)
+def test_registry_fails_closed_for_legacy_adjudication_status_strings(
+    adjudication_status,
+):
+    facts = _ready_registry_facts()
+    facts["validation_events"].loc[0, "adjudication_status"] = adjudication_status
     errors = validate_registry_integrity(
-        **_ready_registry_facts(),
+        **facts,
         screen_intake=pd.DataFrame(
             [
                 _intake_row(
@@ -659,7 +799,8 @@ def test_registry_accepts_ready_status_only_with_linked_fact_evidence():
         ),
         eligibility_checks=pd.DataFrame(_passing_policy_checks("I1", "SC1")),
     )
-    assert errors.empty
+    message = "\n".join(errors["error"])
+    assert "labels.adjudicated_validation_event" in message
 
 
 def test_registry_does_not_treat_orcs_author_hit_as_validation_evidence():

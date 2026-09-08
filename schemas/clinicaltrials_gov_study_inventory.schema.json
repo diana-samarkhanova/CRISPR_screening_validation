@@ -1,0 +1,240 @@
+{
+  "additionalProperties": false,
+  "description": "Deterministic study projection from one frozen API page.\n\nThe inventory is an intake artifact, not normalized clinical evidence.  It\npreserves projected source strings, while exact null-versus-missing structure\nremains authoritative only in the retained raw JSON.  It cannot be used as a\nvalidation label or a success-model feature.",
+  "properties": {
+    "snapshot_id": {
+      "minLength": 1,
+      "title": "Snapshot Id",
+      "type": "string"
+    },
+    "source_study_id": {
+      "pattern": "^NCT\\d{8}$",
+      "title": "Source Study Id",
+      "type": "string"
+    },
+    "source_family_id": {
+      "minLength": 1,
+      "title": "Source Family Id",
+      "type": "string"
+    },
+    "source_asset_id": {
+      "minLength": 1,
+      "title": "Source Asset Id",
+      "type": "string"
+    },
+    "source_asset_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Source Asset Sha256",
+      "type": "string"
+    },
+    "source_page_index": {
+      "minimum": 1,
+      "title": "Source Page Index",
+      "type": "integer"
+    },
+    "source_study_index": {
+      "minimum": 0,
+      "title": "Source Study Index",
+      "type": "integer"
+    },
+    "source_version_holder": {
+      "anyOf": [
+        {
+          "pattern": "^\\d{4}(?:-\\d{2}(?:-\\d{2})?)?$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Version Holder"
+    },
+    "record_last_update_date": {
+      "anyOf": [
+        {
+          "pattern": "^\\d{4}(?:-\\d{2}(?:-\\d{2})?)?$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Record Last Update Date"
+    },
+    "study_first_post_date": {
+      "anyOf": [
+        {
+          "pattern": "^\\d{4}(?:-\\d{2}(?:-\\d{2})?)?$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Study First Post Date"
+    },
+    "results_first_post_date": {
+      "anyOf": [
+        {
+          "pattern": "^\\d{4}(?:-\\d{2}(?:-\\d{2})?)?$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Results First Post Date"
+    },
+    "source_study_type": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Study Type"
+    },
+    "source_overall_status": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Overall Status"
+    },
+    "source_brief_title": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Brief Title"
+    },
+    "source_official_title": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Official Title"
+    },
+    "source_phases_json": {
+      "title": "Source Phases Json",
+      "type": "string"
+    },
+    "source_conditions_json": {
+      "title": "Source Conditions Json",
+      "type": "string"
+    },
+    "source_keywords_json": {
+      "title": "Source Keywords Json",
+      "type": "string"
+    },
+    "source_design_json": {
+      "title": "Source Design Json",
+      "type": "string"
+    },
+    "source_interventions_json": {
+      "title": "Source Interventions Json",
+      "type": "string"
+    },
+    "source_arm_groups_json": {
+      "title": "Source Arm Groups Json",
+      "type": "string"
+    },
+    "population_scope_locator_candidates_json": {
+      "title": "Population Scope Locator Candidates Json",
+      "type": "string"
+    },
+    "population_scope_text_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Population Scope Text Sha256",
+      "type": "string"
+    },
+    "source_has_results": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Has Results"
+    },
+    "source_url": {
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Source Url",
+      "type": "string"
+    },
+    "retrieved_at_utc": {
+      "format": "date-time",
+      "title": "Retrieved At Utc",
+      "type": "string"
+    },
+    "tsv_formula_escape_applied": {
+      "title": "Tsv Formula Escape Applied",
+      "type": "boolean"
+    },
+    "normalization_status": {
+      "const": "raw_registry_inventory_only",
+      "default": "raw_registry_inventory_only",
+      "title": "Normalization Status",
+      "type": "string"
+    },
+    "used_for_label": {
+      "const": false,
+      "default": false,
+      "title": "Used For Label",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "snapshot_id",
+    "source_study_id",
+    "source_family_id",
+    "source_asset_id",
+    "source_asset_sha256",
+    "source_page_index",
+    "source_study_index",
+    "source_phases_json",
+    "source_conditions_json",
+    "source_keywords_json",
+    "source_design_json",
+    "source_interventions_json",
+    "source_arm_groups_json",
+    "population_scope_locator_candidates_json",
+    "population_scope_text_sha256",
+    "source_url",
+    "retrieved_at_utc",
+    "tsv_formula_escape_applied"
+  ],
+  "title": "ClinicalTrialsGovStudyInventoryRecord",
+  "type": "object"
+}

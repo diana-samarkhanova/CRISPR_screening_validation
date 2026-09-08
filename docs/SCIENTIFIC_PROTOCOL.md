@@ -156,7 +156,8 @@ mechanistically attractive genes. The benchmark therefore uses:
    only where the testing denominator is explicitly documented;
 2. a success model among tested genes;
 3. clipped inverse-propensity weights as a sensitivity analysis;
-4. unweighted and weighted results side by side;
+4. independent-provenance-group-balanced non-selection-IPW and clipped
+   selection-IPW results side by side;
 5. analyses restricted to studies reporting a reasonably complete testing
    denominator.
 
@@ -196,24 +197,39 @@ scoring that case study.
 
 ## Metrics
 
-Primary:
+Exactly one primary estimand and metric must be approved by the principal
+investigator and statistical lead and externally preregistered before real
+labels are analysed. `config/benchmark.yaml` records
+`study_macro_normalized_average_precision` as a design candidate, not as a
+completed preregistration. The outcome-completeness rule and target population
+must be frozen with that choice.
 
-- observed V2/V3 yield and recall at 5, 10, and 20 when the full candidate
-  universe is ranked;
-- observed NDCG@5, @10, and @20 over the full candidate universe;
-- macro average precision among screens with both explicit positive and
-  explicit negative validation outcomes, averaged within study and then across
-  studies;
-- uplift over MAGeCK rank, drugZ, effect size, and recurrence baselines.
+Secondary and diagnostic outputs include:
 
-Secondary:
+- global and study-macro AP with positive prevalence beside them;
+- AP above prevalence and `(AP - prevalence) / (1 - prevalence)`, with the
+  explicit limitation that this scaling does not make AP prevalence-invariant;
+- adjudicated precision/lift and NDCG with informative-query denominators;
+- strict top-k NDCG on rosters larger than k, plus standard full-roster NDCG
+  with a cutoff-saturation diagnostic;
+- `documented_success_*` capture, lift, recall, and NDCG, which count an unknown
+  outcome as not documented rather than as a biological failure;
+- direction-stratified results, conditional calibration diagnostics, and
+  quantile reliability bins;
+- source/raw-family cluster intervals, paired candidate-minus-comparator
+  intervals, and fixed-fold seed sensitivity.
 
-- precision and NDCG restricted to adjudicated genes, clearly labeled as such;
-- Brier score and calibration slope/intercept;
-- an explicitly named uncalibrated Brier diagnostic during development;
-- recall at the experimental validation budget;
-- study-clustered bootstrap confidence intervals;
-- failure rate among top-ranked candidates.
+The cluster sampled for an uncertainty interval and the unit used for a macro
+metric are distinct. The primary interval resamples connected source/raw-data
+families, but `study_macro_*` continues to average by study within each draw.
+Custom split groups are always unioned through source/raw-family links before
+fold assignment; they cannot override provenance independence.
+
+All inferential within-query ranking summaries exclude adjudicated queries with
+only one target class and report them separately. Top-k ties use fractional
+expected relevance at the cutoff, so a row permutation cannot change the
+answer. Candidate-minus-comparator intervals require complete finite scores on
+one common roster; methods are never compared on independently filtered rows.
 
 Bootstrap query identifiers are tuple-valued, so user-supplied delimiters cannot
 merge independent queries. Every interval reports its own effective number of
@@ -225,10 +241,15 @@ AUROC is descriptive, not a primary metric.
 No score is presented as a calibrated probability until nested calibration and
 prospective calibration have been completed.
 
-Untested genes are not biological negatives. Full-universe metrics therefore
-use the term **observed success yield**, not precision: they measure recovery of
-documented V2/V3 events and are a selection-biased lower bound on the true
-validation yield.
+Untested genes are not biological negatives. Full-universe diagnostics use the
+term **documented success**, not observed validation yield: they measure
+recovery of documented V2/V3 events and remain ascertainment-sensitive. They
+cannot be primary until the tested/outcome-complete denominator is defined.
+
+Precision@k is undefined when `k` covers the complete evaluated roster because
+it then equals prevalence and has no ranking resolution. Full-roster NDCG is
+still rank-sensitive; it is retained once, while the report separately shows
+whether each requested cutoff was unsaturated.
 
 ## Ablations
 
@@ -244,6 +265,73 @@ Report:
 
 This prevents a biologically popular gene from appearing reproducible solely
 because it has more papers.
+
+## Auxiliary immune-context analysis
+
+Apply immune-context analysis only after the primary screen-signal ranking and
+retain it as a separate report. The query unit is
+`gene × modality × compartment × phenotype stratum × analysis tail`.
+
+For every comparison, curate the perturbed compartment, exact cell model,
+species and orthology, in-vitro/in-vivo setting, treatment and comparator,
+phenotype endpoint, timepoint, native effect direction, endpoint polarity,
+source/raw-data families, source snapshot, and transformation date. A sign is
+interpretable only after the contrast and endpoint polarity are explicit.
+ICRAFT's CRISPRa display inversion is never used as a native biological effect.
+
+Quantitative support is restricted to human evidence or versioned one-to-one
+orthology. Collapse reanalyses first through raw-data families and then through
+source families; report record, raw-family, source-family, and conservative
+independent-component counts separately. Exclude the target screen and every
+sibling source/raw family before recurrence. For historical evaluation, use
+only rows whose source, provider snapshot, and transformation were all
+available by the cutoff.
+
+De novo order-statistic RRA is permitted only within one explicitly selected
+recurrence stratum. A rank-list declaration must be verified by observing one
+unique gene at every rank from 1 through the declared gene-universe size. At
+least two independent provenance components are required. Top-hit subsets,
+incomplete lists, mixed tails, or unverified rosters return an abstention with
+a null p-value.
+
+Dual-action classification requires an explicit `dual_action_group_id` plus a
+versioned, reviewed `dual_action_group_version`, the same perturbation modality
+in both compartments, functional CRISPR evidence in both tumor and immune
+cells, and no unresolved within-family conflict. Use
+`dual_benefit_candidate`, not “validated dual-action target.” scRNA-seq,
+DepMap/CCLE, TCGA, and ICB-response associations annotate expression, safety,
+or clinical context but do not count as functional support or validation.
+The software verifies the declared group version and semantic compatibility;
+it cannot authenticate the claimed human review, which remains a provenance
+and governance requirement.
+
+For olaparib KO screens, keep the drug-response axis independent. KO enrichment
+under olaparib denotes candidate loss-induced resistance; favorable immune
+evidence does not turn that gene into an inhibitor target. Report the result as
+a PARPi–immune trade-off when the two axes disagree.
+
+## Clinical treatment-by-cancer registry context
+
+Run the clinical registry report independently of gene ranking. Define one
+versioned treatment concept, one versioned cancer concept, a cutoff date, and a
+checksum-pinned source asset. Do not match by a drug substring, pharmacologic
+class, broad parent cancer, comparator mention, prior-treatment mention, or
+unreviewed model suggestion.
+
+The eligible landscape contains curator-reviewed exact treatment and cancer
+mappings from interventional records in which the treatment has the
+experimental role. Report distinct source-family counts by status, phase,
+regimen, and whether aggregate results are posted. Do not treat a completed
+study as successful, absent posted results as a negative effect, or a
+combination outcome as attributable to one component. Zero eligible records
+means only that none were observed in the supplied frozen snapshot.
+
+ClinicalTrials.gov registry metadata remain study-level evidence. Regulatory
+indications, endpoint-level aggregate effects, primary publications, and
+treatment-linked patient molecular cohorts require separate contracts and
+claim-specific rules. TCGA/GDC data without documented treatment exposure and
+response may provide disease context or prognostic association, but cannot
+validate an olaparib-response biomarker.
 
 ## Prospective experiment
 
